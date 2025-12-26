@@ -96,17 +96,17 @@ export function Session() {
                             Invite / Manage
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-card border-white/10">
+                    <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
                         <DialogHeader>
                             <DialogTitle>Add to Plan</DialogTitle>
                         </DialogHeader>
-                         <div className="space-y-6 pt-4">
+                         <div className="space-y-6 pt-4 overflow-y-auto max-h-[60vh] pr-1">
                             {/* Share Link */}
                             <div className="space-y-2 pb-4 border-b border-white/10">
                                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Share Plan Link</h4>
-                                <div className="flex flex-col gap-2">
-                                    <div className="flex gap-2">
-                                        <div className="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
+                                <div className="flex flex-col gap-2 w-full">
+                                    <div className="flex gap-2 w-full">
+                                        <div className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
                                             {window.location.origin}/join-plan/{session.inviteCode}
                                         </div>
                                     </div>
