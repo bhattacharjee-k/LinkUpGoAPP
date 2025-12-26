@@ -5,17 +5,20 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon, Clock, ChevronRight, MapPin, DollarSign } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, ChevronRight, MapPin, DollarSign, UserPlus, Users, Link as LinkIcon, Check, Copy } from 'lucide-react';
 import { City, Budget, Energy, Category } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from '@/hooks/use-toast';
 
 export function NewPlan() {
-  const { startSession, user } = useApp();
+  const { startSession, user, groups, addParticipantToSession } = useApp();
   const [_, setLocation] = useLocation();
   const [step, setStep] = useState(1);
+  const { toast } = useToast();
   
   const [formData, setFormData] = useState({
     date: new Date(),
@@ -26,13 +29,20 @@ export function NewPlan() {
     budget: '$$' as Budget,
     energy: user?.energy || 'Social',
     categories: [] as Category[],
+    participants: [user?.id || 'me'], // Current user is always a participant
   });
+
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [newParticipantName, setNewParticipantName] = useState('');
+
+  // Find user's primary group or first available group
+  const userGroup = groups.find(g => g.members.includes(user?.id || 'me')) || groups[0];
 
   const handleCreate = () => {
     if (!user) return;
     
     // Format "Day-TimeBlock" approximation for the MVP data model compatibility
-    // In a real app we'd switch to real timestamps, but for this mock we'll map roughly
     const hour = parseInt(formData.timeStart.split(':')[0]);
     let timeWindow = 'Fri-Night'; // Default fallback
     
@@ -43,16 +53,23 @@ export function NewPlan() {
     
     timeWindow = `${dayName}-${timeBlock}`;
 
-    const id = startSession('g1', {
-        timeWindow, // Using the computed window for compatibility
+    const id = startSession('g1', { // Using g1 as placeholder, real app would let you pick group context
+        timeWindow, 
         locationScope: formData.locationScope,
         category: formData.categories.length > 0 ? formData.categories : ['Drinks'],
         energy: formData.energy,
         budget: formData.budget,
-        // New fields for specific time would go here in a real backend
         specificDate: formData.date,
         specificTime: `${formData.timeStart}-${formData.timeEnd}`
     });
+
+    // Add selected participants to the new session
+    formData.participants.forEach(pid => {
+        if (pid !== user.id) {
+            addParticipantToSession(id, pid);
+        }
+    });
+
     setLocation(`/session/${id}`);
   };
 
@@ -65,6 +82,30 @@ export function NewPlan() {
     }));
   };
 
+  const handleAddParticipant = () => {
+    if (!newParticipantName.trim()) return;
+    const mockId = `user-${Math.random().toString(36).substr(2, 5)}`;
+    // In a real app, this would validate the user exists first
+    setFormData(prev => ({
+        ...prev,
+        participants: [...prev.participants, mockId]
+    }));
+    setNewParticipantName('');
+    toast({ title: "Added", description: "User added to plan list." });
+  };
+
+  const toggleParticipant = (pid: string) => {
+      setFormData(prev => {
+          const isSelected = prev.participants.includes(pid);
+          return {
+              ...prev,
+              participants: isSelected 
+                ? prev.participants.filter(p => p !== pid)
+                : [...prev.participants, pid]
+          };
+      });
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col px-6 py-6 relative overflow-hidden">
       <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-purple-500/20 rounded-full blur-[100px]" />
@@ -75,12 +116,85 @@ export function NewPlan() {
                 ← Cancel
             </Button>
             <h1 className="text-3xl font-display font-bold mt-2">New Plan</h1>
-            <p className="text-muted-foreground">Set the time, then finding the vibe.</p>
+            <p className="text-muted-foreground">Who, when, and what's the vibe?</p>
         </div>
 
         <div className="space-y-8 flex-1">
-            {/* Date & Time Selection */}
+            
+            {/* Participants Section */}
             <div className="space-y-4">
+                <Label className="text-lg flex justify-between items-center">
+                    Who's going?
+                    <span className="text-xs text-muted-foreground font-normal">{formData.participants.length} selected</span>
+                </Label>
+                
+                <div className="flex flex-wrap gap-2">
+                    {/* Add Button */}
+                    <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" className="rounded-full h-10 w-10 p-0 border-dashed border-white/30 bg-white/5">
+                                <UserPlus size={16} />
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-card border-white/10">
+                            <DialogHeader>
+                                <DialogTitle>Add to Plan</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 pt-4">
+                                <div className="space-y-2">
+                                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">From {userGroup.name}</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {userGroup.members.map(m => (
+                                            <Button 
+                                                key={m} 
+                                                variant={formData.participants.includes(m) ? "default" : "outline"} 
+                                                size="sm" 
+                                                onClick={() => toggleParticipant(m)} 
+                                                className="text-xs h-8"
+                                            >
+                                                {m === user?.id ? 'You' : m.substr(0,4)}
+                                                {formData.participants.includes(m) && <Check size={12} className="ml-1" />}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                     <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Add by Name</h4>
+                                     <div className="flex gap-2">
+                                        <Input 
+                                            placeholder="@username" 
+                                            className="bg-white/5 border-white/10" 
+                                            value={newParticipantName}
+                                            onChange={e => setNewParticipantName(e.target.value)}
+                                        />
+                                        <Button onClick={handleAddParticipant} disabled={!newParticipantName}>Add</Button>
+                                     </div>
+                                </div>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+
+                    {/* Selected Avatars */}
+                    {formData.participants.map((pid, i) => (
+                        <div key={pid} className="relative group">
+                            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-blue-500/20 border border-white/10 flex items-center justify-center text-xs font-bold">
+                                {pid === user?.id ? 'ME' : `U${i}`}
+                            </div>
+                            {pid !== user?.id && (
+                                <button 
+                                    onClick={() => toggleParticipant(pid)}
+                                    className="absolute -top-1 -right-1 bg-red-500 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <Users size={8} className="text-white" />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Date & Time Selection */}
+            <div className="space-y-4 pt-4 border-t border-white/10">
                 <Label className="text-lg">When?</Label>
                 
                 <div className="flex gap-4">
