@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Onboarding } from "@/pages/onboarding";
 import { Home } from "@/pages/home";
 import { Session } from "@/pages/session";
+import { NewPlan } from "@/pages/new-plan";
 import { useEffect } from "react";
 
 function PrivateRoute({ component: Component }: { component: React.ComponentType }) {
@@ -18,30 +19,6 @@ function PrivateRoute({ component: Component }: { component: React.ComponentType
 
   if (!user) return null;
   return <Component />;
-}
-
-
-function NewSessionHandler() {
-  const { startSession, user } = useApp();
-  const [_, setLocation] = useLocation();
-
-  useEffect(() => {
-    // Auto-create a session for demo purposes
-    if (user) {
-        const id = startSession('g1', {
-            timeWindow: 'Fri-Night',
-            locationScope: user.city,
-            category: ['Drinks'],
-            energy: 'Social',
-            budget: '$$'
-        });
-        setLocation(`/session/${id}`);
-    } else {
-        setLocation('/onboarding');
-    }
-  }, [user, startSession, setLocation]);
-
-  return <div className="flex items-center justify-center h-screen">Initializing Planner...</div>;
 }
 
 function Router() {
@@ -60,7 +37,9 @@ function Router() {
       </Route>
       
       {/* New Session Creation Mock */}
-      <Route path="/new-session" component={NewSessionHandler} />
+      <Route path="/new-session">
+        <PrivateRoute component={NewPlan} />
+      </Route>
 
       <Route path="/session/:id" component={Session} />
       

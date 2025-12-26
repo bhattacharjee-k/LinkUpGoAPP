@@ -19,7 +19,7 @@ export interface UserProfile {
   energy: Energy;
   categories: Category[];
   hardNos: string[];
-  availability: Availability;
+  // availability removed from profile, now session specific
 }
 
 export interface Group {
@@ -94,12 +94,14 @@ const MOCK_USER: UserProfile = {
   energy: 'Social',
   categories: ['Dinner', 'Drinks'],
   hardNos: ['Dive bars', 'Seafood'],
+  /* Availability removed from mock
   availability: {
     'Fri-Evening': true,
     'Fri-Night': true,
     'Sat-Evening': true,
     'Sat-Night': true,
   },
+  */
 };
 
 export const MOCK_GROUPS: Group[] = [

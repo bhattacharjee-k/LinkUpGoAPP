@@ -20,11 +20,10 @@ export function Onboarding() {
     budget: ['$$'] as Budget[],
     energy: 'Social' as Energy,
     categories: [] as Category[],
-    availability: {} as Record<string, boolean>,
   });
 
   const handleNext = () => {
-    if (step < 4) {
+    if (step < 3) {
       setStep(step + 1);
     } else {
       // Finish
@@ -55,19 +54,6 @@ export function Onboarding() {
     }));
   };
 
-  const toggleAvailability = (day: string, time: string) => {
-    const key = `${day}-${time}`;
-    setFormData(prev => {
-      const newAvail = { ...prev.availability };
-      if (newAvail[key]) delete newAvail[key];
-      else newAvail[key] = true;
-      return { ...prev, availability: newAvail };
-    });
-  };
-
-  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const TIMES = ['Evening', 'Night'];
-
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center px-6 py-10 relative overflow-hidden">
       <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
@@ -80,12 +66,11 @@ export function Onboarding() {
         className="z-10 w-full max-w-md mx-auto space-y-8"
       >
         <div className="space-y-2">
-          <div className="text-primary font-bold tracking-widest text-xs uppercase">Step {step} of 4</div>
+          <div className="text-primary font-bold tracking-widest text-xs uppercase">Step {step} of 3</div>
           <h1 className="text-4xl font-display font-bold text-white leading-tight">
             {step === 1 && "Let's get your profile set up."}
             {step === 2 && "What's your vibe?"}
-            {step === 3 && "When are you free?"}
-            {step === 4 && "What do you like to do?"}
+            {step === 3 && "What do you like to do?"}
           </h1>
         </div>
 
@@ -162,37 +147,6 @@ export function Onboarding() {
 
         {step === 3 && (
           <div className="space-y-4">
-            <p className="text-muted-foreground text-sm">Recurring availability helps us suggest times that actually work.</p>
-            <div className="grid grid-cols-[auto_1fr_1fr] gap-2 text-sm">
-              <div className="font-mono text-xs text-muted-foreground py-2"></div>
-              {TIMES.map(t => <div key={t} className="text-center text-xs font-bold text-muted-foreground">{t}</div>)}
-              
-              {DAYS.map(day => (
-                <React.Fragment key={day}>
-                  <div className="flex items-center font-bold text-muted-foreground">{day}</div>
-                  {TIMES.map(time => {
-                    const isActive = formData.availability[`${day}-${time}`];
-                    return (
-                      <button
-                        key={`${day}-${time}`}
-                        onClick={() => toggleAvailability(day, time)}
-                        className={cn(
-                          "h-10 rounded-md border transition-all",
-                          isActive 
-                            ? "bg-primary border-primary shadow-[0_0_10px_rgba(124,58,237,0.5)]" 
-                            : "bg-white/5 border-white/10 hover:bg-white/10"
-                        )}
-                      />
-                    );
-                  })}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {step === 4 && (
-          <div className="space-y-4">
              <div className="grid grid-cols-2 gap-3">
               {['Dinner', 'Drinks', 'Activity', 'Club', 'Brunch', 'Cafe'].map((c) => (
                 <button
@@ -215,7 +169,7 @@ export function Onboarding() {
           className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/20"
           disabled={step === 1 && !formData.name}
         >
-          {step === 4 ? "Complete Profile" : "Next"} <ChevronRight className="ml-2" />
+          {step === 3 ? "Complete Profile" : "Next"} <ChevronRight className="ml-2" />
         </Button>
       </motion.div>
     </div>

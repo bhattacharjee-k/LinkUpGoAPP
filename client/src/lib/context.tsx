@@ -16,7 +16,6 @@ interface AppContextType {
   addMessage: (sessionId: string, text: string) => void;
   voteForSuggestion: (sessionId: string, suggestionId: string, vote: 'yes' | 'no' | 'fire') => void;
   confirmPlan: (sessionId: string, suggestionId: string) => void;
-  toggleAvailability: (dayTime: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -130,20 +129,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
   };
   
-  const toggleAvailability = (dayTime: string) => {
-    if (!user) return;
-    const newAvail = { ...user.availability };
-    if (newAvail[dayTime]) {
-      delete newAvail[dayTime];
-    } else {
-      newAvail[dayTime] = true;
-    }
-    setUser({ ...user, availability: newAvail });
-  };
-
   return (
     <AppContext.Provider value={{ 
-      user, groups, sessions, setUser, createGroup, startSession, getSession, addMessage, voteForSuggestion, confirmPlan, toggleAvailability 
+      user, groups, sessions, setUser, createGroup, startSession, getSession, addMessage, voteForSuggestion, confirmPlan 
     }}>
       {children}
     </AppContext.Provider>
