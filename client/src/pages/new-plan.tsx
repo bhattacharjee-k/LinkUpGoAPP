@@ -78,13 +78,36 @@ export function NewPlan() {
 
   const handleCopyLink = () => {
     const link = `${window.location.origin}/join-plan/${draftInviteCode}`;
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    toast({
-        title: "Link copied!",
-        description: "Note: Link will be active once you create the plan.",
-    });
+    const message = `Let's plan together — join my plan: ${link}`;
+    
+    // Try to use Web Share API if available (works on mobile)
+    if (navigator.share) {
+        navigator.share({
+            title: 'Join my plan',
+            text: `Let's plan together — join my plan:`,
+            url: link,
+        }).then(() => {
+             toast({ title: "Shared successfully!" });
+        }).catch(() => {
+             // Fallback to clipboard if share cancelled or failed
+             navigator.clipboard.writeText(message);
+             setCopied(true);
+             setTimeout(() => setCopied(false), 2000);
+             toast({
+                title: "Link & Message copied!",
+                description: "Paste it to your friends.",
+            });
+        });
+    } else {
+        // Fallback for desktop
+        navigator.clipboard.writeText(message);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        toast({
+            title: "Link & Message copied!",
+            description: "Paste it to your friends.",
+        });
+    }
   };
 
   const toggleCategory = (c: Category) => {
