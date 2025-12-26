@@ -1,5 +1,3 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 
 // --- Types ---
 export type City = 'NYC' | 'Chicago';
@@ -104,7 +102,7 @@ const MOCK_USER: UserProfile = {
   },
 };
 
-const MOCK_GROUPS: Group[] = [
+export const MOCK_GROUPS: Group[] = [
   { id: 'g1', name: 'Tech Founders NYC', members: ['me', 'u2', 'u3', 'u4'] },
   { id: 'g2', name: 'West Loop Crew', members: ['me', 'u5', 'u6'] },
 ];

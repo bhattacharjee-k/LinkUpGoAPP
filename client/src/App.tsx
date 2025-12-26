@@ -20,6 +20,30 @@ function PrivateRoute({ component: Component }: { component: React.ComponentType
   return <Component />;
 }
 
+
+function NewSessionHandler() {
+  const { startSession, user } = useApp();
+  const [_, setLocation] = useLocation();
+
+  useEffect(() => {
+    // Auto-create a session for demo purposes
+    if (user) {
+        const id = startSession('g1', {
+            timeWindow: 'Fri-Night',
+            locationScope: user.city,
+            category: ['Drinks'],
+            energy: 'Social',
+            budget: '$$'
+        });
+        setLocation(`/session/${id}`);
+    } else {
+        setLocation('/onboarding');
+    }
+  }, [user, startSession, setLocation]);
+
+  return <div className="flex items-center justify-center h-screen">Initializing Planner...</div>;
+}
+
 function Router() {
   const { user } = useApp();
   
@@ -36,24 +60,7 @@ function Router() {
       </Route>
       
       {/* New Session Creation Mock */}
-      <Route path="/new-session">
-        {() => {
-            const { startSession, user } = useApp();
-            const [_, setLocation] = useLocation();
-            useEffect(() => {
-                // Auto-create a session for demo purposes
-                const id = startSession('g1', {
-                    timeWindow: 'Fri-Night',
-                    locationScope: user?.city || 'NYC',
-                    category: ['Drinks'],
-                    energy: 'Social',
-                    budget: '$$'
-                });
-                setLocation(`/session/${id}`);
-            }, []);
-            return <div className="flex items-center justify-center h-screen">Initializing Planner...</div>
-        }}
-      </Route>
+      <Route path="/new-session" component={NewSessionHandler} />
 
       <Route path="/session/:id" component={Session} />
       
