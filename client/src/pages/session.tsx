@@ -87,74 +87,89 @@ export function Session() {
           </div>
 
           {/* Participants Bar */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center -space-x-2 overflow-hidden py-1">
-                {participants.map((pid, i) => (
-                    <Avatar key={pid} className="w-8 h-8 border-2 border-background">
-                        <AvatarFallback className="text-[10px] bg-white/10">
-                            {pid === user?.id ? 'ME' : `U${i}`}
-                        </AvatarFallback>
-                    </Avatar>
-                ))}
+          <div className="flex flex-col gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+            <div className="flex justify-between items-center">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Who's Going</span>
+                <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                    <DialogTrigger asChild>
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px] text-primary hover:text-primary hover:bg-primary/10 -mr-2">
+                            Invite / Manage
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-card border-white/10">
+                        <DialogHeader>
+                            <DialogTitle>Add to Plan</DialogTitle>
+                        </DialogHeader>
+                         <div className="space-y-6 pt-4">
+                            {/* Share Link */}
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Share Plan Link</h4>
+                                <div className="flex gap-2">
+                                    <div className="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
+                                        {window.location.origin}/join-plan/{session.inviteCode}
+                                    </div>
+                                    <Button size="icon" variant="outline" onClick={handleCopyLink} className="border-white/10">
+                                        {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Add from Group */}
+                            {group && (
+                                <div className="space-y-2">
+                                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">From {group.name}</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {group.members.filter(m => !participants.includes(m)).map(m => (
+                                            <Button key={m} variant="outline" size="sm" onClick={() => handleAddGroupMember(m)} className="text-xs h-7 border-white/10">
+                                                + {m.substr(0,4)}
+                                            </Button>
+                                        ))}
+                                        {group.members.every(m => participants.includes(m)) && (
+                                            <p className="text-xs text-muted-foreground italic">All group members added</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Direct Add */}
+                            <div className="space-y-2">
+                                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Invite by Name/Email</h4>
+                                 <div className="flex gap-2">
+                                    <Input 
+                                        placeholder="@username" 
+                                        className="bg-white/5 border-white/10" 
+                                        value={newParticipantName}
+                                        onChange={e => setNewParticipantName(e.target.value)}
+                                    />
+                                    <Button onClick={handleAddParticipant} disabled={!newParticipantName}>Add</Button>
+                                 </div>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
             
-            <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-                <DialogTrigger asChild>
-                    <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-white/10 bg-white/5">
-                        <UserPlus size={12} /> Add Friends
-                    </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-card border-white/10">
-                    <DialogHeader>
-                        <DialogTitle>Add to Plan</DialogTitle>
-                    </DialogHeader>
-                     <div className="space-y-6 pt-4">
-                        {/* Share Link */}
-                        <div className="space-y-2">
-                            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Share Plan Link</h4>
-                            <div className="flex gap-2">
-                                <div className="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
-                                    {window.location.origin}/join-plan/{session.inviteCode}
-                                </div>
-                                <Button size="icon" variant="outline" onClick={handleCopyLink} className="border-white/10">
-                                    {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Add from Group */}
-                        {group && (
-                            <div className="space-y-2">
-                                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">From {group.name}</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {group.members.filter(m => !participants.includes(m)).map(m => (
-                                        <Button key={m} variant="outline" size="sm" onClick={() => handleAddGroupMember(m)} className="text-xs h-7 border-white/10">
-                                            + {m.substr(0,4)}
-                                        </Button>
-                                    ))}
-                                    {group.members.every(m => participants.includes(m)) && (
-                                        <p className="text-xs text-muted-foreground italic">All group members added</p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Direct Add */}
-                        <div className="space-y-2">
-                             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Invite by Name/Email</h4>
-                             <div className="flex gap-2">
-                                <Input 
-                                    placeholder="@username" 
-                                    className="bg-white/5 border-white/10" 
-                                    value={newParticipantName}
-                                    onChange={e => setNewParticipantName(e.target.value)}
-                                />
-                                <Button onClick={handleAddParticipant} disabled={!newParticipantName}>Add</Button>
-                             </div>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center -space-x-2 overflow-hidden">
+                    {participants.map((pid, i) => (
+                        <Avatar key={pid} className="w-8 h-8 border-2 border-background">
+                            <AvatarFallback className="text-[10px] bg-white/10">
+                                {pid === user?.id ? 'ME' : `U${i}`}
+                            </AvatarFallback>
+                        </Avatar>
+                    ))}
+                    <button 
+                        onClick={() => setInviteOpen(true)}
+                        className="w-8 h-8 rounded-full bg-white/5 border-2 border-dashed border-white/20 flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors ml-2"
+                    >
+                        <UserPlus size={12} />
+                    </button>
+                </div>
+                
+                <Button size="sm" variant="secondary" className="h-8 text-xs bg-white/10 hover:bg-white/20 border-0" onClick={handleCopyLink}>
+                    <LinkIcon size={12} className="mr-2" /> Send Link
+                </Button>
+            </div>
           </div>
         </div>
 
