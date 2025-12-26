@@ -7,17 +7,24 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
-import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from '@/hooks/use-toast';
 
 export function Session() {
   const [match, params] = useRoute('/session/:id');
-  const { getSession, addMessage, voteForSuggestion, confirmPlan, user } = useApp();
+  const { getSession, addMessage, voteForSuggestion, confirmPlan, addParticipantToSession, user, groups } = useApp();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
   
   const session = getSession(params?.id || '');
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [newParticipantName, setNewParticipantName] = useState('');
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -33,21 +40,122 @@ export function Session() {
     setInput('');
   };
 
+  const handleCopyLink = () => {
+    const link = `${window.location.origin}/join-plan/${session.inviteCode}`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({
+        title: "Plan link copied!",
+        description: "Send this to friends to join this specific plan.",
+    });
+  };
+
+  const handleAddParticipant = () => {
+    if (!newParticipantName.trim()) return;
+    const mockId = `user-${Math.random().toString(36).substr(2, 5)}`;
+    addParticipantToSession(session.id, mockId);
+    setNewParticipantName('');
+    toast({ title: "Added to plan", description: "User added to this session." });
+    setInviteOpen(false);
+  };
+
+  const handleAddGroupMember = (memberId: string) => {
+      addParticipantToSession(session.id, memberId);
+      toast({ title: "Added", description: "Group member added to plan." });
+  };
+
+  const group = groups.find(g => g.id === session.groupId);
+  const participants = session.participants || [];
+
   return (
     <Layout hideNav>
       <div className="flex flex-col h-screen max-h-screen">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-white/10 bg-background/80 backdrop-blur-md z-20 flex justify-between items-center">
-          <div>
-            <h2 className="font-bold text-lg">Planning Session</h2>
-            <p className="text-xs text-muted-foreground flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"/> 
-              {session.status === 'planning' ? 'Live Voting' : 'Plan Confirmed'}
-            </p>
+        <div className="px-6 py-4 border-b border-white/10 bg-background/80 backdrop-blur-md z-20 space-y-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="font-bold text-lg leading-tight">Planning Session</h2>
+              <p className="text-xs text-muted-foreground flex items-center gap-2">
+                <span className={cn("w-2 h-2 rounded-full animate-pulse", session.status === 'planning' ? "bg-green-500" : "bg-blue-500")}/> 
+                {session.status === 'planning' ? 'Live Voting' : 'Plan Confirmed'}
+              </p>
+            </div>
+            {session.finalChoiceId && (
+              <Badge className="bg-primary text-white border-none">CONFIRMED</Badge>
+            )}
           </div>
-          {session.finalChoiceId && (
-            <Badge className="bg-primary text-white border-none">CONFIRMED</Badge>
-          )}
+
+          {/* Participants Bar */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center -space-x-2 overflow-hidden py-1">
+                {participants.map((pid, i) => (
+                    <Avatar key={pid} className="w-8 h-8 border-2 border-background">
+                        <AvatarFallback className="text-[10px] bg-white/10">
+                            {pid === user?.id ? 'ME' : `U${i}`}
+                        </AvatarFallback>
+                    </Avatar>
+                ))}
+            </div>
+            
+            <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                <DialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-white/10 bg-white/5">
+                        <UserPlus size={12} /> Add Friends
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-white/10">
+                    <DialogHeader>
+                        <DialogTitle>Add to Plan</DialogTitle>
+                    </DialogHeader>
+                     <div className="space-y-6 pt-4">
+                        {/* Share Link */}
+                        <div className="space-y-2">
+                            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Share Plan Link</h4>
+                            <div className="flex gap-2">
+                                <div className="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
+                                    {window.location.origin}/join-plan/{session.inviteCode}
+                                </div>
+                                <Button size="icon" variant="outline" onClick={handleCopyLink} className="border-white/10">
+                                    {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Add from Group */}
+                        {group && (
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">From {group.name}</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {group.members.filter(m => !participants.includes(m)).map(m => (
+                                        <Button key={m} variant="outline" size="sm" onClick={() => handleAddGroupMember(m)} className="text-xs h-7 border-white/10">
+                                            + {m.substr(0,4)}
+                                        </Button>
+                                    ))}
+                                    {group.members.every(m => participants.includes(m)) && (
+                                        <p className="text-xs text-muted-foreground italic">All group members added</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Direct Add */}
+                        <div className="space-y-2">
+                             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Invite by Name/Email</h4>
+                             <div className="flex gap-2">
+                                <Input 
+                                    placeholder="@username" 
+                                    className="bg-white/5 border-white/10" 
+                                    value={newParticipantName}
+                                    onChange={e => setNewParticipantName(e.target.value)}
+                                />
+                                <Button onClick={handleAddParticipant} disabled={!newParticipantName}>Add</Button>
+                             </div>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <Tabs defaultValue="suggestions" className="flex-1 flex flex-col overflow-hidden">

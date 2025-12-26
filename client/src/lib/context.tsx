@@ -17,6 +17,7 @@ interface AppContextType {
   voteForSuggestion: (sessionId: string, suggestionId: string, vote: 'yes' | 'no' | 'fire') => void;
   confirmPlan: (sessionId: string, suggestionId: string) => void;
   addMemberToGroup: (groupId: string, userId: string) => void;
+  addParticipantToSession: (sessionId: string, userId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -55,6 +56,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
+  const addParticipantToSession = (sessionId: string, userId: string) => {
+    setSessions(prev => prev.map(s => {
+        if (s.id !== sessionId) return s;
+        if (s.participants?.includes(userId)) return s;
+        // Also ensure they are in the group? Not strictly required for MVP but good practice
+        // For now just add to session
+        return { ...s, participants: [...(s.participants || []), userId] };
+    }));
+  };
+
   const startSession = (groupId: string, initialFilters: any) => {
     const newSession: PlanningSession = {
       id: Math.random().toString(36).substr(2, 9),
@@ -66,6 +77,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         priority: 'turnout',
       },
       suggestions: MOCK_SUGGESTIONS.map(s => ({...s, votes: {}})), // Reset votes
+      participants: [user?.id || 'me'], // Creator is participant
+      inviteCode: Math.random().toString(36).substr(2, 6).toUpperCase(),
       messages: [
         { id: 'msg1', sender: 'system', text: 'Planning session started. @Planner is listening.', timestamp: Date.now() }
       ],
@@ -141,7 +154,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   
   return (
     <AppContext.Provider value={{ 
-      user, groups, sessions, setUser, createGroup, startSession, getSession, addMessage, voteForSuggestion, confirmPlan, addMemberToGroup 
+      user, groups, sessions, setUser, createGroup, startSession, getSession, addMessage, voteForSuggestion, confirmPlan, addMemberToGroup, addParticipantToSession 
     }}>
       {children}
     </AppContext.Provider>

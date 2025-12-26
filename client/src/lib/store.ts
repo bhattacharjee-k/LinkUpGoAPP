@@ -67,6 +67,8 @@ export interface PlanningSession {
   suggestions: Suggestion[];
   messages: ChatMessage[];
   finalChoiceId?: string;
+  participants: string[]; // User IDs specific to this session
+  inviteCode?: string; // Session specific invite
 }
 
 // --- Store ---

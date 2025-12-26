@@ -46,6 +46,31 @@ function JoinRoute() {
     return <div className="flex items-center justify-center h-screen">Joining group...</div>;
 }
 
+function JoinPlanRoute() {
+    const [match, params] = useRoute('/join-plan/:code');
+    const { sessions, addParticipantToSession, addMemberToGroup, user } = useApp();
+    const [_, setLocation] = useLocation();
+    
+    useEffect(() => {
+        if (params?.code && user) {
+            const session = sessions.find(s => s.inviteCode === params.code);
+            if (session) {
+                // Add to session
+                addParticipantToSession(session.id, user.id);
+                // Also implicit add to group if not already
+                addMemberToGroup(session.groupId, user.id);
+                setLocation(`/session/${session.id}`);
+            } else {
+                setLocation('/');
+            }
+        } else if (!user) {
+            setLocation('/onboarding');
+        }
+    }, [params, user, sessions]);
+
+    return <div className="flex items-center justify-center h-screen">Joining plan...</div>;
+}
+
 function Router() {
   const { user } = useApp();
   
@@ -61,6 +86,7 @@ function Router() {
         <PrivateRoute component={GroupDetails} />
       </Route>
       <Route path="/join/:code" component={JoinRoute} />
+      <Route path="/join-plan/:code" component={JoinPlanRoute} />
 
       <Route path="/profile">
         <PrivateRoute component={Home} />
