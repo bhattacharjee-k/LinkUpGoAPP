@@ -16,6 +16,7 @@ interface AppContextType {
   addMessage: (sessionId: string, text: string) => void;
   voteForSuggestion: (sessionId: string, suggestionId: string, vote: 'yes' | 'no' | 'fire') => void;
   confirmPlan: (sessionId: string, suggestionId: string) => void;
+  addMemberToGroup: (groupId: string, userId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -41,8 +42,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       id: Math.random().toString(36).substr(2, 9),
       name,
       members: [user?.id || 'me'],
+      inviteCode: Math.random().toString(36).substr(2, 6).toUpperCase(),
     };
     setGroups([...groups, newGroup]);
+  };
+
+  const addMemberToGroup = (groupId: string, userId: string) => {
+    setGroups(prev => prev.map(g => {
+        if (g.id !== groupId) return g;
+        if (g.members.includes(userId)) return g;
+        return { ...g, members: [...g.members, userId] };
+    }));
   };
 
   const startSession = (groupId: string, initialFilters: any) => {
@@ -131,7 +141,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   
   return (
     <AppContext.Provider value={{ 
-      user, groups, sessions, setUser, createGroup, startSession, getSession, addMessage, voteForSuggestion, confirmPlan 
+      user, groups, sessions, setUser, createGroup, startSession, getSession, addMessage, voteForSuggestion, confirmPlan, addMemberToGroup 
     }}>
       {children}
     </AppContext.Provider>

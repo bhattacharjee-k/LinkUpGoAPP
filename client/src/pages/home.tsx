@@ -90,7 +90,7 @@ export function Home() {
            <h3 className="text-lg font-bold">Your Squads</h3>
            <div className="grid grid-cols-2 gap-3">
              {groups.map(group => (
-               <Card key={group.id} className="p-4 bg-white/5 border-white/10 aspect-square flex flex-col justify-between hover:border-primary/50 transition-all cursor-pointer">
+               <Card key={group.id} onClick={() => setLocation(`/group/${group.id}`)} className="p-4 bg-white/5 border-white/10 aspect-square flex flex-col justify-between hover:border-primary/50 transition-all cursor-pointer">
                  <div className="flex -space-x-2">
                    {[1,2,3].map(i => (
                      <div key={i} className="w-6 h-6 rounded-full bg-gray-700 border border-background" />

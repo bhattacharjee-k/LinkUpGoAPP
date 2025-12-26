@@ -26,6 +26,7 @@ export interface Group {
   id: string;
   name: string;
   members: string[]; // User IDs
+  inviteCode?: string; // For external sharing
 }
 
 export interface Suggestion {
