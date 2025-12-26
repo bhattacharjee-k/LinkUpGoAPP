@@ -102,14 +102,17 @@ export function Session() {
                         </DialogHeader>
                          <div className="space-y-6 pt-4">
                             {/* Share Link */}
-                            <div className="space-y-2">
+                            <div className="space-y-2 pb-4 border-b border-white/10">
                                 <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Share Plan Link</h4>
-                                <div className="flex gap-2">
-                                    <div className="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
-                                        {window.location.origin}/join-plan/{session.inviteCode}
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex gap-2">
+                                        <div className="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
+                                            {window.location.origin}/join-plan/{session.inviteCode}
+                                        </div>
                                     </div>
-                                    <Button size="icon" variant="outline" onClick={handleCopyLink} className="border-white/10">
-                                        {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                                    <Button size="sm" variant="secondary" onClick={handleCopyLink} className="w-full bg-white/10 hover:bg-white/20 border-0 h-9">
+                                        {copied ? <Check size={14} className="mr-2 text-green-500" /> : <LinkIcon size={14} className="mr-2" />}
+                                        {copied ? "Link Copied" : "Copy Invite Link"}
                                     </Button>
                                 </div>
                             </div>

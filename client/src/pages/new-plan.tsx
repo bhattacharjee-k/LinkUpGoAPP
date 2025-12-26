@@ -35,6 +35,8 @@ export function NewPlan() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [newParticipantName, setNewParticipantName] = useState('');
+  // Pre-generate invite code for display
+  const [draftInviteCode] = useState(Math.random().toString(36).substr(2, 6).toUpperCase());
 
   // Find user's primary group or first available group
   const userGroup = groups.find(g => g.members.includes(user?.id || 'me')) || groups[0];
@@ -60,7 +62,8 @@ export function NewPlan() {
         energy: formData.energy,
         budget: formData.budget,
         specificDate: formData.date,
-        specificTime: `${formData.timeStart}-${formData.timeEnd}`
+        specificTime: `${formData.timeStart}-${formData.timeEnd}`,
+        inviteCode: draftInviteCode // Pass the pre-generated code
     });
 
     // Add selected participants to the new session
@@ -71,6 +74,17 @@ export function NewPlan() {
     });
 
     setLocation(`/session/${id}`);
+  };
+
+  const handleCopyLink = () => {
+    const link = `${window.location.origin}/join-plan/${draftInviteCode}`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({
+        title: "Link copied!",
+        description: "Note: Link will be active once you create the plan.",
+    });
   };
 
   const toggleCategory = (c: Category) => {
@@ -141,6 +155,23 @@ export function NewPlan() {
                                 <DialogTitle>Add to Plan</DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4 pt-4">
+                                {/* Share Link - Added as requested */}
+                                <div className="space-y-2 pb-4 border-b border-white/10">
+                                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Share Plan Link</h4>
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex gap-2">
+                                            <div className="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
+                                                {window.location.origin}/join-plan/{draftInviteCode}
+                                            </div>
+                                        </div>
+                                        <Button size="sm" variant="secondary" onClick={handleCopyLink} className="w-full bg-white/10 hover:bg-white/20 border-0 h-9">
+                                            {copied ? <Check size={14} className="mr-2 text-green-500" /> : <LinkIcon size={14} className="mr-2" />}
+                                            {copied ? "Link Copied" : "Copy Invite Link"}
+                                        </Button>
+                                        <p className="text-[10px] text-muted-foreground text-center italic">Link becomes active once you click "Find Options"</p>
+                                    </div>
+                                </div>
+
                                 <div className="space-y-2">
                                     <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">From {userGroup.name}</h4>
                                     <div className="flex flex-wrap gap-2">

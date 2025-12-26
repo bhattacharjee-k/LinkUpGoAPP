@@ -78,7 +78,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
       suggestions: MOCK_SUGGESTIONS.map(s => ({...s, votes: {}})), // Reset votes
       participants: [user?.id || 'me'], // Creator is participant
-      inviteCode: Math.random().toString(36).substr(2, 6).toUpperCase(),
+      inviteCode: initialFilters.inviteCode || Math.random().toString(36).substr(2, 6).toUpperCase(),
       messages: [
         { id: 'msg1', sender: 'system', text: 'Planning session started. @Planner is listening.', timestamp: Date.now() }
       ],
