@@ -329,7 +329,7 @@ export function NewPlan() {
                             onClick={() => setFormData({...formData, energy: e as Energy})}
                             className={cn(
                             "h-10 rounded-lg border border-white/10 text-sm font-medium transition-all",
-                            formData.energy === e ? "bg-primary text-white border-primary" : "bg-white/5 text-muted-foreground"
+                            formData.energy === e ? "bg-primary text-black border-primary font-bold" : "bg-white/5 text-muted-foreground"
                             )}
                         >
                             {e}
@@ -347,7 +347,7 @@ export function NewPlan() {
                             onClick={() => toggleCategory(c as Category)}
                             className={cn(
                             "px-3 py-2 rounded-lg border border-white/10 text-xs font-medium transition-all",
-                            formData.categories.includes(c as Category) ? "bg-white/10 border-primary text-primary" : "bg-white/5 text-muted-foreground"
+                            formData.categories.includes(c as Category) ? "bg-primary text-black border-primary font-bold" : "bg-white/5 text-muted-foreground"
                             )}
                         >
                             {c}

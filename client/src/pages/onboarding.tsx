@@ -118,7 +118,7 @@ export function Onboarding() {
                     onClick={() => setFormData({...formData, city: city as City})}
                     className={cn(
                       "h-14 rounded-xl border border-white/10 flex items-center justify-center gap-2 font-medium transition-all",
-                      formData.city === city ? "bg-primary text-white border-primary" : "bg-white/5 hover:bg-white/10"
+                      formData.city === city ? "bg-primary text-black border-primary font-bold" : "bg-white/5 hover:bg-white/10"
                     )}
                   >
                     <MapPin size={18} /> {city}
@@ -142,7 +142,7 @@ export function Onboarding() {
                             className={cn(
                                 "px-4 py-2 rounded-full border border-white/10 font-medium transition-all text-sm",
                                 formData.categories.includes(c) 
-                                    ? "bg-primary/20 border-primary text-primary hover:bg-primary/30" 
+                                    ? "bg-primary text-black border-primary font-bold hover:bg-primary/90" 
                                     : "bg-white/5 hover:bg-white/10 text-muted-foreground"
                             )}
                             >
@@ -165,7 +165,7 @@ export function Onboarding() {
                     className={cn(
                       "h-16 rounded-xl border border-white/10 flex items-center px-6 transition-all",
                       formData.energy === e 
-                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20" 
+                        ? "bg-primary text-black border-primary shadow-lg shadow-primary/20 font-bold" 
                         : "bg-white/5 hover:bg-white/10 text-muted-foreground"
                     )}
                   >

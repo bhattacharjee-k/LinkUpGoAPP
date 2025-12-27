@@ -36,7 +36,7 @@ export function Home() {
               <Button onClick={() => setLocation('/groups')} className="flex-1 bg-white/10 hover:bg-white/20 text-white border-0">
                 <Users size={16} className="mr-2" /> Groups
               </Button>
-              <Button onClick={() => setLocation('/new-session')} className="flex-1 bg-primary text-black hover:bg-primary/90">
+              <Button onClick={() => setLocation('/new-session')} className="flex-1 bg-primary text-black hover:bg-primary/90 font-bold">
                 <Plus size={16} className="mr-2" /> New Plan
               </Button>
             </div>
