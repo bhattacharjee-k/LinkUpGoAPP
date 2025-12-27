@@ -28,15 +28,15 @@ export function Home() {
         </div>
 
         {/* Action Card */}
-        <div className="p-1 rounded-2xl bg-gradient-to-r from-primary to-purple-600 shadow-lg shadow-purple-500/20">
+        <div className="p-1 rounded-2xl bg-gradient-to-r from-primary to-green-600 shadow-lg shadow-primary/20">
           <div className="bg-background/90 backdrop-blur-md rounded-xl p-6 space-y-4">
-            <h2 className="text-xl font-bold">Ready to plan?</h2>
+            <h2 className="text-xl font-bold">Ready to LinkUpGo?</h2>
             <p className="text-sm text-muted-foreground">Start a new planning session with your groups or create a new squad.</p>
             <div className="flex gap-3">
               <Button onClick={() => setLocation('/groups')} className="flex-1 bg-white/10 hover:bg-white/20 text-white border-0">
                 <Users size={16} className="mr-2" /> Groups
               </Button>
-              <Button onClick={() => setLocation('/new-session')} className="flex-1">
+              <Button onClick={() => setLocation('/new-session')} className="flex-1 bg-primary text-black hover:bg-primary/90">
                 <Plus size={16} className="mr-2" /> New Plan
               </Button>
             </div>

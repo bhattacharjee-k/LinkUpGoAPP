@@ -145,14 +145,14 @@ export function NewPlan() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col px-6 py-6 relative overflow-hidden">
-      <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-purple-500/20 rounded-full blur-[100px]" />
+      <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
       
       <div className="z-10 w-full max-w-md mx-auto flex-1 flex flex-col">
         <div className="mb-8">
             <Button variant="ghost" className="pl-0 hover:bg-transparent text-muted-foreground" onClick={() => setLocation('/')}>
                 ← Cancel
             </Button>
-            <h1 className="text-3xl font-display font-bold mt-2">New Plan</h1>
+            <h1 className="text-3xl font-display font-bold mt-2 text-white">LinkUpGo Plan</h1>
             <p className="text-muted-foreground">Who, when, and what's the vibe?</p>
         </div>
 

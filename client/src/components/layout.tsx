@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocation } from 'wouter';
 import { Home, Users, User, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import bgImage from '@assets/generated_images/abstract_vibrant_social_connection_nightlife_background.png';
+// import bgImage from '@assets/generated_images/abstract_vibrant_social_connection_nightlife_background.png';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -20,14 +20,10 @@ export function Layout({ children, hideNav = false }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans relative overflow-hidden flex flex-col">
-      {/* Background with Overlay */}
-      <div className="fixed inset-0 z-0">
-        <img 
-          src={bgImage} 
-          alt="Background" 
-          className="w-full h-full object-cover opacity-30 blur-2xl scale-110" 
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/80 to-background" />
+      {/* Background with Overlay - simplified for LinkUpGo theme */}
+      <div className="fixed inset-0 z-0 bg-background">
+        {/* Subtle noise texture or gradient if needed, keeping it clean black for now */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
       </div>
 
       {/* Main Content */}
@@ -38,7 +34,7 @@ export function Layout({ children, hideNav = false }: LayoutProps) {
       {/* Bottom Navigation */}
       {!hideNav && (
         <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-safe">
-          <nav className="glass-panel mx-4 mb-4 px-6 py-3 rounded-2xl flex items-center justify-between w-full max-w-md backdrop-blur-xl bg-black/40 border-white/10">
+          <nav className="glass-panel mx-4 mb-4 px-6 py-3 rounded-2xl flex items-center justify-between w-full max-w-md backdrop-blur-xl bg-black/80 border-white/10">
             {navItems.map((item) => {
               const isActive = location === item.path;
               return (

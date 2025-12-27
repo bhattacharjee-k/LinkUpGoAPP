@@ -74,7 +74,7 @@ export function Onboarding() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center px-6 py-10 relative overflow-hidden">
-      <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
+      <div className="absolute top-[-20%] right-[-10%] w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
       
       <motion.div 
         key={step}
@@ -86,7 +86,7 @@ export function Onboarding() {
         <div className="space-y-2">
           <div className="text-primary font-bold tracking-widest text-xs uppercase">Step {step} of 4</div>
           <h1 className="text-4xl font-display font-bold text-white leading-tight">
-            {step === 1 && "Let's get your profile set up."}
+            {step === 1 && "Welcome to LinkUpGo."}
             {step === 2 && "What are you into?"}
             {step === 3 && "What's your usual vibe?"}
             {step === 4 && "Any hard no's?"}

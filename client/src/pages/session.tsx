@@ -98,14 +98,14 @@ export function Session() {
         <div className="px-6 py-4 border-b border-white/10 bg-background/80 backdrop-blur-md z-20 space-y-3">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="font-bold text-lg leading-tight">Planning Session</h2>
+              <h2 className="font-bold text-lg leading-tight">LinkUpGo Session</h2>
               <p className="text-xs text-muted-foreground flex items-center gap-2">
-                <span className={cn("w-2 h-2 rounded-full animate-pulse", session.status === 'planning' ? "bg-green-500" : "bg-blue-500")}/> 
+                <span className={cn("w-2 h-2 rounded-full animate-pulse", session.status === 'planning' ? "bg-primary" : "bg-blue-500")}/> 
                 {session.status === 'planning' ? 'Live Voting' : 'Plan Confirmed'}
               </p>
             </div>
             {session.finalChoiceId && (
-              <Badge className="bg-primary text-white border-none">CONFIRMED</Badge>
+              <Badge className="bg-primary text-black font-bold border-none">CONFIRMED</Badge>
             )}
           </div>
 
@@ -221,13 +221,13 @@ export function Session() {
                  )}
                >
                  {/* Pseudo-Image Header */}
-                 <div className="h-24 bg-gradient-to-r from-gray-800 to-gray-700 relative p-4 flex flex-col justify-between">
+                 <div className="h-24 bg-gradient-to-r from-gray-900 to-gray-800 relative p-4 flex flex-col justify-between">
                     <div className="flex justify-between items-start">
-                       <Badge variant="secondary" className="bg-black/40 backdrop-blur-md text-white border-0 text-[10px] uppercase tracking-wider">
+                       <Badge variant="secondary" className="bg-black/60 backdrop-blur-md text-white border-0 text-[10px] uppercase tracking-wider">
                          {suggestion.source}
                        </Badge>
-                       <div className="flex items-center gap-1 text-xs font-bold text-white bg-black/40 px-2 py-1 rounded-full backdrop-blur-md">
-                         <Star size={10} className="text-yellow-400 fill-yellow-400" /> {suggestion.rating}
+                       <div className="flex items-center gap-1 text-xs font-bold text-black bg-primary px-2 py-1 rounded-full backdrop-blur-md shadow-lg shadow-primary/20">
+                         <Star size={10} className="text-black fill-black" /> {suggestion.rating}
                        </div>
                     </div>
                     <h3 className="text-xl font-bold text-white shadow-black/50 drop-shadow-md">{suggestion.name}</h3>
@@ -254,7 +254,7 @@ export function Session() {
                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
                      <div className="flex gap-1">
                        {Object.values(suggestion.votes).filter(v => v === 'yes').length > 0 && (
-                         <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                         <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
                            {Object.values(suggestion.votes).filter(v => v === 'yes').length} Yes
                          </span>
                        )}
@@ -277,7 +277,7 @@ export function Session() {
                        <Button 
                          size="icon" 
                          variant="ghost" 
-                         className={cn("h-8 w-8 rounded-full", suggestion.votes[user?.id || 'me'] === 'yes' && "bg-green-500/20 text-green-500")}
+                         className={cn("h-8 w-8 rounded-full", suggestion.votes[user?.id || 'me'] === 'yes' && "bg-primary/20 text-primary")}
                          onClick={() => voteForSuggestion(session.id, suggestion.id, 'yes')}
                        >
                          <ThumbsUp size={14} />
@@ -295,7 +295,7 @@ export function Session() {
 
                    <Button 
                      variant="secondary" 
-                     className="w-full bg-white/5 hover:bg-primary hover:text-white transition-all text-xs h-8"
+                     className="w-full bg-white/5 hover:bg-primary hover:text-black transition-all text-xs h-8 font-bold"
                      onClick={() => confirmPlan(session.id, suggestion.id)}
                    >
                      Lock it in
@@ -316,12 +316,12 @@ export function Session() {
                     key={msg.id} 
                     className={cn(
                       "max-w-[80%] p-3 text-sm rounded-2xl",
-                      msg.sender === 'user' ? "ml-auto bg-primary text-white rounded-br-none" : 
-                      msg.sender === 'planner-ai' ? "bg-purple-900/40 text-purple-100 border border-purple-500/30 rounded-bl-none" :
+                      msg.sender === 'user' ? "ml-auto bg-primary text-black font-medium rounded-br-none" : 
+                      msg.sender === 'planner-ai' ? "bg-white/10 text-white border border-white/10 rounded-bl-none" :
                       "bg-white/10 text-muted-foreground text-xs text-center mx-auto"
                     )}
                   >
-                    {msg.sender === 'planner-ai' && <div className="text-[10px] text-purple-300 font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner AI</div>}
+                    {msg.sender === 'planner-ai' && <div className="text-[10px] text-primary font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner AI</div>}
                     {msg.text}
                   </motion.div>
                 ))}
@@ -334,10 +334,10 @@ export function Session() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  className="pr-10 bg-white/5 border-white/10 focus-visible:ring-primary"
+                  className="pr-10 bg-white/5 border-white/10 focus-visible:ring-primary text-white placeholder:text-muted-foreground"
                 />
               </div>
-              <Button size="icon" onClick={handleSend} className="bg-primary hover:bg-primary/90 text-white">
+              <Button size="icon" onClick={handleSend} className="bg-primary hover:bg-primary/90 text-black">
                 <Send size={16} />
               </Button>
             </div>
