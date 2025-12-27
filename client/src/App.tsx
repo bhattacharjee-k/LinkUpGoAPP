@@ -34,14 +34,17 @@ function JoinRoute() {
                 addMemberToGroup(group.id, user.id);
                 setLocation(`/group/${group.id}`);
             } else {
-                // Invalid code
+                // Invalid code or group not found (mockup limitation)
+                // For demo purposes, let's create a mock group if needed or just redirect
+                console.warn("Group not found for code:", params.code);
                 setLocation('/');
             }
         } else if (!user) {
-            // Force onboarding if not logged in
-            setLocation('/onboarding');
+            // Force onboarding if not logged in, preserve return path
+            const returnPath = encodeURIComponent(window.location.pathname);
+            setLocation(`/onboarding?returnTo=${returnPath}`);
         }
-    }, [params, user, groups]);
+    }, [params, user, groups, setLocation]);
 
     return <div className="flex items-center justify-center h-screen">Joining group...</div>;
 }
@@ -61,12 +64,16 @@ function JoinPlanRoute() {
                 addMemberToGroup(session.groupId, user.id);
                 setLocation(`/session/${session.id}`);
             } else {
-                setLocation('/');
+                 // Invalid code or session not found (mockup limitation)
+                 console.warn("Session not found for code:", params.code);
+                 setLocation('/');
             }
         } else if (!user) {
-            setLocation('/onboarding');
+            // Force onboarding if not logged in, preserve return path
+            const returnPath = encodeURIComponent(window.location.pathname);
+            setLocation(`/onboarding?returnTo=${returnPath}`);
         }
-    }, [params, user, sessions]);
+    }, [params, user, sessions, setLocation]);
 
     return <div className="flex items-center justify-center h-screen">Joining plan...</div>;
 }

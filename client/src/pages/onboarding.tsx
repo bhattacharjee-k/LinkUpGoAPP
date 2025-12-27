@@ -32,7 +32,16 @@ export function Onboarding() {
         ...formData,
         hardNos: [], // Default for now
       });
-      setLocation('/');
+      
+      // Check for returnTo param
+      const params = new URLSearchParams(window.location.search);
+      const returnTo = params.get('returnTo');
+      
+      if (returnTo) {
+          setLocation(decodeURIComponent(returnTo));
+      } else {
+          setLocation('/');
+      }
     }
   };
 
