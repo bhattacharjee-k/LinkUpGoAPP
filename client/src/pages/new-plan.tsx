@@ -27,7 +27,7 @@ export function NewPlan() {
     flexibility: 'strict', // strict, flexible
     locationScope: user?.city || 'NYC',
     budget: '$$' as Budget,
-    energy: user?.energy || 'Social',
+    energy: user?.energy || 'Vibey',
     categories: [] as Category[],
     participants: [user?.id || 'me'], // Current user is always a participant
   });
@@ -322,8 +322,8 @@ export function NewPlan() {
 
                 <div className="space-y-3">
                     <Label className="text-xs text-muted-foreground">Energy</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                        {['Chill', 'Social', 'Party'].map((e) => (
+                    <div className="grid grid-cols-2 gap-2">
+                        {['Chill', 'Vibey', 'Going out', 'Full send'].map((e) => (
                         <button
                             key={e}
                             onClick={() => setFormData({...formData, energy: e as Energy})}
@@ -341,7 +341,7 @@ export function NewPlan() {
                  <div className="space-y-3">
                     <Label className="text-xs text-muted-foreground">Category (Optional)</Label>
                     <div className="flex flex-wrap gap-2">
-                        {['Dinner', 'Drinks', 'Activity', 'Club'].map((c) => (
+                        {['Dinner', 'Drinks', 'Brunch', 'Club', 'Activity'].map((c) => (
                         <button
                             key={c}
                             onClick={() => toggleCategory(c as Category)}

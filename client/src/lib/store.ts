@@ -4,12 +4,23 @@ export type City = 'NYC' | 'Chicago';
 export type Day = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
 export type TimeBlock = 'Day' | 'Evening' | 'Night';
 export type Budget = '$' | '$$' | '$$$' | '$$$$';
-export type Category = 'Dinner' | 'Drinks' | 'Activity' | 'Club' | 'Brunch' | 'Cafe';
-export type Energy = 'Chill' | 'Social' | 'Party';
+export type Energy = 'Chill' | 'Vibey' | 'Going out' | 'Full send';
 
 export interface Availability {
   [key: string]: boolean; // key format: "Day-TimeBlock" e.g., "Fri-Night"
 }
+
+export type Category = 
+  // Food & Drink
+  | 'Dinner' | 'Drinks' | 'Brunch' | 'Cafe' | 'Coffee' | 'Dive Bar' | 'Cocktails' | 'Wine Bar' | 'Brewery'
+  // Going Out
+  | 'Club' | 'Lounge' | 'Rooftop' | 'Speakeasy' | 'Live Music' | 'Dancing'
+  // Activities
+  | 'Activity' | 'Bowling' | 'Karaoke' | 'Comedy' | 'Arcade' | 'Museum' | 'Walk'
+  // Social Modes (Abstract/Vibe)
+  | 'Conversation' | 'Meeting New People' | 'Big Group' | 'Date Night';
+
+export type HardNo = 'Clubs' | 'Loud places' | 'Ticketed events' | 'Late nights' | 'Expensive spots';
 
 export interface UserProfile {
   id: string;
@@ -17,9 +28,8 @@ export interface UserProfile {
   city: City;
   budget: Budget[];
   energy: Energy;
-  categories: Category[];
-  hardNos: string[];
-  // availability removed from profile, now session specific
+  categories: Category[]; // Interests
+  hardNos: string[]; // Using string array to be flexible, but could be HardNo[]
 }
 
 export interface Group {
@@ -94,9 +104,9 @@ const MOCK_USER: UserProfile = {
   name: 'Alex',
   city: 'NYC',
   budget: ['$$', '$$$'],
-  energy: 'Social',
+  energy: 'Vibey',
   categories: ['Dinner', 'Drinks'],
-  hardNos: ['Dive bars', 'Seafood'],
+  hardNos: ['Dive Bar'],
   /* Availability removed from mock
   availability: {
     'Fri-Evening': true,
