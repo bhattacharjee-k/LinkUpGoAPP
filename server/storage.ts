@@ -60,7 +60,16 @@ export interface IStorage {
 
   // Messages
   getSessionMessages(sessionId: string): Promise<Message[]>;
+  getRecentPlannerMessages(sessionId: string, limit?: number): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
+  
+  // Planner context
+  getSessionWithContext(sessionId: string): Promise<{
+    session: Session;
+    participants: Array<{ id: string; name: string; preferences: { budget: string[]; energy: string; categories: string[] } }>;
+    suggestions: Suggestion[];
+    recentMessages: Message[];
+  } | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -261,9 +270,68 @@ export class DbStorage implements IStorage {
     return db.select().from(schema.messages).where(eq(schema.messages.sessionId, sessionId));
   }
 
+  async getRecentPlannerMessages(sessionId: string, limit: number = 20): Promise<Message[]> {
+    const allMessages = await db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.sessionId, sessionId));
+    
+    // Filter to only planner-relevant messages and get last N
+    const plannerMessages = allMessages
+      .filter(m => m.sender === 'planner-ai' || (m.sender !== 'system'))
+      .slice(-limit);
+    
+    return plannerMessages;
+  }
+
   async createMessage(message: InsertMessage): Promise<Message> {
     const [newMessage] = await db.insert(schema.messages).values(message).returning();
     return newMessage;
+  }
+
+  async getSessionWithContext(sessionId: string): Promise<{
+    session: Session;
+    participants: Array<{ id: string; name: string; preferences: { budget: string[]; energy: string; categories: string[] } }>;
+    suggestions: Suggestion[];
+    recentMessages: Message[];
+  } | undefined> {
+    const session = await this.getSession(sessionId);
+    if (!session) return undefined;
+    
+    // Get participants with their user data
+    const participantRecords = await this.getSessionParticipants(sessionId);
+    const activeParticipants = participantRecords.filter(p => p.status !== 'left');
+    
+    const participants = await Promise.all(
+      activeParticipants.map(async (p) => {
+        const user = await this.getUser(p.userId);
+        if (!user) return null;
+        return {
+          id: user.id,
+          name: user.name,
+          preferences: {
+            budget: user.budget,
+            energy: user.energy,
+            categories: user.categories
+          }
+        };
+      })
+    );
+    
+    const validParticipants = participants.filter((p): p is NonNullable<typeof p> => p !== null);
+    
+    // Get suggestions
+    const suggestions = await this.getSessionSuggestions(sessionId);
+    
+    // Get recent messages for conversation context
+    const recentMessages = await this.getRecentPlannerMessages(sessionId, 15);
+    
+    return {
+      session,
+      participants: validParticipants,
+      suggestions,
+      recentMessages
+    };
   }
 }
 
