@@ -231,7 +231,38 @@ export async function registerRoutes(
         groups.map(g => storage.getGroupSessions(g.id))
       );
       
-      res.json(allSessions.flat());
+      // Enrich each session with participants, suggestions, and messages
+      const enrichedSessions = await Promise.all(
+        allSessions.flat().map(async (session) => {
+          const participants = await storage.getSessionParticipants(session.id);
+          const suggestions = await storage.getSessionSuggestions(session.id);
+          const messages = await storage.getSessionMessages(session.id);
+          
+          const suggestionsWithVotes = await Promise.all(
+            suggestions.map(async (s) => {
+              const votes = await storage.getSuggestionVotes(s.id);
+              const votesRecord: Record<string, string> = {};
+              votes.forEach(v => {
+                votesRecord[v.userId] = v.vote;
+              });
+              return { ...s, votes: votesRecord };
+            })
+          );
+          
+          return {
+            ...session,
+            participants: participants.map(p => p.userId),
+            participantStatusByUserId: participants.reduce((acc, p) => {
+              acc[p.userId] = p.status;
+              return acc;
+            }, {} as Record<string, string>),
+            suggestions: suggestionsWithVotes,
+            messages
+          };
+        })
+      );
+      
+      res.json(enrichedSessions);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
