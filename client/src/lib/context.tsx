@@ -198,11 +198,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Create mock suggestions
+    // Create mock suggestions (exclude hardcoded id, let server generate)
     for (const mockSugg of MOCK_SUGGESTIONS) {
+      const { id, votes, ...suggestionData } = mockSugg;
       await api.suggestions.create({
         sessionId: session.id,
-        ...mockSugg
+        ...suggestionData
       });
     }
 
