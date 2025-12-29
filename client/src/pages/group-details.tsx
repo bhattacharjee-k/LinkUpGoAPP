@@ -145,7 +145,7 @@ export function GroupDetails() {
         <div className="flex gap-2">
             <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
                 <DialogTrigger asChild>
-                    <Button className="flex-1 gap-2 bg-primary text-white hover:bg-primary/90">
+                    <Button className="flex-1 gap-2 bg-primary hover:bg-primary/90 text-[#0a0a0a]">
                         <UserPlus size={16} /> Add People
                     </Button>
                 </DialogTrigger>
