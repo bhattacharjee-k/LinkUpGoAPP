@@ -14,7 +14,6 @@ export function Layout({ children, hideNav = false }: LayoutProps) {
 
   const navItems = [
     { icon: Home, label: 'Home', path: '/' },
-    { icon: Users, label: 'Groups', path: '/groups' },
     { icon: User, label: 'Profile', path: '/profile' },
   ];
 

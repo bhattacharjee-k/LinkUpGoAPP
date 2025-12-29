@@ -86,10 +86,10 @@ function Router() {
       <Route path="/onboarding" component={Onboarding} />
       
       <Route path="/groups">
-        <PrivateRoute component={Groups} />
+        <PrivateRoute component={Home} />
       </Route>
       <Route path="/group/:id">
-        <PrivateRoute component={GroupDetails} />
+        <PrivateRoute component={Home} />
       </Route>
       <Route path="/join/:code" component={JoinRoute} />
       <Route path="/join-plan/:code" component={JoinPlanRoute} />
