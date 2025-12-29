@@ -289,7 +289,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       text
     });
 
-    // Simple AI trigger logic
+    // Simple planner trigger logic
     if (text.includes('@Planner')) {
       setTimeout(async () => {
         await api.messages.create({

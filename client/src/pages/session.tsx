@@ -655,13 +655,35 @@ export function Session() {
           <div className="px-6 py-2">
              <TabsList className="w-full grid grid-cols-2 bg-white/5">
               <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
-              <TabsTrigger value="chat">Chat & AI</TabsTrigger>
+              <TabsTrigger value="chat">Chat</TabsTrigger>
             </TabsList>
           </div>
 
           {/* Suggestions Tab */}
           <TabsContent value="suggestions" className="flex-1 overflow-y-auto p-6 space-y-6 data-[state=inactive]:hidden">
-             {sortedSuggestions.map((suggestion, idx) => {
+             {sortedSuggestions.length === 0 ? (
+               <div className="flex flex-col items-center justify-center py-16 px-6 text-center space-y-6">
+                 <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
+                   <MapPin size={40} className="text-muted-foreground" />
+                 </div>
+                 <div className="space-y-2">
+                   <h2 className="text-xl font-bold">No options found in {session.filters.locationScope || 'this area'}</h2>
+                   <p className="text-muted-foreground max-w-md text-sm">
+                     Try adjusting your filters to expand the search. You can change distance, budget, or categories to find more options.
+                   </p>
+                 </div>
+                 {!isLocked && (
+                   <Button 
+                     onClick={() => setEditOpen(true)} 
+                     className="bg-primary text-black font-bold"
+                     data-testid="button-adjust-filters"
+                   >
+                     Adjust Filters
+                   </Button>
+                 )}
+               </div>
+             ) : (
+               sortedSuggestions.map((suggestion, idx) => {
                const myVote = suggestion.votes[user?.id || 'me'];
                const score = calculateScore(suggestion);
                
@@ -777,7 +799,9 @@ export function Session() {
                    )}
                  </div>
                </motion.div>
-             )})}
+             );
+             })
+             )}
              
              {/* Admin Confirm All / Tie Breaker Button */}
              {isUserAdmin && !isLocked && session.suggestions.length > 0 && (
@@ -805,7 +829,7 @@ export function Session() {
                       "bg-white/10 text-muted-foreground text-xs text-center mx-auto"
                     )}
                   >
-                    {msg.sender === 'planner-ai' && <div className="text-[10px] text-primary font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner AI</div>}
+                    {msg.sender === 'planner-ai' && <div className="text-[10px] text-primary font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner</div>}
                     {msg.text}
                   </motion.div>
                 ))}
