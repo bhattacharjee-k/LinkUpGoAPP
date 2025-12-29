@@ -53,6 +53,10 @@ export interface Suggestion {
   description: string;
   tags: string[];
   votes: Record<string, 'yes' | 'no' | 'fire' | 'cant'>; // userId -> vote
+  detailUrl?: string; // Optional general more info link
+  reservationUrl?: string; // Optional reservation link
+  ticketUrl?: string; // Optional ticket purchase link
+  eventUrl?: string; // Optional event page link
 }
 
 // City coordinates for location grounding
