@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
-import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield, Lock, Ban } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield, Lock, Ban, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -177,6 +177,14 @@ export function Session() {
       return (
           <Layout hideNav>
              <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-6">
+                   <Button 
+                     variant="ghost" 
+                     size="icon" 
+                     className="absolute top-4 left-4"
+                     onClick={() => window.history.back()}
+                   >
+                     <ArrowLeft size={20} />
+                   </Button>
                    <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center">
                        <MapPin size={40} className="text-muted-foreground" />
                    </div>
@@ -188,6 +196,13 @@ export function Session() {
                        <Button variant="outline" onClick={() => toast({title: "Filters Updated", description: "Search radius increased."})}>Increase Distance</Button>
                        <Button variant="outline" onClick={() => toast({title: "Filters Updated", description: "Budget filter removed."})}>Increase Budget</Button>
                    </div>
+                   <Button 
+                     variant="ghost" 
+                     className="text-muted-foreground"
+                     onClick={() => window.history.back()}
+                   >
+                     Go Back
+                   </Button>
               </div>
           </Layout>
       )
