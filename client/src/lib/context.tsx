@@ -363,12 +363,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteSession = async (sessionId: string) => {
+    // Backend enforces admin-only access via isGroupAdmin middleware
     await api.sessions.delete(sessionId);
     // Remove session from local state
     setSessions(prev => prev.filter(s => s.id !== sessionId));
   };
 
   const leaveSession = async (sessionId: string) => {
+    // Backend enforces participant-only access
     await api.sessions.leave(sessionId);
     await refreshSession(sessionId);
   };

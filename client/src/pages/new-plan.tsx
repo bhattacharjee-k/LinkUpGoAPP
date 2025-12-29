@@ -70,6 +70,7 @@ export function NewPlan() {
         groupId = newGroup.id;
       } catch (error: any) {
         toast({ title: "Error", description: "Failed to create group. Please try again.", variant: "destructive" });
+        setIsCreating(false);
         return;
       }
     }
