@@ -10,9 +10,10 @@ import { City, Budget, Energy, Category, HardNo } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 export function Onboarding() {
-  const { register } = useApp();
+  const { register, login } = useApp();
   const [_, setLocation] = useLocation();
   const [step, setStep] = useState(1);
+  const [isLoginMode, setIsLoginMode] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
@@ -26,6 +27,26 @@ export function Onboarding() {
     categories: [] as Category[],
     hardNos: [] as string[],
   });
+
+  const handleLogin = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      await login(formData.username, formData.password);
+      
+      const params = new URLSearchParams(window.location.search);
+      const returnTo = params.get('returnTo');
+      
+      if (returnTo) {
+        setLocation(decodeURIComponent(returnTo));
+      } else {
+        setLocation('/');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+      setIsLoading(false);
+    }
+  };
 
   const handleNext = async () => {
     if (step < 5) {
@@ -56,7 +77,12 @@ export function Onboarding() {
             setLocation('/');
         }
       } catch (err: any) {
-        setError(err.message || 'Registration failed');
+        // Show user-friendly error messages
+        let errorMsg = err.message || 'Registration failed';
+        if (errorMsg.includes('unique constraint') || errorMsg.includes('duplicate key')) {
+          errorMsg = 'This username is already taken. Try a different one or sign in below.';
+        }
+        setError(errorMsg);
         setIsLoading(false);
       }
     }
@@ -104,16 +130,16 @@ export function Onboarding() {
         className="z-10 w-full max-w-md mx-auto space-y-8"
       >
         <div className="space-y-2">
-          <div className="text-primary font-bold tracking-widest text-xs uppercase" data-testid="text-step-indicator">Step {step} of 5</div>
+          {!isLoginMode && <div className="text-primary font-bold tracking-widest text-xs uppercase" data-testid="text-step-indicator">Step {step} of 5</div>}
           <h1 className="text-4xl font-display font-bold text-white leading-tight" data-testid="text-step-title">
-            {step === 1 && "Welcome to LinkUpGo."}
+            {step === 1 && (isLoginMode ? "Welcome back!" : "Welcome to LinkUpGo.")}
             {step === 2 && "Tell us about yourself"}
             {step === 3 && "What are you into?"}
             {step === 4 && "What's your usual vibe?"}
             {step === 5 && "Any hard no's?"}
           </h1>
           <p className="text-muted-foreground text-lg">
-             {step === 1 && "Create your account to start planning with friends."}
+             {step === 1 && (isLoginMode ? "Sign in to continue planning with friends." : "Create your account to start planning with friends.")}
              {step === 3 && "Pick anything you're usually open to — we'll learn your real preferences as you plan."}
              {step === 4 && "This sets your baseline, but you can change it for every plan."}
              {step === 5 && "We'll hide these types of places from your suggestions."}
@@ -148,8 +174,17 @@ export function Onboarding() {
                 placeholder="••••••••"
                 className="bg-white/5 border-white/10 h-12 text-lg"
               />
-              <p className="text-xs text-muted-foreground">Minimum 6 characters</p>
+              {!isLoginMode && <p className="text-xs text-muted-foreground">Minimum 6 characters</p>}
             </div>
+            
+            <button
+              type="button"
+              onClick={() => { setIsLoginMode(!isLoginMode); setError(''); }}
+              className="text-sm text-primary hover:underline w-full text-center"
+              data-testid="button-toggle-auth-mode"
+            >
+              {isLoginMode ? "Need an account? Sign up" : "Already have an account? Sign in"}
+            </button>
           </div>
         )}
 
@@ -262,12 +297,15 @@ export function Onboarding() {
         )}
 
         <Button 
-          onClick={handleNext} 
+          onClick={isLoginMode ? handleLogin : handleNext} 
           data-testid="button-next"
           className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/20"
           disabled={(step === 1 && !isStep1Valid) || (step === 2 && !isStep2Valid) || isLoading}
         >
-          {isLoading ? 'Creating account...' : step === 5 ? "Complete Profile" : "Next"} {!isLoading && <ChevronRight className="ml-2" />}
+          {isLoading ? (isLoginMode ? 'Signing in...' : 'Creating account...') : 
+           isLoginMode ? "Sign In" :
+           step === 5 ? "Complete Profile" : "Next"} 
+          {!isLoading && <ChevronRight className="ml-2" />}
         </Button>
       </motion.div>
     </div>
