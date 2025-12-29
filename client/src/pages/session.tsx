@@ -28,8 +28,6 @@ export function Session() {
   const [_, setLocation] = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  
-  const session = getSession(params?.id || '');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [newParticipantName, setNewParticipantName] = useState('');
@@ -53,6 +51,8 @@ export function Session() {
     categories: [] as Category[],
     distance: '1 mi',
   });
+  
+  const session = getSession(params?.id || '');
 
   useEffect(() => {
     if (scrollRef.current) {
