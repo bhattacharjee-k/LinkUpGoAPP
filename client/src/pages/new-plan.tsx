@@ -59,14 +59,10 @@ export function NewPlan() {
     // Use user's group or create one if they don't have any
     let groupId = userGroup?.id;
     if (!groupId) {
-      // Create a default group for the user
-      await createGroup(formData.name || 'My Plans');
-      // After creating, the groups state will update - wait a tick
-      await new Promise(resolve => setTimeout(resolve, 100));
-      // Get the newly created group
-      const newGroups = groups;
-      groupId = newGroups[newGroups.length - 1]?.id;
-      if (!groupId) {
+      try {
+        const newGroup = await createGroup(formData.name || 'My Plans');
+        groupId = newGroup.id;
+      } catch (error: any) {
         toast({ title: "Error", description: "Failed to create group. Please try again.", variant: "destructive" });
         return;
       }

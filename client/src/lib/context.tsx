@@ -150,9 +150,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUserState(updated);
   };
 
-  const createGroup = async (name: string) => {
+  const createGroup = async (name: string): Promise<Group> => {
     const newGroup = await api.groups.create(name);
     setGroups([...groups, newGroup]);
+    return newGroup;
   };
 
   const updateGroup = async (groupId: string, updates: Partial<Group>) => {
