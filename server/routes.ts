@@ -410,6 +410,21 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/sessions/:id/suggestions", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      await storage.deleteSessionSuggestions(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Vote routes
   app.post("/api/votes", async (req, res) => {
     try {

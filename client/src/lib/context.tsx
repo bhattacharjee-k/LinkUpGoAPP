@@ -69,6 +69,8 @@ interface AppContextType {
   addMessage: (sessionId: string, text: string) => Promise<void>;
   voteForSuggestion: (sessionId: string, suggestionId: string, vote: string) => Promise<void>;
   confirmPlan: (sessionId: string, suggestionId: string) => Promise<void>;
+  updateSessionFilters: (sessionId: string, filters: any) => Promise<void>;
+  regenerateSuggestions: (sessionId: string) => Promise<void>;
   addMemberToGroup: (groupId: string, userId: string) => void;
   addParticipantToSession: (sessionId: string, userId: string) => void;
   updateGroup: (groupId: string, updates: Partial<Group>) => Promise<void>;
@@ -272,6 +274,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await refreshSession(sessionId);
   };
 
+  const updateSessionFilters = async (sessionId: string, filters: any) => {
+    await api.sessions.update(sessionId, { filters });
+    await refreshSession(sessionId);
+  };
+
+  const regenerateSuggestions = async (sessionId: string) => {
+    // Delete existing suggestions first
+    await api.suggestions.deleteForSession(sessionId);
+    
+    // Create new ones based on updated filters
+    // For MVP, we just regenerate mock suggestions
+    for (const mockSugg of MOCK_SUGGESTIONS) {
+      const { id, votes, ...suggestionData } = mockSugg;
+      await api.suggestions.create({
+        sessionId,
+        ...suggestionData
+      });
+    }
+    
+    await api.messages.create({
+      sessionId,
+      sender: 'system',
+      text: 'Options regenerated based on updated filters.'
+    });
+    
+    await refreshSession(sessionId);
+  };
+
   const value: AppContextType = {
     user,
     groups,
@@ -289,6 +319,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addMessage,
     voteForSuggestion,
     confirmPlan,
+    updateSessionFilters,
+    regenerateSuggestions,
     addMemberToGroup,
     addParticipantToSession,
     updateGroup,

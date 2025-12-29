@@ -48,6 +48,7 @@ export interface IStorage {
   getSuggestion(id: string): Promise<Suggestion | undefined>;
   getSessionSuggestions(sessionId: string): Promise<Suggestion[]>;
   createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion>;
+  deleteSessionSuggestions(sessionId: string): Promise<void>;
 
   // Votes
   vote(suggestionId: string, userId: string, voteType: string): Promise<void>;
@@ -179,6 +180,10 @@ export class DbStorage implements IStorage {
   async createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion> {
     const [newSuggestion] = await db.insert(schema.suggestions).values(suggestion).returning();
     return newSuggestion;
+  }
+
+  async deleteSessionSuggestions(sessionId: string): Promise<void> {
+    await db.delete(schema.suggestions).where(eq(schema.suggestions.sessionId, sessionId));
   }
 
   // Votes

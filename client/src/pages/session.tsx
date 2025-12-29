@@ -4,20 +4,25 @@ import { useApp } from '@/lib/context';
 import { Layout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
-import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield, Lock, Ban, ArrowLeft } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield, Lock, Ban, ArrowLeft, Pencil, RefreshCw, Calendar, Clock, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from '@/hooks/use-toast';
-import { PlanningSession } from '@/lib/store';
+import { PlanningSession, Budget, Energy, Category } from '@/lib/store';
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
 
 export function Session() {
   const [match, params] = useRoute('/session/:id');
-  const { getSession, addMessage, voteForSuggestion, confirmPlan, addParticipantToSession, user, groups, isAdmin } = useApp();
+  const { getSession, addMessage, voteForSuggestion, confirmPlan, addParticipantToSession, updateSessionFilters, regenerateSuggestions, user, groups, isAdmin } = useApp();
   const [input, setInput] = useState('');
   const [_, setLocation] = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -29,6 +34,19 @@ export function Session() {
   const [newParticipantName, setNewParticipantName] = useState('');
   const [tieBreakerOpen, setTieBreakerOpen] = useState(false);
   const [tieOptions, setTieOptions] = useState<string[]>([]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [showRegenerateCta, setShowRegenerateCta] = useState(false);
+  const [editForm, setEditForm] = useState({
+    date: new Date(),
+    timeStart: '19:00',
+    timeEnd: '22:00',
+    flexibility: 'strict',
+    budget: '$$' as Budget,
+    energy: 'Vibey' as Energy,
+    categories: [] as Category[],
+    distance: '1 mi',
+  });
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -92,6 +110,64 @@ export function Session() {
   const handleAddGroupMember = (memberId: string) => {
       addParticipantToSession(session.id, memberId);
       toast({ title: "Added", description: "Group member added to plan." });
+  };
+
+  // Initialize edit form from session filters
+  useEffect(() => {
+    if (session?.filters) {
+      const f = session.filters;
+      setEditForm(prev => ({
+        ...prev,
+        budget: f.budget || '$$',
+        energy: f.energy || 'Vibey',
+        categories: f.category || [],
+        date: f.specificDate ? new Date(f.specificDate) : new Date(),
+        timeStart: f.specificTime?.split('-')[0] || '19:00',
+        timeEnd: f.specificTime?.split('-')[1] || '22:00',
+        flexibility: f.flexibility || 'strict',
+        distance: f.distance || '1 mi',
+      }));
+    }
+  }, [session?.filters]);
+
+  const toggleCategory = (c: Category) => {
+    setEditForm(prev => ({
+      ...prev,
+      categories: prev.categories.includes(c)
+        ? prev.categories.filter(x => x !== c)
+        : [...prev.categories, c]
+    }));
+  };
+
+  const handleSaveEdit = async () => {
+    const updatedFilters = {
+      ...session.filters,
+      budget: editForm.budget,
+      energy: editForm.energy,
+      category: editForm.categories.length > 0 ? editForm.categories : session.filters.category,
+      specificDate: editForm.date.toISOString(),
+      specificTime: `${editForm.timeStart}-${editForm.timeEnd}`,
+      flexibility: editForm.flexibility,
+      distance: editForm.distance,
+    };
+    
+    await updateSessionFilters(session.id, updatedFilters);
+    setEditOpen(false);
+    setShowRegenerateCta(true);
+    toast({ title: "Plan updated!", description: "Your preferences have been saved." });
+  };
+
+  const handleRegenerate = async () => {
+    setIsRegenerating(true);
+    try {
+      await regenerateSuggestions(session.id);
+      setShowRegenerateCta(false);
+      toast({ title: "Options regenerated!", description: "New suggestions based on your updated preferences." });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to regenerate options.", variant: "destructive" });
+    } finally {
+      setIsRegenerating(false);
+    }
   };
 
   const calculateScore = (suggestion: any) => {
@@ -223,18 +299,250 @@ export function Session() {
                 </span>
               </p>
             </div>
-            {isLocked && (
-              <Badge className="bg-green-500 text-black font-bold border-none gap-1">
-                  <Lock size={10} /> LOCKED
+            <div className="flex items-center gap-2">
+              {!isLocked && (
+                <Sheet open={editOpen} onOpenChange={setEditOpen}>
+                  <SheetTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-8 text-xs border-white/10 bg-white/5" data-testid="button-edit-plan">
+                      <Pencil size={12} className="mr-1" /> Edit Plan
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="bg-card border-white/10 rounded-t-3xl max-h-[85vh] overflow-y-auto">
+                    <SheetHeader className="pb-4">
+                      <SheetTitle>Edit Plan</SheetTitle>
+                    </SheetHeader>
+                    <div className="space-y-6 pb-8">
+                      {/* Date & Time */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">When?</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start text-left font-normal bg-white/5 border-white/10 h-10">
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {editForm.date ? format(editForm.date, "PPP") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 bg-card border-white/10" align="start">
+                            <CalendarPicker
+                              mode="single"
+                              selected={editForm.date}
+                              onSelect={(d) => d && setEditForm({...editForm, date: d})}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Start</Label>
+                            <Input 
+                              type="time" 
+                              className="bg-white/5 border-white/10 h-9" 
+                              value={editForm.timeStart}
+                              onChange={e => setEditForm({...editForm, timeStart: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">End</Label>
+                            <Input 
+                              type="time" 
+                              className="bg-white/5 border-white/10 h-9"
+                              value={editForm.timeEnd}
+                              onChange={e => setEditForm({...editForm, timeEnd: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {['strict', 'flexible'].map(f => (
+                            <button
+                              key={f}
+                              onClick={() => setEditForm({...editForm, flexibility: f})}
+                              className={cn(
+                                "flex-1 h-9 rounded-lg border text-xs font-medium transition-all capitalize",
+                                editForm.flexibility === f ? "bg-primary text-black border-primary font-bold" : "bg-white/5 border-white/10 text-muted-foreground"
+                              )}
+                            >
+                              {f}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Budget */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Budget</Label>
+                        <div className="flex gap-2">
+                          {['$', '$$', '$$$', '$$$$'].map((b) => (
+                            <button
+                              key={b}
+                              onClick={() => setEditForm({...editForm, budget: b as Budget})}
+                              className={cn(
+                                "flex-1 h-9 rounded-lg border font-bold transition-all text-sm",
+                                editForm.budget === b ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-white/5 border-white/10 text-muted-foreground"
+                              )}
+                            >
+                              {b}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Energy */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Energy / Vibe</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {['Chill', 'Vibey', 'Going out', 'Full send'].map((e) => (
+                            <button
+                              key={e}
+                              onClick={() => setEditForm({...editForm, energy: e as Energy})}
+                              className={cn(
+                                "h-9 rounded-lg border text-xs font-medium transition-all",
+                                editForm.energy === e ? "bg-primary text-black border-primary font-bold" : "bg-white/5 border-white/10 text-muted-foreground"
+                              )}
+                            >
+                              {e}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Category */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Category</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {['Dinner', 'Drinks', 'Brunch', 'Club', 'Activity'].map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => toggleCategory(c as Category)}
+                              className={cn(
+                                "px-3 py-2 rounded-lg border text-xs font-medium transition-all",
+                                editForm.categories.includes(c as Category) ? "bg-primary text-black border-primary font-bold" : "bg-white/5 border-white/10 text-muted-foreground"
+                              )}
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Distance */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Distance</Label>
+                        <div className="flex gap-2">
+                          {['0.5 mi', '1 mi', '2 mi', '5 mi'].map((d) => (
+                            <button
+                              key={d}
+                              onClick={() => setEditForm({...editForm, distance: d})}
+                              className={cn(
+                                "flex-1 h-9 rounded-lg border text-xs font-medium transition-all",
+                                editForm.distance === d ? "bg-primary text-black border-primary font-bold" : "bg-white/5 border-white/10 text-muted-foreground"
+                              )}
+                            >
+                              {d}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Participants section */}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <Label className="text-sm font-medium">Participants</Label>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs text-primary" onClick={() => { setEditOpen(false); setInviteOpen(true); }}>
+                            <UserPlus size={12} className="mr-1" /> Invite
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {participants.map((pid, i) => {
+                            const status = session.participantStatusByUserId?.[pid] || 'active';
+                            const isCant = status === 'cant_make_it';
+                            return (
+                              <div key={pid} className={cn("flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10 text-xs", isCant && "opacity-50")}>
+                                <span>{pid === user?.id ? 'You' : `User ${i+1}`}</span>
+                                {isCant && <Ban size={10} className="text-red-500" />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="flex gap-2 items-center">
+                          <div className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
+                            {window.location.origin}/join-plan/{session.inviteCode}
+                          </div>
+                          <Button size="sm" variant="secondary" onClick={handleCopyLink} className="bg-white/10 h-8">
+                            <Copy size={12} />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <Button onClick={handleSaveEdit} className="w-full h-11 font-bold" data-testid="button-save-edit">
+                        Save Changes
+                      </Button>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              )}
+              {isLocked && (
+                <Badge className="bg-green-500 text-black font-bold border-none gap-1">
+                    <Lock size={10} /> LOCKED
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {/* Plan Summary Chips */}
+          <div className="flex flex-wrap gap-1.5">
+            {session.filters?.specificDate && (
+              <Badge variant="secondary" className="bg-white/5 border-white/10 text-[10px] gap-1">
+                <Calendar size={10} /> {format(new Date(session.filters.specificDate), 'MMM d')}
               </Badge>
             )}
+            {session.filters?.specificTime && (
+              <Badge variant="secondary" className="bg-white/5 border-white/10 text-[10px] gap-1">
+                <Clock size={10} /> {session.filters.specificTime}
+              </Badge>
+            )}
+            {session.filters?.budget && (
+              <Badge variant="secondary" className="bg-white/5 border-white/10 text-[10px] gap-1">
+                <DollarSign size={10} /> {session.filters.budget}
+              </Badge>
+            )}
+            {session.filters?.energy && (
+              <Badge variant="secondary" className="bg-white/5 border-white/10 text-[10px] gap-1">
+                <Zap size={10} /> {session.filters.energy}
+              </Badge>
+            )}
+            {session.filters?.category?.map((cat: string) => (
+              <Badge key={cat} variant="secondary" className="bg-white/5 border-white/10 text-[10px]">
+                {cat}
+              </Badge>
+            ))}
           </div>
 
           {/* Locked Banner */}
           {isLocked && (
               <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2 flex items-center justify-center text-xs text-green-400 font-medium">
-                  Plan locked by Admin. Enjoy!
+                  <Lock size={12} className="mr-2" /> Plan locked — editing disabled.
               </div>
+          )}
+
+          {/* Regenerate Options CTA */}
+          {!isLocked && showRegenerateCta && session.suggestions.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }} 
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-primary/10 border border-primary/30 rounded-lg p-3 flex items-center justify-between"
+            >
+              <span className="text-xs text-primary font-medium">Filters updated! Get new options?</span>
+              <Button 
+                size="sm" 
+                className="h-7 text-xs bg-primary text-black font-bold"
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
+                data-testid="button-regenerate"
+              >
+                {isRegenerating ? <RefreshCw size={12} className="animate-spin mr-1" /> : <RefreshCw size={12} className="mr-1" />}
+                {isRegenerating ? 'Regenerating...' : 'Regenerate Options'}
+              </Button>
+            </motion.div>
           )}
 
           {/* Participants Bar */}

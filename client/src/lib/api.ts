@@ -57,6 +57,7 @@ export const api = {
   // Suggestions
   suggestions: {
     create: (data: any) => fetchAPI('/suggestions', { method: 'POST', body: JSON.stringify(data) }),
+    deleteForSession: (sessionId: string) => fetchAPI(`/sessions/${sessionId}/suggestions`, { method: 'DELETE' }),
   },
   
   // Votes
