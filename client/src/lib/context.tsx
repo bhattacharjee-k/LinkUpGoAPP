@@ -63,13 +63,14 @@ interface AppContextType {
   logout: () => Promise<void>;
   updateUserProfile: (updates: any) => Promise<void>;
   updateUserLocation: (lat: string, lng: string, permission: string) => Promise<void>;
-  createGroup: (name: string) => Promise<void>;
+  createGroup: (name: string) => Promise<Group>;
   startSession: (groupId: string, initialFilters: any, name?: string) => Promise<string>;
   getSession: (id: string) => PlanningSession | undefined;
   refreshSession: (id: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   leaveSession: (sessionId: string) => Promise<void>;
   addMessage: (sessionId: string, text: string) => Promise<void>;
+  sendPlannerMessage: (sessionId: string, text: string, onStream: (chunk: string) => void) => Promise<string>;
   voteForSuggestion: (sessionId: string, suggestionId: string, vote: string) => Promise<void>;
   confirmPlan: (sessionId: string, suggestionId: string) => Promise<void>;
   updateSessionFilters: (sessionId: string, filters: any) => Promise<void>;
@@ -286,25 +287,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addMessage = async (sessionId: string, text: string) => {
+    // Check if this is a planner message (case-insensitive)
+    if (text.toLowerCase().includes('@planner') || text.toLowerCase().startsWith('planner ')) {
+      // Don't save user message here - the planner endpoint will save it
+      // Just trigger the streaming planner response
+      return;
+    }
+    
+    // Regular message - save to database
     await api.messages.create({
       sessionId,
       sender: user?.id || 'user',
       text
     });
 
-    // Simple planner trigger logic
-    if (text.includes('@Planner')) {
-      setTimeout(async () => {
-        await api.messages.create({
-          sessionId,
-          sender: 'planner-ai',
-          text: 'I heard you! I\'ve adjusted the ranking based on your feedback.'
-        });
-        await refreshSession(sessionId);
-      }, 1500);
-    }
-
     await refreshSession(sessionId);
+  };
+  
+  const sendPlannerMessage = async (
+    sessionId: string, 
+    text: string, 
+    onStream: (chunk: string) => void
+  ): Promise<string> => {
+    let fullResponse = '';
+    
+    try {
+      for await (const chunk of api.planner.stream(sessionId, text)) {
+        fullResponse += chunk;
+        onStream(chunk);
+      }
+    } catch (error: any) {
+      console.error('[Planner] Stream error:', error);
+      fullResponse = "Sorry, I'm having trouble connecting right now. Try again in a moment!";
+    }
+    
+    // Refresh session to get the saved messages
+    await refreshSession(sessionId);
+    
+    return fullResponse;
   };
 
   const voteForSuggestion = async (sessionId: string, suggestionId: string, vote: string) => {
@@ -398,6 +418,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     deleteSession,
     leaveSession,
     addMessage,
+    sendPlannerMessage,
     voteForSuggestion,
     confirmPlan,
     updateSessionFilters,

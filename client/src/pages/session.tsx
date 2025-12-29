@@ -23,7 +23,7 @@ import { format } from "date-fns";
 
 export function Session() {
   const [match, params] = useRoute('/session/:id');
-  const { getSession, addMessage, voteForSuggestion, confirmPlan, addParticipantToSession, updateSessionFilters, regenerateSuggestions, user, groups, isAdmin, deleteSession, leaveSession } = useApp();
+  const { getSession, addMessage, sendPlannerMessage, voteForSuggestion, confirmPlan, addParticipantToSession, updateSessionFilters, regenerateSuggestions, user, groups, isAdmin, deleteSession, leaveSession } = useApp();
   const [input, setInput] = useState('');
   const [_, setLocation] = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -41,6 +41,8 @@ export function Session() {
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [streamingResponse, setStreamingResponse] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
   const [editForm, setEditForm] = useState({
     date: new Date(),
     timeStart: '19:00',
@@ -75,10 +77,39 @@ export function Session() {
   const isUserAdmin = group ? isAdmin(group.id) : false;
   const isLocked = session.status === 'locked';
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
-    addMessage(session.id, input);
+    const messageText = input;
     setInput('');
+    
+    // Check if this is a planner message (case-insensitive, handles @planner, @Planner, planner, etc.)
+    const isPlannerMessage = messageText.toLowerCase().includes('@planner') || messageText.toLowerCase().startsWith('planner ');
+    
+    if (isPlannerMessage) {
+      // Start streaming response
+      setIsStreaming(true);
+      setStreamingResponse('');
+      
+      try {
+        const response = await sendPlannerMessage(session.id, messageText, (chunk) => {
+          setStreamingResponse(prev => prev + chunk);
+        });
+        
+        // If the response indicates an error, show it
+        if (response.includes("trouble connecting") || response.includes("Try again")) {
+          toast({ title: "Planner unavailable", description: response, variant: "destructive" });
+        }
+      } catch (error) {
+        console.error('Planner error:', error);
+        toast({ title: "Error", description: "Failed to get planner response", variant: "destructive" });
+      } finally {
+        setIsStreaming(false);
+        setStreamingResponse('');
+      }
+    } else {
+      // Regular message
+      addMessage(session.id, messageText);
+    }
   };
 
   const handleCopyLink = () => {
@@ -883,22 +914,58 @@ export function Session() {
           <TabsContent value="chat" className="flex-1 flex flex-col overflow-hidden data-[state=inactive]:hidden">
             <ScrollArea className="flex-1 px-4 py-4" ref={scrollRef}>
               <div className="space-y-4 min-h-full flex flex-col justify-end pb-4">
-                {session.messages.map(msg => (
+                {session.messages.map(msg => {
+                  const isCurrentUser = msg.sender === user?.id;
+                  const isPlannerAi = msg.sender === 'planner-ai';
+                  const isSystem = msg.sender === 'system';
+                  
+                  return (
                   <motion.div 
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     key={msg.id} 
                     className={cn(
                       "max-w-[80%] p-3 text-sm rounded-2xl",
-                      msg.sender === 'user' ? "ml-auto bg-primary text-black font-medium rounded-br-none" : 
-                      msg.sender === 'planner-ai' ? "bg-white/10 text-white border border-white/10 rounded-bl-none" :
-                      "bg-white/10 text-muted-foreground text-xs text-center mx-auto"
+                      isCurrentUser ? "ml-auto bg-primary text-black font-medium rounded-br-none" : 
+                      isPlannerAi ? "bg-white/10 text-white border border-white/10 rounded-bl-none" :
+                      isSystem ? "bg-white/10 text-muted-foreground text-xs text-center mx-auto" :
+                      "bg-white/5 text-white rounded-bl-none"
                     )}
                   >
-                    {msg.sender === 'planner-ai' && <div className="text-[10px] text-primary font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner</div>}
+                    {isPlannerAi && <div className="text-[10px] text-primary font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner</div>}
                     {msg.text}
                   </motion.div>
-                ))}
+                  );
+                })}
+                
+                {/* Streaming response */}
+                {isStreaming && streamingResponse && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="max-w-[80%] p-3 text-sm rounded-2xl bg-white/10 text-white border border-white/10 rounded-bl-none"
+                  >
+                    <div className="text-[10px] text-primary font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner</div>
+                    {streamingResponse}
+                    <span className="inline-block w-1 h-4 bg-primary ml-1 animate-pulse" />
+                  </motion.div>
+                )}
+                
+                {/* Typing indicator when waiting for response */}
+                {isStreaming && !streamingResponse && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="max-w-[80%] p-3 text-sm rounded-2xl bg-white/10 text-white border border-white/10 rounded-bl-none"
+                  >
+                    <div className="text-[10px] text-primary font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner</div>
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </motion.div>
+                )}
               </div>
             </ScrollArea>
             <div className="p-4 bg-background border-t border-white/10 flex gap-2">

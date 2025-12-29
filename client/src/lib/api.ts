@@ -78,4 +78,55 @@ export const api = {
   messages: {
     create: (data: any) => fetchAPI('/messages', { method: 'POST', body: JSON.stringify(data) }),
   },
+  
+  // Planner AI
+  planner: {
+    stream: async function*(sessionId: string, message: string): AsyncGenerator<string, void, unknown> {
+      const response = await fetch(`${API_BASE}/sessions/${sessionId}/planner`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ message }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Request failed' }));
+        throw new Error(error.message || 'Planner request failed');
+      }
+      
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Stream not available');
+      }
+      
+      const decoder = new TextDecoder();
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                yield data.content;
+              } else if (data.error) {
+                throw new Error(data.error);
+              } else if (data.done) {
+                return;
+              }
+            } catch (e) {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+    },
+  },
 };
