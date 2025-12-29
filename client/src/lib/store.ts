@@ -61,6 +61,7 @@ export interface ChatMessage {
 
 export interface PlanningSession {
   id: string;
+  name?: string; // Optional name for the plan (e.g. "Friday Drinks")
   groupId: string;
   status: 'planning' | 'confirmed';
   filters: {

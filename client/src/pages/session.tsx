@@ -98,7 +98,7 @@ export function Session() {
         <div className="px-6 py-4 border-b border-white/10 bg-background/80 backdrop-blur-md z-20 space-y-3">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="font-bold text-lg leading-tight">LinkUpGo Session</h2>
+              <h2 className="font-bold text-lg leading-tight">{session.name || 'LinkUpGo Session'}</h2>
               <p className="text-xs text-muted-foreground flex items-center gap-2">
                 <span className={cn("w-2 h-2 rounded-full animate-pulse", session.status === 'planning' ? "bg-primary" : "bg-blue-500")}/> 
                 {session.status === 'planning' ? 'Live Voting' : 'Plan Confirmed'}

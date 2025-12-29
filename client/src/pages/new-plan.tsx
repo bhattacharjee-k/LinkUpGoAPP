@@ -21,6 +21,7 @@ export function NewPlan() {
   const { toast } = useToast();
   
   const [formData, setFormData] = useState({
+    name: '',
     date: new Date(),
     timeStart: '19:00',
     timeEnd: '22:00',
@@ -64,7 +65,7 @@ export function NewPlan() {
         specificDate: formData.date,
         specificTime: `${formData.timeStart}-${formData.timeEnd}`,
         inviteCode: draftInviteCode // Pass the pre-generated code
-    });
+    }, formData.name || undefined);
 
     // Add selected participants to the new session
     formData.participants.forEach(pid => {
@@ -158,6 +159,17 @@ export function NewPlan() {
 
         <div className="space-y-8 flex-1">
             
+            {/* Plan Name Section */}
+            <div className="space-y-4">
+                <Label className="text-lg">What are we calling this?</Label>
+                <Input 
+                    placeholder="e.g. Friday Drinks, Birthday Bash, Work Happy Hour" 
+                    className="bg-white/5 border-white/10 h-12 text-lg" 
+                    value={formData.name}
+                    onChange={e => setFormData({...formData, name: e.target.value})}
+                />
+            </div>
+
             {/* Participants Section */}
             <div className="space-y-4">
                 <Label className="text-lg flex justify-between items-center">

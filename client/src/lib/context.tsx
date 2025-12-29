@@ -11,7 +11,7 @@ interface AppContextType {
   sessions: PlanningSession[];
   setUser: (user: UserProfile) => void;
   createGroup: (name: string) => void;
-  startSession: (groupId: string, initialFilters: any) => string;
+  startSession: (groupId: string, initialFilters: any, name?: string) => string;
   getSession: (id: string) => PlanningSession | undefined;
   addMessage: (sessionId: string, text: string) => void;
   voteForSuggestion: (sessionId: string, suggestionId: string, vote: 'yes' | 'no' | 'fire') => void;
@@ -66,10 +66,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const startSession = (groupId: string, initialFilters: any) => {
+  const startSession = (groupId: string, initialFilters: any, name?: string) => {
     const newSession: PlanningSession = {
       id: Math.random().toString(36).substr(2, 9),
       groupId,
+      name,
       status: 'planning',
       filters: initialFilters,
       guardrails: {
