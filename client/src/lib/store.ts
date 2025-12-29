@@ -37,6 +37,8 @@ export interface Group {
   name: string;
   members: string[]; // User IDs
   inviteCode?: string; // For external sharing
+  adminId?: string; // ID of the group admin (creator)
+  locked?: boolean; // If true, new members cannot join via invite link
 }
 
 export interface Suggestion {
@@ -119,8 +121,8 @@ const MOCK_USER: UserProfile = {
 };
 
 export const MOCK_GROUPS: Group[] = [
-  { id: 'g1', name: 'Tech Founders NYC', members: ['me', 'u2', 'u3', 'u4'] },
-  { id: 'g2', name: 'West Loop Crew', members: ['me', 'u5', 'u6'] },
+  { id: 'g1', name: 'Tech Founders NYC', members: ['me', 'u2', 'u3', 'u4'], adminId: 'me', locked: false },
+  { id: 'g2', name: 'West Loop Crew', members: ['me', 'u5', 'u6'], adminId: 'me', locked: false },
 ];
 
 export const MOCK_SUGGESTIONS: Suggestion[] = [

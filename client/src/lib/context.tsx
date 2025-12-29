@@ -18,6 +18,9 @@ interface AppContextType {
   confirmPlan: (sessionId: string, suggestionId: string) => void;
   addMemberToGroup: (groupId: string, userId: string) => void;
   addParticipantToSession: (sessionId: string, userId: string) => void;
+  updateGroup: (groupId: string, updates: Partial<Group>) => void;
+  isGroupLocked: (groupId: string) => boolean;
+  isAdmin: (groupId: string) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -44,11 +47,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       name,
       members: [user?.id || 'me'],
       inviteCode: Math.random().toString(36).substr(2, 6).toUpperCase(),
+      adminId: user?.id || 'me',
+      locked: false,
     };
     setGroups([...groups, newGroup]);
   };
 
+  const updateGroup = (groupId: string, updates: Partial<Group>) => {
+    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, ...updates } : g));
+  };
+  
+  const isGroupLocked = (groupId: string) => {
+      const group = groups.find(g => g.id === groupId);
+      return group?.locked || false;
+  };
+
+  const isAdmin = (groupId: string) => {
+      const group = groups.find(g => g.id === groupId);
+      return group?.adminId === (user?.id || 'me');
+  };
+
   const addMemberToGroup = (groupId: string, userId: string) => {
+    const group = groups.find(g => g.id === groupId);
+    if (group?.locked) return; // Prevent join if locked
+    
     setGroups(prev => prev.map(g => {
         if (g.id !== groupId) return g;
         if (g.members.includes(userId)) return g;
@@ -155,7 +177,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   
   return (
     <AppContext.Provider value={{ 
-      user, groups, sessions, setUser, createGroup, startSession, getSession, addMessage, voteForSuggestion, confirmPlan, addMemberToGroup, addParticipantToSession 
+      user, groups, sessions, setUser, createGroup, startSession, getSession, addMessage, voteForSuggestion, confirmPlan, addMemberToGroup, addParticipantToSession,
+      updateGroup, isGroupLocked, isAdmin
     }}>
       {children}
     </AppContext.Provider>
