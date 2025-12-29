@@ -207,6 +207,7 @@ export function NewPlan() {
                                     </div>
                                 </div>
 
+                                {userGroup && (
                                 <div className="space-y-2">
                                     <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">From {userGroup.name}</h4>
                                     <div className="flex flex-wrap gap-2">
@@ -224,6 +225,7 @@ export function NewPlan() {
                                         ))}
                                     </div>
                                 </div>
+                                )}
                                 <div className="space-y-2">
                                      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Add by Name</h4>
                                      <div className="flex gap-2">
