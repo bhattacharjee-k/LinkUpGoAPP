@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 
 export function NewPlan() {
-  const { startSession, user, groups, addParticipantToSession } = useApp();
+  const { startSession, user, groups, addParticipantToSession, createGroup } = useApp();
   const [_, setLocation] = useLocation();
   const [step, setStep] = useState(1);
   const { toast } = useToast();
@@ -42,7 +42,7 @@ export function NewPlan() {
   // Find user's primary group or first available group
   const userGroup = groups.find(g => g.members.includes(user?.id || 'me')) || groups[0];
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!user) return;
     
     // Format "Day-TimeBlock" approximation for the MVP data model compatibility
@@ -56,25 +56,45 @@ export function NewPlan() {
     
     timeWindow = `${dayName}-${timeBlock}`;
 
-    const id = startSession('g1', { // Using g1 as placeholder, real app would let you pick group context
-        timeWindow, 
-        locationScope: formData.locationScope,
-        category: formData.categories.length > 0 ? formData.categories : ['Drinks'],
-        energy: formData.energy,
-        budget: formData.budget,
-        specificDate: formData.date,
-        specificTime: `${formData.timeStart}-${formData.timeEnd}`,
-        inviteCode: draftInviteCode // Pass the pre-generated code
-    }, formData.name || undefined);
+    // Use user's group or create one if they don't have any
+    let groupId = userGroup?.id;
+    if (!groupId) {
+      // Create a default group for the user
+      await createGroup(formData.name || 'My Plans');
+      // After creating, the groups state will update - wait a tick
+      await new Promise(resolve => setTimeout(resolve, 100));
+      // Get the newly created group
+      const newGroups = groups;
+      groupId = newGroups[newGroups.length - 1]?.id;
+      if (!groupId) {
+        toast({ title: "Error", description: "Failed to create group. Please try again.", variant: "destructive" });
+        return;
+      }
+    }
 
-    // Add selected participants to the new session
-    formData.participants.forEach(pid => {
-        if (pid !== user.id) {
-            addParticipantToSession(id, pid);
-        }
-    });
+    try {
+      const id = await startSession(groupId, {
+          timeWindow, 
+          locationScope: formData.locationScope,
+          category: formData.categories.length > 0 ? formData.categories : ['Drinks'],
+          energy: formData.energy,
+          budget: formData.budget,
+          specificDate: formData.date,
+          specificTime: `${formData.timeStart}-${formData.timeEnd}`,
+          inviteCode: draftInviteCode
+      }, formData.name || undefined);
 
-    setLocation(`/session/${id}`);
+      // Add selected participants to the new session
+      formData.participants.forEach(pid => {
+          if (pid !== user.id) {
+              addParticipantToSession(id, pid);
+          }
+      });
+
+      setLocation(`/session/${id}`);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to create session", variant: "destructive" });
+    }
   };
 
   const handleCopyLink = () => {
