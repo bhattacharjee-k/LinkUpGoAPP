@@ -149,6 +149,8 @@ const NYC_SUGGESTIONS: Suggestion[] = [
     budget: '$$$',
     description: 'Perfect for groups. High energy rooftop with incredible skewers. Matches your "Social" vibe and fits the budget.',
     tags: ['Rooftop', 'Middle Eastern', 'Views'],
+    reservationUrl: 'https://resy.com/cities/ny/laser-wolf',
+    detailUrl: 'https://laserwolfnyc.com',
     votes: {},
   },
   {
@@ -162,6 +164,7 @@ const NYC_SUGGESTIONS: Suggestion[] = [
     budget: '$$',
     description: 'World-class cocktails in a buzzy setting. Might be a wait, but hits the "Drinks" preference perfectly.',
     tags: ['Cocktails', 'Award Winning', 'Busy'],
+    detailUrl: 'https://doublechickenplease.com',
     votes: {},
   },
   {
@@ -175,6 +178,8 @@ const NYC_SUGGESTIONS: Suggestion[] = [
     budget: '$$',
     description: 'Vegan cafe by day, audiophile bar by night. Great fit for the "Chill" into "Party" transition.',
     tags: ['Music', 'Vegan', 'Patio'],
+    eventUrl: 'https://publicrecords.nyc/events',
+    detailUrl: 'https://publicrecords.nyc',
     votes: {},
   },
   {
@@ -188,6 +193,8 @@ const NYC_SUGGESTIONS: Suggestion[] = [
     budget: '$$$$',
     description: 'Immersive theatrical club experience. A bit pricey, but guarantees a memorable night.',
     tags: ['Club', 'Performance', 'Late Night'],
+    ticketUrl: 'https://houseofx.com/tickets',
+    detailUrl: 'https://houseofx.com',
     votes: {},
   },
 ];
@@ -205,6 +212,8 @@ const CHICAGO_SUGGESTIONS: Suggestion[] = [
     budget: '$$$',
     description: 'Stephanie Izard\'s celebrated restaurant in West Loop. Energetic atmosphere with bold flavors perfect for groups.',
     tags: ['Dinner', 'West Loop', 'Celebrity Chef'],
+    reservationUrl: 'https://resy.com/cities/chi/girl-and-the-goat',
+    detailUrl: 'https://girlandthegoat.com',
     votes: {},
   },
   {
@@ -218,6 +227,7 @@ const CHICAGO_SUGGESTIONS: Suggestion[] = [
     budget: '$$',
     description: 'Acclaimed cocktail bar in Wicker Park. Intimate setting with exceptional drinks and a no-standing policy.',
     tags: ['Cocktails', 'Speakeasy', 'Award Winning'],
+    detailUrl: 'https://theviolethour.com',
     votes: {},
   },
   {
@@ -231,6 +241,8 @@ const CHICAGO_SUGGESTIONS: Suggestion[] = [
     budget: '$$$',
     description: 'Stunning rooftop bar with panoramic views of Millennium Park. Perfect for celebrations and group gatherings.',
     tags: ['Rooftop', 'Views', 'Downtown'],
+    reservationUrl: 'https://resy.com/cities/chi/cindys-rooftop',
+    detailUrl: 'https://cindysrooftop.com',
     votes: {},
   },
   {
@@ -244,6 +256,8 @@ const CHICAGO_SUGGESTIONS: Suggestion[] = [
     budget: '$$',
     description: 'Historic jazz club in Uptown. Live music every night with a vintage vibe and classic cocktails.',
     tags: ['Live Music', 'Jazz', 'Historic'],
+    eventUrl: 'https://greenmilljazz.com/calendar',
+    detailUrl: 'https://greenmilljazz.com',
     votes: {},
   },
   {
@@ -257,6 +271,8 @@ const CHICAGO_SUGGESTIONS: Suggestion[] = [
     budget: '$$$$',
     description: 'High-energy dance club with top DJs and bottle service. Late night vibes in River North.',
     tags: ['Club', 'Dancing', 'Late Night'],
+    ticketUrl: 'https://discoclub.com/events',
+    detailUrl: 'https://discoclub.com',
     votes: {},
   },
 ];
