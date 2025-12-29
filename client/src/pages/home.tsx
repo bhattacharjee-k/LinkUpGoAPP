@@ -1,16 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '@/lib/context';
 import { Layout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Plus, Calendar, MapPin, Users, ArrowRight, PlusCircle } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function Home() {
   const { user, sessions, groups, createGroup, startSession } = useApp();
   const [_, setLocation] = useLocation();
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
 
   if (!user) return null; // Should redirect to onboarding ideally
+
+  const handleCreateGroup = () => {
+    if (!newGroupName.trim()) return;
+    createGroup(newGroupName);
+    setNewGroupName('');
+    setIsCreateGroupOpen(false);
+  };
 
   return (
     <Layout>
@@ -97,15 +109,41 @@ export function Home() {
                    ))}
                  </div>
                  <div>
-                   <h4 className="font-bold text-sm">{group.name}</h4>
+                   <h4 className="font-bold text-sm truncate">{group.name}</h4>
                    <p className="text-xs text-muted-foreground">{group.members.length} members</p>
                  </div>
                </Card>
              ))}
-             <button onClick={() => createGroup(`Squad ${groups.length + 1}`)} className="rounded-xl border border-dashed border-white/20 flex flex-col items-center justify-center gap-2 aspect-square hover:bg-white/5 transition-all text-muted-foreground hover:text-primary">
-               <PlusCircle size={24} />
-               <span className="text-xs font-medium">Create New</span>
-             </button>
+             
+             <Dialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
+               <DialogTrigger asChild>
+                 <button className="rounded-xl border border-dashed border-white/20 flex flex-col items-center justify-center gap-2 aspect-square hover:bg-white/5 transition-all text-muted-foreground hover:text-primary">
+                   <PlusCircle size={24} />
+                   <span className="text-xs font-medium">Create New</span>
+                 </button>
+               </DialogTrigger>
+               <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
+                 <DialogHeader>
+                   <DialogTitle>Name your new group</DialogTitle>
+                 </DialogHeader>
+                 <div className="space-y-4 py-4">
+                   <div className="space-y-2">
+                     <Label>Group Name</Label>
+                     <Input 
+                       placeholder="e.g. Friday Crew, Chicago Friends" 
+                       value={newGroupName}
+                       onChange={(e) => setNewGroupName(e.target.value)}
+                       className="bg-white/5 border-white/10"
+                     />
+                   </div>
+                 </div>
+                 <DialogFooter>
+                   <Button onClick={handleCreateGroup} disabled={!newGroupName.trim()} className="w-full bg-primary text-black font-bold">
+                     Create Group
+                   </Button>
+                 </DialogFooter>
+               </DialogContent>
+             </Dialog>
            </div>
         </div>
 

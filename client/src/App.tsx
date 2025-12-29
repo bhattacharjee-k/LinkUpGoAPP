@@ -51,7 +51,7 @@ function JoinRoute() {
 
 function JoinPlanRoute() {
     const [match, params] = useRoute('/join-plan/:code');
-    const { sessions, addParticipantToSession, addMemberToGroup, user } = useApp();
+    const { sessions, groups, addParticipantToSession, addMemberToGroup, user } = useApp();
     const [_, setLocation] = useLocation();
     
     useEffect(() => {
@@ -75,7 +75,19 @@ function JoinPlanRoute() {
         }
     }, [params, user, sessions, setLocation]);
 
-    return <div className="flex items-center justify-center h-screen">Joining plan...</div>;
+    // Simple loading state with session info attempt
+    const session = sessions.find(s => s.inviteCode === params?.code);
+    const group = session ? groups.find(g => g.id === session.groupId) : null;
+
+    return (
+        <div className="flex flex-col items-center justify-center h-screen bg-background text-foreground gap-4">
+            <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            <div className="text-center">
+                <h2 className="text-xl font-bold">Joining Plan...</h2>
+                {group && <p className="text-muted-foreground">with {group.name}</p>}
+            </div>
+        </div>
+    );
 }
 
 function Router() {
