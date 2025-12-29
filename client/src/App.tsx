@@ -6,6 +6,8 @@ import { Home } from "@/pages/home";
 import { Session } from "@/pages/session";
 import { NewPlan } from "@/pages/new-plan";
 import { GroupDetails } from "@/pages/group-details";
+import { Groups } from "@/pages/groups";
+import { Profile } from "@/pages/profile";
 import { useEffect } from "react";
 
 function PrivateRoute({ component: Component }: { component: React.ComponentType }) {
@@ -83,9 +85,8 @@ function Router() {
     <Switch>
       <Route path="/onboarding" component={Onboarding} />
       
-      {/* Groups and Profile just redirect to Home for MVP since we focused on Session flow */}
       <Route path="/groups">
-        <PrivateRoute component={Home} />
+        <PrivateRoute component={Groups} />
       </Route>
       <Route path="/group/:id">
         <PrivateRoute component={GroupDetails} />
@@ -94,7 +95,7 @@ function Router() {
       <Route path="/join-plan/:code" component={JoinPlanRoute} />
 
       <Route path="/profile">
-        <PrivateRoute component={Home} />
+        <PrivateRoute component={Profile} />
       </Route>
       
       {/* New Session Creation Mock */}
