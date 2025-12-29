@@ -9,10 +9,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield, Lock, Ban, ArrowLeft, Pencil, RefreshCw, Calendar, Clock, Zap } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield, Lock, Ban, ArrowLeft, Pencil, RefreshCw, Calendar, Clock, Zap, MoreVertical, LogOut, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from '@/hooks/use-toast';
 import { PlanningSession, Budget, Energy, Category } from '@/lib/store';
@@ -22,7 +23,7 @@ import { format } from "date-fns";
 
 export function Session() {
   const [match, params] = useRoute('/session/:id');
-  const { getSession, addMessage, voteForSuggestion, confirmPlan, addParticipantToSession, updateSessionFilters, regenerateSuggestions, user, groups, isAdmin } = useApp();
+  const { getSession, addMessage, voteForSuggestion, confirmPlan, addParticipantToSession, updateSessionFilters, regenerateSuggestions, user, groups, isAdmin, deleteSession, leaveSession } = useApp();
   const [input, setInput] = useState('');
   const [_, setLocation] = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -37,6 +38,9 @@ export function Session() {
   const [editOpen, setEditOpen] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [showRegenerateCta, setShowRegenerateCta] = useState(false);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [editForm, setEditForm] = useState({
     date: new Date(),
     timeStart: '19:00',
@@ -207,6 +211,32 @@ export function Session() {
           // No votes? Just pick the first one or show error
           handleLockIn(session.suggestions[0].id);
       }
+  };
+
+  const handleLeavePlan = async () => {
+    try {
+      await leaveSession(session.id);
+      setLeaveDialogOpen(false);
+      toast({ title: "Left plan", description: "You've been removed from this plan." });
+      setLocation('/');
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to leave plan", variant: "destructive" });
+    }
+  };
+
+  const handleDeletePlan = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      toast({ title: "Confirmation required", description: "Type DELETE to confirm.", variant: "destructive" });
+      return;
+    }
+    try {
+      await deleteSession(session.id);
+      setDeleteDialogOpen(false);
+      toast({ title: "Plan deleted", description: "This plan has been permanently deleted." });
+      setLocation('/');
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to delete plan", variant: "destructive" });
+    }
   };
 
   const sortedSuggestions = [...session.suggestions].sort((a, b) => {
@@ -485,6 +515,36 @@ export function Session() {
                     <Lock size={10} /> LOCKED
                 </Badge>
               )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" data-testid="button-plan-menu">
+                    <MoreVertical size={16} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-card border-white/10 w-48">
+                  <DropdownMenuItem 
+                    onClick={() => setLeaveDialogOpen(true)}
+                    className="text-sm cursor-pointer focus:bg-white/10"
+                    data-testid="menu-item-leave-plan"
+                  >
+                    <LogOut size={14} className="mr-2" />
+                    Leave plan
+                  </DropdownMenuItem>
+                  {isUserAdmin && (
+                    <>
+                      <DropdownMenuSeparator className="bg-white/10" />
+                      <DropdownMenuItem 
+                        onClick={() => setDeleteDialogOpen(true)}
+                        className="text-sm cursor-pointer text-red-500 focus:bg-red-500/10 focus:text-red-400"
+                        data-testid="menu-item-delete-plan"
+                      >
+                        <Trash2 size={14} className="mr-2" />
+                        Delete plan
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -854,7 +914,7 @@ export function Session() {
 
         {/* Tie Breaker Dialog */}
         <Dialog open={tieBreakerOpen} onOpenChange={setTieBreakerOpen}>
-            <DialogContent>
+            <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
                 <DialogHeader>
                     <DialogTitle>Tie Breaker needed!</DialogTitle>
                 </DialogHeader>
@@ -872,6 +932,80 @@ export function Session() {
                     })}
                 </div>
             </DialogContent>
+        </Dialog>
+
+        {/* Leave Plan Dialog */}
+        <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+          <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Leave this plan?</DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                You'll be removed from this plan and won't be able to vote or see updates.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-row gap-2 sm:gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setLeaveDialogOpen(false)}
+                className="flex-1 border-white/10 bg-white/5"
+                data-testid="button-cancel-leave"
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={handleLeavePlan}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                data-testid="button-confirm-leave"
+              >
+                Leave Plan
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Plan Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Delete this plan?</DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                This action cannot be undone. All votes and messages will be permanently deleted.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <p className="text-sm">Type <span className="font-mono font-bold text-primary">DELETE</span> to confirm:</p>
+              <Input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE"
+                className="bg-white/5 border-white/10"
+                data-testid="input-delete-confirm"
+              />
+            </div>
+            <DialogFooter className="flex-row gap-2 sm:gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setDeleteConfirmText('');
+                }}
+                className="flex-1 border-white/10 bg-white/5"
+                data-testid="button-cancel-delete"
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={handleDeletePlan}
+                disabled={deleteConfirmText !== 'DELETE'}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white disabled:opacity-50"
+                data-testid="button-confirm-delete"
+              >
+                Delete Forever
+              </Button>
+            </DialogFooter>
+          </DialogContent>
         </Dialog>
       </div>
     </Layout>
