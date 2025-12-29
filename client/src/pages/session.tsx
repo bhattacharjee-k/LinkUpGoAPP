@@ -66,7 +66,12 @@ export function Session() {
   );
 
   const group = groups.find(g => g.id === session.groupId);
-  const participants = session.participants || [];
+  const allParticipants = session.participants || [];
+  // Filter out users who have left
+  const participants = allParticipants.filter(pid => {
+    const status = session.participantStatusByUserId?.[pid];
+    return status !== 'left';
+  });
   const isUserAdmin = group ? isAdmin(group.id) : false;
   const isLocked = session.status === 'locked';
 
@@ -176,10 +181,11 @@ export function Session() {
 
   const calculateScore = (suggestion: any) => {
       let score = 0;
-      // Only count votes from active participants
+      // Only count votes from active participants (exclude 'cant_make_it' and 'left')
       Object.entries(suggestion.votes).forEach(([uid, vote]) => {
-          // Check if this user is active
-          if (session.participantStatusByUserId && session.participantStatusByUserId[uid] === 'cant_make_it') {
+          const status = session.participantStatusByUserId?.[uid];
+          // Skip if user has left or can't make it
+          if (status === 'cant_make_it' || status === 'left') {
               return;
           }
 

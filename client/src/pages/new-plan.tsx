@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon, Clock, ChevronRight, MapPin, DollarSign, UserPlus, Users, Link as LinkIcon, Check, Copy } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, ChevronRight, MapPin, DollarSign, UserPlus, Users, Link as LinkIcon, Check, Copy, Navigation, X } from 'lucide-react';
 import { City, Budget, Energy, Category } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { Calendar } from "@/components/ui/calendar";
@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 
 export function NewPlan() {
-  const { startSession, user, groups, addParticipantToSession, createGroup } = useApp();
+  const { startSession, user, groups, addParticipantToSession, createGroup, updateUserLocation } = useApp();
   const [_, setLocation] = useLocation();
   const [step, setStep] = useState(1);
   const { toast } = useToast();
@@ -27,6 +27,7 @@ export function NewPlan() {
     timeEnd: '22:00',
     flexibility: 'strict', // strict, flexible
     locationScope: user?.city || 'NYC',
+    neighborhood: '',
     budget: '$$' as Budget,
     energy: user?.energy || 'Vibey',
     categories: [] as Category[],
@@ -37,6 +38,9 @@ export function NewPlan() {
   const [copied, setCopied] = useState(false);
   const [newParticipantName, setNewParticipantName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [locationPermission, setLocationPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(true);
   // Pre-generate invite code for display
   const [draftInviteCode] = useState(Math.random().toString(36).substr(2, 6).toUpperCase());
 
@@ -74,6 +78,7 @@ export function NewPlan() {
       const id = await startSession(groupId, {
           timeWindow, 
           locationScope: formData.locationScope,
+          neighborhood: formData.neighborhood || undefined,
           category: formData.categories.length > 0 ? formData.categories : ['Drinks'],
           energy: formData.energy,
           budget: formData.budget,
@@ -161,6 +166,47 @@ export function NewPlan() {
                 : [...prev.participants, pid]
           };
       });
+  };
+
+  const handleRequestLocation = async () => {
+    if (!navigator.geolocation) {
+      toast({ title: "Not supported", description: "Location is not supported by your browser.", variant: "destructive" });
+      setLocationPermission('denied');
+      return;
+    }
+
+    setIsGettingLocation(true);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          await updateUserLocation(
+            latitude.toString(), 
+            longitude.toString(), 
+            'granted'
+          );
+          setLocationPermission('granted');
+          toast({ title: "Location saved", description: "Your location has been saved for better suggestions." });
+          setShowLocationPrompt(false);
+        } catch (error: any) {
+          toast({ title: "Error", description: error.message || "Failed to save location", variant: "destructive" });
+        } finally {
+          setIsGettingLocation(false);
+        }
+      },
+      (error) => {
+        console.error('Location error:', error);
+        setLocationPermission('denied');
+        setIsGettingLocation(false);
+        toast({ 
+          title: "Location denied", 
+          description: "You can still manually enter your neighborhood.", 
+          variant: "destructive" 
+        });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
   return (
@@ -277,6 +323,73 @@ export function NewPlan() {
                             )}
                         </div>
                     ))}
+                </div>
+            </div>
+
+            {/* Location & Neighborhood Section */}
+            <div className="space-y-4 pt-4 border-t border-white/10">
+                <Label className="text-lg">Where?</Label>
+                
+                {/* Location Permission Card */}
+                {showLocationPrompt && locationPermission !== 'granted' && (
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-primary/20 rounded-lg">
+                        <Navigation size={18} className="text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm">Better suggestions with your location</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Share your location for more accurate neighborhood-based recommendations.
+                        </p>
+                      </div>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-6 w-6 -mt-1 -mr-1"
+                        onClick={() => setShowLocationPrompt(false)}
+                        data-testid="button-close-location-prompt"
+                      >
+                        <X size={14} />
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={handleRequestLocation}
+                        disabled={isGettingLocation}
+                        className="flex-1 bg-primary text-black hover:bg-primary/90 h-9 text-sm font-medium"
+                        data-testid="button-request-location"
+                      >
+                        {isGettingLocation ? "Getting location..." : "Share Location"}
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => setShowLocationPrompt(false)}
+                        className="flex-1 border-white/10 bg-white/5 h-9 text-sm"
+                        data-testid="button-skip-location"
+                      >
+                        Skip
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Neighborhood Input */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <MapPin size={12} />
+                    Neighborhood (optional)
+                  </Label>
+                  <Input 
+                    placeholder={formData.locationScope === 'Chicago' ? "e.g. River North, West Loop" : "e.g. Williamsburg, East Village"}
+                    className="bg-white/5 border-white/10 h-10" 
+                    value={formData.neighborhood}
+                    onChange={e => setFormData({...formData, neighborhood: e.target.value})}
+                    data-testid="input-neighborhood"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Helps us find options closer to where you are
+                  </p>
                 </div>
             </div>
 
