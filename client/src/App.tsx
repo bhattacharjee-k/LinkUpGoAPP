@@ -24,67 +24,53 @@ function PrivateRoute({ component: Component }: { component: React.ComponentType
 
 function JoinRoute() {
     const [match, params] = useRoute('/join/:code');
-    const { groups, addMemberToGroup, user } = useApp();
+    const { joinGroupByCode, user, isLoading } = useApp();
     const [_, setLocation] = useLocation();
     
     useEffect(() => {
-        if (params?.code && user) {
-            const group = groups.find(g => g.inviteCode === params.code);
-            if (group) {
-                addMemberToGroup(group.id, user.id);
-                setLocation(`/group/${group.id}`);
-            } else {
-                // Invalid code or group not found (mockup limitation)
-                // For demo purposes, let's create a mock group if needed or just redirect
-                console.warn("Group not found for code:", params.code);
-                setLocation('/');
+        const joinGroup = async () => {
+            if (params?.code && user && !isLoading) {
+                try {
+                    await joinGroupByCode(params.code);
+                    // Group has been joined, find it and redirect
+                    setLocation('/');
+                } catch (error) {
+                    console.error("Failed to join group:", error);
+                    setLocation('/');
+                }
+            } else if (!user && !isLoading) {
+                // Force onboarding if not logged in, preserve return path
+                const returnPath = encodeURIComponent(window.location.pathname);
+                setLocation(`/onboarding?returnTo=${returnPath}`);
             }
-        } else if (!user) {
-            // Force onboarding if not logged in, preserve return path
-            const returnPath = encodeURIComponent(window.location.pathname);
-            setLocation(`/onboarding?returnTo=${returnPath}`);
-        }
-    }, [params, user, groups, setLocation]);
+        };
+        joinGroup();
+    }, [params, user, isLoading, setLocation]);
 
     return <div className="flex items-center justify-center h-screen">Joining group...</div>;
 }
 
 function JoinPlanRoute() {
     const [match, params] = useRoute('/join-plan/:code');
-    const { sessions, groups, addParticipantToSession, addMemberToGroup, user } = useApp();
+    const { user, isLoading } = useApp();
     const [_, setLocation] = useLocation();
     
     useEffect(() => {
-        if (params?.code && user) {
-            const session = sessions.find(s => s.inviteCode === params.code);
-            if (session) {
-                // Add to session
-                addParticipantToSession(session.id, user.id);
-                // Also implicit add to group if not already
-                addMemberToGroup(session.groupId, user.id);
-                setLocation(`/session/${session.id}`);
-            } else {
-                 // Invalid code or session not found (mockup limitation)
-                 console.warn("Session not found for code:", params.code);
-                 setLocation('/');
-            }
-        } else if (!user) {
-            // Force onboarding if not logged in, preserve return path
+        // For session invite links, we'll implement this after MVP
+        // For now, just redirect to home
+        if (!user && !isLoading) {
             const returnPath = encodeURIComponent(window.location.pathname);
             setLocation(`/onboarding?returnTo=${returnPath}`);
+        } else if (user) {
+            setLocation('/');
         }
-    }, [params, user, sessions, setLocation]);
-
-    // Simple loading state with session info attempt
-    const session = sessions.find(s => s.inviteCode === params?.code);
-    const group = session ? groups.find(g => g.id === session.groupId) : null;
+    }, [params, user, isLoading, setLocation]);
 
     return (
         <div className="flex flex-col items-center justify-center h-screen bg-background text-foreground gap-4">
             <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
             <div className="text-center">
                 <h2 className="text-xl font-bold">Joining Plan...</h2>
-                {group && <p className="text-muted-foreground">with {group.name}</p>}
             </div>
         </div>
     );
