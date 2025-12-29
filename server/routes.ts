@@ -17,7 +17,14 @@ export async function registerRoutes(
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const data = insertUserSchema.parse(req.body);
+      // Map frontend camelCase to database snake_case
+      const { hardNos, ...rest } = req.body;
+      const mappedData = {
+        ...rest,
+        hardNos: hardNos || [],
+      };
+      
+      const data = insertUserSchema.parse(mappedData);
       const hashedPassword = await bcrypt.hash(data.password, 10);
       
       const user = await storage.createUser({
@@ -28,6 +35,7 @@ export async function registerRoutes(
       // @ts-ignore - session is added by express-session
       req.session.userId = user.id;
       
+      // Map back to camelCase for frontend
       const { password, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
     } catch (error: any) {
