@@ -122,6 +122,7 @@ export const messages = pgTable("messages", {
   sessionId: varchar("session_id").notNull().references(() => sessions.id, { onDelete: 'cascade' }),
   sender: text("sender").notNull(), // 'user' | 'system' | 'planner-ai' or userId
   text: text("text").notNull(),
+  metadata: jsonb("metadata"), // Optional AI metadata (tokens used, etc.)
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
