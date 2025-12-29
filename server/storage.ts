@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import * as schema from '@shared/schema';
 import type {
   User, InsertUser,
@@ -25,6 +25,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
+  updateUserLocation(id: string, lat: string, lng: string, permission: string): Promise<User | undefined>;
 
   // Groups
   getGroup(id: string): Promise<Group | undefined>;
@@ -40,6 +41,8 @@ export interface IStorage {
   getGroupSessions(groupId: string): Promise<Session[]>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: string, updates: Partial<InsertSession>): Promise<Session | undefined>;
+  softDeleteSession(id: string): Promise<void>;
+  leaveSession(sessionId: string, userId: string): Promise<void>;
   addSessionParticipant(sessionId: string, userId: string, status?: string): Promise<void>;
   getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string }>>;
   updateParticipantStatus(sessionId: string, userId: string, status: string): Promise<void>;
@@ -53,6 +56,7 @@ export interface IStorage {
   // Votes
   vote(suggestionId: string, userId: string, voteType: string): Promise<void>;
   getSuggestionVotes(suggestionId: string): Promise<Array<{ userId: string; vote: string }>>;
+  clearUserVotes(sessionId: string, userId: string): Promise<void>;
 
   // Messages
   getSessionMessages(sessionId: string): Promise<Message[]>;
@@ -78,6 +82,19 @@ export class DbStorage implements IStorage {
 
   async updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined> {
     const [updated] = await db.update(schema.users).set(updates).where(eq(schema.users.id, id)).returning();
+    return updated;
+  }
+
+  async updateUserLocation(id: string, lat: string, lng: string, permission: string): Promise<User | undefined> {
+    const [updated] = await db.update(schema.users)
+      .set({
+        lastKnownLat: lat,
+        lastKnownLng: lng,
+        lastLocationTimestamp: new Date(),
+        locationPermission: permission
+      })
+      .where(eq(schema.users.id, id))
+      .returning();
     return updated;
   }
 
@@ -136,7 +153,12 @@ export class DbStorage implements IStorage {
   }
 
   async getGroupSessions(groupId: string): Promise<Session[]> {
-    return db.select().from(schema.sessions).where(eq(schema.sessions.groupId, groupId));
+    return db.select().from(schema.sessions).where(
+      and(
+        eq(schema.sessions.groupId, groupId),
+        isNull(schema.sessions.deletedAt)
+      )
+    );
   }
 
   async createSession(session: InsertSession): Promise<Session> {
@@ -147,6 +169,20 @@ export class DbStorage implements IStorage {
   async updateSession(id: string, updates: Partial<InsertSession>): Promise<Session | undefined> {
     const [updated] = await db.update(schema.sessions).set(updates).where(eq(schema.sessions.id, id)).returning();
     return updated;
+  }
+
+  async softDeleteSession(id: string): Promise<void> {
+    await db.update(schema.sessions)
+      .set({ deletedAt: new Date() })
+      .where(eq(schema.sessions.id, id));
+  }
+
+  async leaveSession(sessionId: string, userId: string): Promise<void> {
+    // Update participant status to 'left'
+    await this.updateParticipantStatus(sessionId, userId, 'left');
+    
+    // Clear all votes from this user for this session's suggestions
+    await this.clearUserVotes(sessionId, userId);
   }
 
   async addSessionParticipant(sessionId: string, userId: string, status: string = 'active'): Promise<void> {
@@ -202,6 +238,22 @@ export class DbStorage implements IStorage {
   async getSuggestionVotes(suggestionId: string): Promise<Array<{ userId: string; vote: string }>> {
     const votes = await db.select().from(schema.votes).where(eq(schema.votes.suggestionId, suggestionId));
     return votes.map(v => ({ userId: v.userId, vote: v.vote }));
+  }
+
+  async clearUserVotes(sessionId: string, userId: string): Promise<void> {
+    // Get all suggestions for this session
+    const suggestions = await this.getSessionSuggestions(sessionId);
+    const suggestionIds = suggestions.map(s => s.id);
+    
+    // Delete all votes from this user for these suggestions
+    for (const suggestionId of suggestionIds) {
+      await db.delete(schema.votes).where(
+        and(
+          eq(schema.votes.suggestionId, suggestionId),
+          eq(schema.votes.userId, userId)
+        )
+      );
+    }
   }
 
   // Messages

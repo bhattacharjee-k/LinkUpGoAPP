@@ -14,6 +14,10 @@ export const users = pgTable("users", {
   energy: text("energy").notNull(), // 'Chill' | 'Vibey' | 'Going out' | 'Full send'
   categories: text("categories").array().notNull(), // Interests
   hardNos: text("hard_nos").array().notNull(),
+  lastKnownLat: text("last_known_lat"),
+  lastKnownLng: text("last_known_lng"),
+  lastLocationTimestamp: timestamp("last_location_timestamp"),
+  locationPermission: text("location_permission").default('pending'), // 'pending' | 'granted' | 'denied'
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
@@ -57,6 +61,8 @@ export const sessions = pgTable("sessions", {
   winningOptionId: varchar("winning_option_id"),
   filters: jsonb("filters").notNull(),
   guardrails: jsonb("guardrails").notNull(),
+  neighborhood: text("neighborhood"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -69,7 +75,7 @@ export const sessionParticipants = pgTable("session_participants", {
   id: serial("id").primaryKey(),
   sessionId: varchar("session_id").notNull().references(() => sessions.id, { onDelete: 'cascade' }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
-  status: text("status").notNull().default('active'), // 'active' | 'cant_make_it'
+  status: text("status").notNull().default('active'), // 'active' | 'cant_make_it' | 'left'
   joinedAt: timestamp("joined_at").notNull().defaultNow(),
 });
 
