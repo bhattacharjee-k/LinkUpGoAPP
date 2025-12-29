@@ -36,6 +36,7 @@ export function NewPlan() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [newParticipantName, setNewParticipantName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
   // Pre-generate invite code for display
   const [draftInviteCode] = useState(Math.random().toString(36).substr(2, 6).toUpperCase());
 
@@ -43,7 +44,8 @@ export function NewPlan() {
   const userGroup = groups.find(g => g.members.includes(user?.id || 'me')) || groups[0];
 
   const handleCreate = async () => {
-    if (!user) return;
+    if (!user || isCreating) return;
+    setIsCreating(true);
     
     // Format "Day-TimeBlock" approximation for the MVP data model compatibility
     const hour = parseInt(formData.timeStart.split(':')[0]);
@@ -90,6 +92,7 @@ export function NewPlan() {
       setLocation(`/session/${id}`);
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to create session", variant: "destructive" });
+      setIsCreating(false);
     }
   };
 
@@ -390,9 +393,10 @@ export function NewPlan() {
 
         <Button 
           onClick={handleCreate} 
+          disabled={isCreating}
           className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/20 mt-8"
         >
-          Find Options <ChevronRight className="ml-2" />
+          {isCreating ? 'Creating...' : 'Find Options'} {!isCreating && <ChevronRight className="ml-2" />}
         </Button>
       </div>
     </div>
