@@ -96,6 +96,10 @@ export const suggestions = pgTable("suggestions", {
   budget: text("budget").notNull(),
   description: text("description").notNull(),
   tags: text("tags").array().notNull(),
+  detailUrl: text("detail_url"), // Optional general more info link
+  reservationUrl: text("reservation_url"), // Optional reservation link
+  ticketUrl: text("ticket_url"), // Optional ticket purchase link
+  eventUrl: text("event_url"), // Optional event page link
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
