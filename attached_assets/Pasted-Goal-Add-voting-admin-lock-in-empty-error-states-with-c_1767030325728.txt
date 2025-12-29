@@ -1,0 +1,111 @@
+Goal: Add voting + admin lock-in + empty/error states, with “can’t make it” participants excluded from planning.
+
+1) Data model updates
+
+Add session/plan fields:
+
+status = 'draft' | 'voting' | 'locked'
+
+lockedByUserId
+
+lockedAt
+
+winningOptionId
+
+Add per-session participant status:
+
+participantStatusByUserId[userId] = 'active' | 'cant_make_it' (default 'active')
+
+Define effectiveParticipants = participants where status === 'active'
+
+For each suggestion option, store votes:
+
+votesByUserId[userId] = 'yes' | 'no' | 'fire' | 'cant'
+
+2) Voting UI
+
+On each suggestion card, add vote buttons: ✅ Yes / ❌ No / 🔥 Fire / 🚫 Can’t
+
+Show counts per vote type and show “You voted X”
+
+Allow changing votes until session is locked
+
+When user votes 🚫 on any option:
+
+set participantStatusByUserId[userId] = 'cant_make_it'
+
+Users marked cant_make_it:
+
+remain visible in participants list with badge “Can’t make it”
+
+can still view the plan
+
+their votes must not affect scoring/winner
+
+3) Admin confirm + lock plan
+
+Admin-only button: Confirm plan (only visible when there are options)
+
+Compute option score using votes from effectiveParticipants only:
+
+score = yes*1 + fire*2 - no*1 (ignore cant_make_it users entirely)
+
+If tie for highest score:
+
+show modal “Break tie” and let admin pick the winner
+
+On confirm:
+
+set winningOptionId
+
+set status='locked', lockedByUserId, lockedAt
+
+After lock:
+
+disable all vote controls and edits
+
+show banner: “Plan locked by Admin”
+
+pin winning option at top
+
+(Optional for testing) Admin-only Unlock plan behind confirmation dialog
+
+4) Empty + error states (polished)
+
+Implement these screens/states with clear CTAs:
+
+No participants → “No one added yet” + CTA “Add people / Send link”
+
+Waiting on availability → list missing effective participants + CTA “Send link”
+
+No overlap/quorum among effective participants → message + CTAs:
+
+“Widen time window”
+
+“Adjust filters”
+
+“Change participants”
+
+No options found → message + CTAs:
+
+“Relax filters”
+
+“Increase distance”
+
+“Increase budget”
+
+Invalid invite → friendly error + CTA to go home
+
+Group locked join attempt → “Group locked” screen
+
+5) UX polish
+
+Toasts: “Vote saved”, “Copied link”, “Plan locked”
+
+Loading indicator during suggestion generation
+
+Status pill on session header always visible:
+
+Draft / Voting Open / Locked
+
+Ensure contrast: lime backgrounds use dark text (not white)

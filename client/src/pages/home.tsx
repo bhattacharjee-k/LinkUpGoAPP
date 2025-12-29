@@ -74,8 +74,11 @@ export function Home() {
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider">
-                            {session.status}
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                            session.status === 'locked' ? "bg-green-500/20 text-green-400" : "bg-primary/20 text-primary"
+                          )}>
+                            {session.status === 'locked' ? 'Confirmed' : 'Voting'}
                           </span>
                           <span className="text-xs text-muted-foreground">Today</span>
                         </div>

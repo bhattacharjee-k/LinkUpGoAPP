@@ -51,7 +51,7 @@ export interface Suggestion {
   budget: Budget;
   description: string;
   tags: string[];
-  votes: Record<string, 'yes' | 'no' | 'fire'>; // userId -> vote
+  votes: Record<string, 'yes' | 'no' | 'fire' | 'cant'>; // userId -> vote
 }
 
 export interface ChatMessage {
@@ -65,7 +65,12 @@ export interface PlanningSession {
   id: string;
   name?: string; // Optional name for the plan (e.g. "Friday Drinks")
   groupId: string;
-  status: 'planning' | 'confirmed';
+  status: 'draft' | 'voting' | 'locked';
+  lockedByUserId?: string;
+  lockedAt?: number;
+  winningOptionId?: string;
+  participantStatusByUserId: Record<string, 'active' | 'cant_make_it'>; // Default 'active'
+  
   filters: {
     timeWindow: string;
     locationScope: string;
@@ -79,7 +84,6 @@ export interface PlanningSession {
   };
   suggestions: Suggestion[];
   messages: ChatMessage[];
-  finalChoiceId?: string;
   participants: string[]; // User IDs specific to this session
   inviteCode?: string; // Session specific invite
 }
@@ -97,7 +101,7 @@ interface AppState {
   startSession: (groupId: string, initialFilters: any) => string;
   addMessage: (sessionId: string, text: string, sender: string) => void;
   updateSessionFilters: (sessionId: string, filters: any) => void;
-  voteForSuggestion: (sessionId: string, suggestionId: string, vote: 'yes' | 'no' | 'fire') => void;
+  voteForSuggestion: (sessionId: string, suggestionId: string, vote: 'yes' | 'no' | 'fire' | 'cant') => void;
   confirmPlan: (sessionId: string, suggestionId: string) => void;
 }
 
