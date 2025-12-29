@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
-import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export function Session() {
   const [match, params] = useRoute('/session/:id');
-  const { getSession, addMessage, voteForSuggestion, confirmPlan, addParticipantToSession, user, groups } = useApp();
+  const { getSession, addMessage, voteForSuggestion, confirmPlan, addParticipantToSession, user, groups, isAdmin } = useApp();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -90,6 +90,7 @@ export function Session() {
 
   const group = groups.find(g => g.id === session.groupId);
   const participants = session.participants || [];
+  const isUserAdmin = group ? isAdmin(group.id) : false;
 
   return (
     <Layout hideNav>
@@ -179,8 +180,13 @@ export function Session() {
                 <div className="flex items-center -space-x-2 overflow-hidden">
                     {participants.map((pid, i) => (
                         <Avatar key={pid} className="w-8 h-8 border-2 border-background">
-                            <AvatarFallback className="text-[10px] bg-white/10">
+                            <AvatarFallback className="text-[10px] bg-white/10 relative">
                                 {pid === user?.id ? 'ME' : `U${i}`}
+                                {group?.adminId === pid && (
+                                    <div className="absolute -bottom-1 -right-1 bg-primary text-black rounded-full p-[2px] border border-black">
+                                        <Shield size={6} />
+                                    </div>
+                                )}
                             </AvatarFallback>
                         </Avatar>
                     ))}
@@ -295,10 +301,11 @@ export function Session() {
 
                    <Button 
                      variant="secondary" 
-                     className="w-full bg-white/5 hover:bg-primary hover:text-black transition-all text-xs h-8 font-bold"
+                     className="w-full bg-white/5 hover:bg-primary hover:text-black transition-all text-xs h-8 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                      onClick={() => confirmPlan(session.id, suggestion.id)}
+                     disabled={!isUserAdmin || !!session.finalChoiceId}
                    >
-                     Lock it in
+                     {session.finalChoiceId === suggestion.id ? 'Confirmed Option' : isUserAdmin ? 'Lock it in (Admin)' : 'Admin Only: Lock it in'}
                    </Button>
                  </div>
                </motion.div>
