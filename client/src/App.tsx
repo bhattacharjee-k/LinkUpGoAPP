@@ -8,6 +8,7 @@ import { NewPlan } from "@/pages/new-plan";
 import { GroupDetails } from "@/pages/group-details";
 import { Groups } from "@/pages/groups";
 import { Profile } from "@/pages/profile";
+import { History } from "@/pages/history";
 import { useEffect } from "react";
 
 function PrivateRoute({ component: Component }: { component: React.ComponentType }) {
@@ -96,6 +97,10 @@ function Router() {
 
       <Route path="/profile">
         <PrivateRoute component={Profile} />
+      </Route>
+      
+      <Route path="/history">
+        <PrivateRoute component={History} />
       </Route>
       
       {/* New Session Creation Mock */}
