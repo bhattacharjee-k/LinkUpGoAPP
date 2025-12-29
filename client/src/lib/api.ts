@@ -17,6 +17,11 @@ async function fetchAPI(url: string, options?: RequestInit) {
     throw new Error(error.message || 'Request failed');
   }
   
+  // Handle 204 No Content responses
+  if (response.status === 204) {
+    return {};
+  }
+  
   return response.json();
 }
 
@@ -32,6 +37,8 @@ export const api = {
   // Users
   users: {
     updateMe: (data: any) => fetchAPI('/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
+    updateLocation: (lat: string, lng: string, permission: string) => 
+      fetchAPI('/users/me/location', { method: 'PATCH', body: JSON.stringify({ lat, lng, permission }) }),
   },
   
   // Groups
@@ -49,6 +56,8 @@ export const api = {
     get: (id: string) => fetchAPI(`/sessions/${id}`),
     create: (data: any) => fetchAPI('/sessions', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, updates: any) => fetchAPI(`/sessions/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
+    delete: (id: string) => fetchAPI(`/sessions/${id}`, { method: 'DELETE' }),
+    leave: (id: string) => fetchAPI(`/sessions/${id}/leave`, { method: 'POST' }),
     addParticipant: (id: string, status?: string) => fetchAPI(`/sessions/${id}/participants`, { method: 'POST', body: JSON.stringify({ status }) }),
     updateParticipantStatus: (sessionId: string, participantId: string, status: string) => 
       fetchAPI(`/sessions/${sessionId}/participants/${participantId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),

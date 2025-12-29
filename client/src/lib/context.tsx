@@ -62,10 +62,13 @@ interface AppContextType {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: any) => Promise<void>;
+  updateUserLocation: (lat: string, lng: string, permission: string) => Promise<void>;
   createGroup: (name: string) => Promise<void>;
   startSession: (groupId: string, initialFilters: any, name?: string) => Promise<string>;
   getSession: (id: string) => PlanningSession | undefined;
   refreshSession: (id: string) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
+  leaveSession: (sessionId: string) => Promise<void>;
   addMessage: (sessionId: string, text: string) => Promise<void>;
   voteForSuggestion: (sessionId: string, suggestionId: string, vote: string) => Promise<void>;
   confirmPlan: (sessionId: string, suggestionId: string) => Promise<void>;
@@ -359,6 +362,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await refreshSession(sessionId);
   };
 
+  const deleteSession = async (sessionId: string) => {
+    await api.sessions.delete(sessionId);
+    // Remove session from local state
+    setSessions(prev => prev.filter(s => s.id !== sessionId));
+  };
+
+  const leaveSession = async (sessionId: string) => {
+    await api.sessions.leave(sessionId);
+    await refreshSession(sessionId);
+  };
+
+  const updateUserLocation = async (lat: string, lng: string, permission: string) => {
+    const updatedUser = await api.users.updateLocation(lat, lng, permission);
+    setUserState(updatedUser);
+  };
+
   const value: AppContextType = {
     user,
     groups,
@@ -369,10 +388,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     updateUserProfile,
+    updateUserLocation,
     createGroup,
     startSession,
     getSession,
     refreshSession,
+    deleteSession,
+    leaveSession,
     addMessage,
     voteForSuggestion,
     confirmPlan,
