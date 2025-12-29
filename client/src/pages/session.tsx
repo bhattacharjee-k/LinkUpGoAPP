@@ -885,6 +885,49 @@ export function Session() {
                      </div>
                    </div>
 
+                   {/* Link Buttons */}
+                   {(() => {
+                     const links: Array<{url: string; label: string}> = [];
+                     
+                     if (suggestion.reservationUrl) {
+                       links.push({url: suggestion.reservationUrl, label: 'Reserve'});
+                     }
+                     if (suggestion.ticketUrl) {
+                       links.push({url: suggestion.ticketUrl, label: 'Tickets'});
+                     }
+                     if (suggestion.eventUrl && links.length < 2) {
+                       links.push({url: suggestion.eventUrl, label: 'Events'});
+                     }
+                     if (suggestion.detailUrl && links.length < 2) {
+                       links.push({url: suggestion.detailUrl, label: 'Details'});
+                     }
+                     
+                     const displayLinks = links.slice(0, 2);
+                     
+                     if (displayLinks.length === 0) return null;
+                     
+                     return (
+                       <div className="pt-3 border-t border-white/5">
+                         <div className={cn("grid gap-2", displayLinks.length === 1 ? "grid-cols-1" : "grid-cols-2")}>
+                           {displayLinks.map((link, i) => (
+                             <a
+                               key={i}
+                               href={link.url}
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               onClick={() => console.log('[Link Click]', {suggestion: suggestion.name, link: link.label, url: link.url})}
+                               className="flex items-center justify-center gap-2 h-9 rounded-lg bg-primary text-black font-bold text-xs hover:bg-primary/90 transition-colors"
+                               data-testid={`link-${link.label.toLowerCase()}-${suggestion.id}`}
+                             >
+                               {link.label}
+                               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                             </a>
+                           ))}
+                         </div>
+                       </div>
+                     );
+                   })()}
+
                    {isUserAdmin && !isLocked && (
                         <Button 
                             variant="secondary" 
