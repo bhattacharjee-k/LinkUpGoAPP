@@ -1,21 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '@/lib/context';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronRight, MapPin, Ban } from 'lucide-react';
+import { ChevronRight, MapPin, Ban, AlertCircle } from 'lucide-react';
 import { City, Budget, Energy, Category, HardNo } from '@/lib/store';
 import { cn } from '@/lib/utils';
+
+const RETURNING_USER_KEY = 'vibecheck_has_account';
 
 export function Onboarding() {
   const { register, login } = useApp();
   const [_, setLocation] = useLocation();
   const [step, setStep] = useState(1);
+  const [isReturningUser, setIsReturningUser] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const hasAccount = localStorage.getItem(RETURNING_USER_KEY);
+    if (hasAccount === 'true') {
+      setIsReturningUser(true);
+      setIsLoginMode(true);
+    }
+  }, []);
   
   const [formData, setFormData] = useState({
     username: '',
@@ -33,6 +44,8 @@ export function Onboarding() {
       setIsLoading(true);
       setError('');
       await login(formData.username, formData.password);
+      
+      localStorage.setItem(RETURNING_USER_KEY, 'true');
       
       const params = new URLSearchParams(window.location.search);
       const returnTo = params.get('returnTo');
@@ -71,6 +84,8 @@ export function Onboarding() {
         const params = new URLSearchParams(window.location.search);
         const returnTo = params.get('returnTo');
         
+        localStorage.setItem(RETURNING_USER_KEY, 'true');
+        
         if (returnTo) {
             setLocation(decodeURIComponent(returnTo));
         } else {
@@ -81,6 +96,8 @@ export function Onboarding() {
         let errorMsg = err.message || 'Registration failed';
         if (errorMsg.includes('unique constraint') || errorMsg.includes('duplicate key')) {
           errorMsg = 'This username is already taken. Try a different one or sign in below.';
+          setIsReturningUser(true);
+          setIsLoginMode(true);
         }
         setError(errorMsg);
         setIsLoading(false);
@@ -149,6 +166,16 @@ export function Onboarding() {
         {error && (
           <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-xl" data-testid="error-message">
             {error}
+          </div>
+        )}
+
+        {step === 1 && isReturningUser && (
+          <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex items-start gap-3" data-testid="returning-user-banner">
+            <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-white font-medium">You already have an account</p>
+              <p className="text-muted-foreground text-sm">Please sign in with your existing credentials below.</p>
+            </div>
           </div>
         )}
 
