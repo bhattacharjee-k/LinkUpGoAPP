@@ -65,8 +65,9 @@ function buildConversationHistory(
   ];
   
   // Add recent message history (last 10 messages for context)
+  // Filter out system messages - user messages have user UUID as sender
   const relevantMessages = context.recentMessages
-    .filter(m => m.sender === 'user' || m.sender === 'planner-ai')
+    .filter(m => m.sender !== 'system')
     .slice(-10);
   
   for (const msg of relevantMessages) {
@@ -95,10 +96,10 @@ export async function* streamPlannerResponse(
   
   try {
     const stream = await openai.chat.completions.create({
-      model: 'gpt-5',
+      model: 'gpt-4o-mini',
       messages,
       stream: true,
-      max_completion_tokens: 500,
+      max_tokens: 500,
     });
     
     for await (const chunk of stream) {
@@ -121,9 +122,9 @@ export async function getPlannerResponse(
   
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-5',
+      model: 'gpt-4o-mini',
       messages,
-      max_completion_tokens: 500,
+      max_tokens: 500,
     });
     
     return response.choices[0]?.message?.content || "I'm not sure what to say. Can you rephrase that?";
