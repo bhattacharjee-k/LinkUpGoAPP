@@ -376,10 +376,7 @@ export function Session() {
 
                  {/* Pseudo-Image Header */}
                  <div className="h-24 bg-gradient-to-r from-gray-900 to-gray-800 relative p-4 flex flex-col justify-between">
-                    <div className="flex justify-between items-start">
-                       <Badge variant="secondary" className="bg-black/60 backdrop-blur-md text-white border-0 text-[10px] uppercase tracking-wider">
-                         {suggestion.source}
-                       </Badge>
+                    <div className="flex justify-end items-start">
                        <div className="flex items-center gap-1 text-xs font-bold text-black bg-primary px-2 py-1 rounded-full backdrop-blur-md shadow-lg shadow-primary/20">
                          <Star size={10} className="text-black fill-black" /> {suggestion.rating}
                        </div>
