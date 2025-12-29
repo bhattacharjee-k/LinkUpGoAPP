@@ -543,5 +543,90 @@ export async function registerRoutes(
     }
   });
 
+  // Planner AI endpoint with SSE streaming
+  app.post("/api/sessions/:id/planner", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const sessionId = req.params.id;
+      const { message: userMessage } = req.body;
+      
+      if (!userMessage) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+      
+      // Check if user is a participant
+      const participants = await storage.getSessionParticipants(sessionId);
+      const isParticipant = participants.some(p => p.userId === userId && p.status !== 'left');
+      
+      if (!isParticipant) {
+        return res.status(403).json({ message: "Not a participant in this session" });
+      }
+      
+      // Get session context for the planner
+      const context = await storage.getSessionWithContext(sessionId);
+      if (!context) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      // Get current user
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Save the user's message first
+      await storage.createMessage({
+        sessionId,
+        sender: userId,
+        text: userMessage
+      });
+      
+      // Set up SSE
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      
+      // Import and use the planner
+      const { streamPlannerResponse } = await import('./planner');
+      
+      let fullResponse = '';
+      
+      try {
+        for await (const chunk of streamPlannerResponse({ ...context, user }, userMessage)) {
+          fullResponse += chunk;
+          res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+        }
+        
+        // Save the AI response
+        await storage.createMessage({
+          sessionId,
+          sender: 'planner-ai',
+          text: fullResponse,
+          metadata: { kind: 'planner' }
+        });
+        
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+      } catch (streamError: any) {
+        console.error('[Planner] Stream error:', streamError);
+        res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
+        res.end();
+      }
+    } catch (error: any) {
+      console.error('[Planner] Error:', error);
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ message: error.message });
+      }
+    }
+  });
+
   return httpServer;
 }
