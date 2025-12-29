@@ -114,7 +114,7 @@ export function Onboarding() {
     }
   };
 
-  // Username validation with debounce
+  // Username validation with debounce and abort control
   const checkUsernameAvailability = useCallback(async (username: string) => {
     if (!username || username.length === 0) {
       setUsernameStatus('idle');
@@ -127,19 +127,42 @@ export function Onboarding() {
       abortControllerRef.current.abort();
     }
 
+    // Create new abort controller for this request
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setUsernameStatus('checking');
     setUsernameMessage('');
 
     try {
-      const response = await api.auth.checkUsername(username);
-      if (response.available) {
+      const response = await fetch(`/api/auth/username-available?username=${encodeURIComponent(username)}`, {
+        signal: controller.signal,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to check username');
+      }
+      
+      const data = await response.json();
+      
+      // Check if this request was aborted
+      if (controller.signal.aborted) {
+        return;
+      }
+      
+      if (data.available) {
         setUsernameStatus('available');
         setUsernameMessage('Username is available');
       } else {
         setUsernameStatus('taken');
         setUsernameMessage('That username is taken');
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore abort errors
+      if (error.name === 'AbortError') {
+        return;
+      }
       setUsernameStatus('error');
       setUsernameMessage("Couldn't check right now — try again");
     }
