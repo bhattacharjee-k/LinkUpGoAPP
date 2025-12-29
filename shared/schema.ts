@@ -82,6 +82,7 @@ export const suggestions = pgTable("suggestions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   sessionId: varchar("session_id").notNull().references(() => sessions.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
+  city: text("city").notNull().default('NYC'), // 'NYC' | 'Chicago'
   source: text("source").notNull(), // 'Web' | 'Beli' | 'Partiful' | 'Posh.vip'
   rating: text("rating").notNull(),
   turnout: text("turnout").notNull(),

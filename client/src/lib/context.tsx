@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { api } from './api';
-import { MOCK_SUGGESTIONS } from './store';
+import { MOCK_SUGGESTIONS, MOCK_SUGGESTIONS_BY_CITY, CITY_COORDS, type City } from './store';
 
 export interface UserProfile {
   id: string;
@@ -188,8 +188,56 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Keep for compatibility
   };
 
+  const generateSuggestionsForSession = (filters: any) => {
+    // LOCATION GROUNDING: Get selected city from filters
+    const selectedCity = (filters.locationScope || 'NYC') as City;
+    const cityCoords = CITY_COORDS[selectedCity];
+    
+    // Log for debugging (developer console only)
+    console.log('[Suggestion Pipeline] Selected city:', selectedCity);
+    console.log('[Suggestion Pipeline] City center:', cityCoords);
+    console.log('[Suggestion Pipeline] Filters:', filters);
+    
+    // CITY FILTERING: Get city-specific suggestion pool
+    const citySuggestions = MOCK_SUGGESTIONS_BY_CITY[selectedCity] || [];
+    console.log('[Suggestion Pipeline] Candidates before filter:', citySuggestions.length);
+    
+    // STRICT CITY GUARDRAIL: Only suggestions matching selected city
+    const filteredByCity = citySuggestions.filter(s => s.city === selectedCity);
+    console.log('[Suggestion Pipeline] Candidates after city filter:', filteredByCity.length);
+    
+    // RANKING: Score based on filters (budget, energy, category match)
+    const scoredSuggestions = filteredByCity.map(suggestion => {
+      let score = 0;
+      
+      // Budget match (exact match = +3, close match = +1)
+      if (suggestion.budget === filters.budget) score += 3;
+      else if (Math.abs(suggestion.budget.length - filters.budget.length) <= 1) score += 1;
+      
+      // Category match (if suggestion tags include any filter categories)
+      const filterCategories = Array.isArray(filters.category) ? filters.category : [filters.category];
+      const categoryMatch = suggestion.tags.some((tag: string) => 
+        filterCategories.some((cat: string) => tag.toLowerCase().includes(cat.toLowerCase()))
+      );
+      if (categoryMatch) score += 2;
+      
+      // Rating boost
+      score += parseFloat(suggestion.rating.toString()) || 0;
+      
+      return { ...suggestion, score };
+    });
+    
+    // Sort by score descending and return top 4
+    const topSuggestions = scoredSuggestions
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4);
+    
+    console.log('[Suggestion Pipeline] Top suggestions:', topSuggestions.length);
+    
+    return topSuggestions;
+  };
+
   const startSession = async (groupId: string, initialFilters: any, name?: string) => {
-    // Generate mock suggestions for now (will be replaced with AI later)
     const session = await api.sessions.create({
       groupId,
       name,
@@ -200,9 +248,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Create mock suggestions (exclude hardcoded id, let server generate)
-    for (const mockSugg of MOCK_SUGGESTIONS) {
-      const { id, votes, ...suggestionData } = mockSugg;
+    // Generate city-aware suggestions
+    const suggestions = generateSuggestionsForSession(initialFilters);
+    
+    // Create suggestions in database
+    for (const mockSugg of suggestions) {
+      const { id, votes, score, ...suggestionData } = mockSugg as any;
       await api.suggestions.create({
         sessionId: session.id,
         ...suggestionData
@@ -280,13 +331,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const regenerateSuggestions = async (sessionId: string) => {
+    // Get current session to access filters
+    const session = getSession(sessionId);
+    if (!session) return;
+    
     // Delete existing suggestions first
     await api.suggestions.deleteForSession(sessionId);
     
-    // Create new ones based on updated filters
-    // For MVP, we just regenerate mock suggestions
-    for (const mockSugg of MOCK_SUGGESTIONS) {
-      const { id, votes, ...suggestionData } = mockSugg;
+    // Generate new city-aware suggestions based on current filters
+    const suggestions = generateSuggestionsForSession(session.filters);
+    
+    // Create new suggestions in database
+    for (const mockSugg of suggestions) {
+      const { id, votes, score, ...suggestionData } = mockSugg as any;
       await api.suggestions.create({
         sessionId,
         ...suggestionData

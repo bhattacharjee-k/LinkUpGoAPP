@@ -44,6 +44,7 @@ export interface Group {
 export interface Suggestion {
   id: string;
   name: string;
+  city: City;
   source: 'Web' | 'Beli' | 'Partiful' | 'Posh.vip';
   rating: number;
   turnout: string; // e.g. "5/6"
@@ -53,6 +54,12 @@ export interface Suggestion {
   tags: string[];
   votes: Record<string, 'yes' | 'no' | 'fire' | 'cant'>; // userId -> vote
 }
+
+// City coordinates for location grounding
+export const CITY_COORDS: Record<City, { lat: number; lng: number }> = {
+  'Chicago': { lat: 41.8781, lng: -87.6298 },
+  'NYC': { lat: 40.7128, lng: -74.0060 }
+};
 
 export interface ChatMessage {
   id: string;
@@ -129,10 +136,12 @@ export const MOCK_GROUPS: Group[] = [
   { id: 'g2', name: 'West Loop Crew', members: ['me', 'u5', 'u6'], adminId: 'me', locked: false },
 ];
 
-export const MOCK_SUGGESTIONS: Suggestion[] = [
+// NYC Mock Suggestions
+const NYC_SUGGESTIONS: Suggestion[] = [
   {
-    id: 's1',
+    id: 'nyc-1',
     name: 'Laser Wolf',
+    city: 'NYC',
     source: 'Beli',
     rating: 4.8,
     turnout: '5/6',
@@ -143,8 +152,9 @@ export const MOCK_SUGGESTIONS: Suggestion[] = [
     votes: {},
   },
   {
-    id: 's2',
+    id: 'nyc-2',
     name: 'Double Chicken Please',
+    city: 'NYC',
     source: 'Web',
     rating: 4.9,
     turnout: '4/6',
@@ -155,8 +165,9 @@ export const MOCK_SUGGESTIONS: Suggestion[] = [
     votes: {},
   },
   {
-    id: 's3',
+    id: 'nyc-3',
     name: 'Public Records',
+    city: 'NYC',
     source: 'Posh.vip',
     rating: 4.6,
     turnout: '6/6',
@@ -167,8 +178,9 @@ export const MOCK_SUGGESTIONS: Suggestion[] = [
     votes: {},
   },
   {
-    id: 's4',
+    id: 'nyc-4',
     name: 'House of X',
+    city: 'NYC',
     source: 'Partiful',
     rating: 4.5,
     turnout: '3/6',
@@ -179,6 +191,84 @@ export const MOCK_SUGGESTIONS: Suggestion[] = [
     votes: {},
   },
 ];
+
+// Chicago Mock Suggestions
+const CHICAGO_SUGGESTIONS: Suggestion[] = [
+  {
+    id: 'chi-1',
+    name: 'Girl & the Goat',
+    city: 'Chicago',
+    source: 'Web',
+    rating: 4.7,
+    turnout: '5/6',
+    distance: '0.8 mi',
+    budget: '$$$',
+    description: 'Stephanie Izard\'s celebrated restaurant in West Loop. Energetic atmosphere with bold flavors perfect for groups.',
+    tags: ['Dinner', 'West Loop', 'Celebrity Chef'],
+    votes: {},
+  },
+  {
+    id: 'chi-2',
+    name: 'The Violet Hour',
+    city: 'Chicago',
+    source: 'Beli',
+    rating: 4.8,
+    turnout: '4/6',
+    distance: '2.1 mi',
+    budget: '$$',
+    description: 'Acclaimed cocktail bar in Wicker Park. Intimate setting with exceptional drinks and a no-standing policy.',
+    tags: ['Cocktails', 'Speakeasy', 'Award Winning'],
+    votes: {},
+  },
+  {
+    id: 'chi-3',
+    name: 'Cindy\'s Rooftop',
+    city: 'Chicago',
+    source: 'Posh.vip',
+    rating: 4.6,
+    turnout: '6/6',
+    distance: '1.5 mi',
+    budget: '$$$',
+    description: 'Stunning rooftop bar with panoramic views of Millennium Park. Perfect for celebrations and group gatherings.',
+    tags: ['Rooftop', 'Views', 'Downtown'],
+    votes: {},
+  },
+  {
+    id: 'chi-4',
+    name: 'The Green Mill',
+    city: 'Chicago',
+    source: 'Web',
+    rating: 4.7,
+    turnout: '5/6',
+    distance: '3.2 mi',
+    budget: '$$',
+    description: 'Historic jazz club in Uptown. Live music every night with a vintage vibe and classic cocktails.',
+    tags: ['Live Music', 'Jazz', 'Historic'],
+    votes: {},
+  },
+  {
+    id: 'chi-5',
+    name: 'DISCO',
+    city: 'Chicago',
+    source: 'Partiful',
+    rating: 4.5,
+    turnout: '4/6',
+    distance: '1.2 mi',
+    budget: '$$$$',
+    description: 'High-energy dance club with top DJs and bottle service. Late night vibes in River North.',
+    tags: ['Club', 'Dancing', 'Late Night'],
+    votes: {},
+  },
+];
+
+// Mock suggestion pool by city
+export const MOCK_SUGGESTIONS_BY_CITY: Record<City, Suggestion[]> = {
+  'NYC': NYC_SUGGESTIONS,
+  'Chicago': CHICAGO_SUGGESTIONS
+};
+
+// Legacy export for backwards compatibility
+export const MOCK_SUGGESTIONS = NYC_SUGGESTIONS;
 
 // Helper to generate a simple ID
 const generateId = () => Math.random().toString(36).substr(2, 9);
