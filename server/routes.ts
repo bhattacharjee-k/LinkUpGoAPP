@@ -107,6 +107,33 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/users/me/location", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { lat, lng, permission } = req.body;
+      
+      if (!lat || !lng || !permission) {
+        return res.status(400).json({ message: "Missing required fields: lat, lng, permission" });
+      }
+      
+      const user = await storage.updateUserLocation(userId, lat, lng, permission);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Group routes
   app.get("/api/groups", async (req, res) => {
     try {
@@ -420,6 +447,64 @@ export async function registerRoutes(
       
       await storage.deleteSessionSuggestions(req.params.id);
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/sessions/:id/leave", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const session = await storage.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      // Check if user is a participant
+      const participants = await storage.getSessionParticipants(session.id);
+      const isParticipant = participants.some(p => p.userId === userId);
+      
+      if (!isParticipant) {
+        return res.status(403).json({ message: "Not a participant in this session" });
+      }
+      
+      await storage.leaveSession(session.id, userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/sessions/:id", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const session = await storage.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      // Check if user is the group admin
+      const group = await storage.getGroup(session.groupId);
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      
+      if (group.adminId !== userId) {
+        return res.status(403).json({ message: "Only group admin can delete sessions" });
+      }
+      
+      await storage.softDeleteSession(session.id);
+      res.status(204).send();
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
