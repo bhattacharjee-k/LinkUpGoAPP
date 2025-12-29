@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '@/lib/context';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronRight, MapPin, Ban, AlertCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, MapPin, Ban, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { City, Budget, Energy, Category, HardNo } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
 
 const RETURNING_USER_KEY = 'vibecheck_has_account';
+
+type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error';
 
 export function Onboarding() {
   const { register, login } = useApp();
@@ -19,6 +22,12 @@ export function Onboarding() {
   const [isLoginMode, setIsLoginMode] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Username validation state
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle');
+  const [usernameMessage, setUsernameMessage] = useState('');
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const hasAccount = localStorage.getItem(RETURNING_USER_KEY);
@@ -105,6 +114,76 @@ export function Onboarding() {
     }
   };
 
+  // Username validation with debounce
+  const checkUsernameAvailability = useCallback(async (username: string) => {
+    if (!username || username.length === 0) {
+      setUsernameStatus('idle');
+      setUsernameMessage('');
+      return;
+    }
+
+    // Abort previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    setUsernameStatus('checking');
+    setUsernameMessage('');
+
+    try {
+      const response = await api.auth.checkUsername(username);
+      if (response.available) {
+        setUsernameStatus('available');
+        setUsernameMessage('Username is available');
+      } else {
+        setUsernameStatus('taken');
+        setUsernameMessage('That username is taken');
+      }
+    } catch (error) {
+      setUsernameStatus('error');
+      setUsernameMessage("Couldn't check right now — try again");
+    }
+  }, []);
+
+  const handleUsernameChange = (username: string) => {
+    setFormData({ ...formData, username });
+    
+    // Don't check in login mode
+    if (isLoginMode) {
+      setUsernameStatus('idle');
+      return;
+    }
+
+    // Clear any pending debounce
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Debounce the check (500ms)
+    debounceTimerRef.current = setTimeout(() => {
+      checkUsernameAvailability(username);
+    }, 500);
+  };
+
+  const handleUsernameBlur = () => {
+    // On blur, check immediately (cancel debounce)
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    if (!isLoginMode && formData.username.length > 0) {
+      checkUsernameAvailability(formData.username);
+    }
+  };
+
+  const handleBack = () => {
+    if (step === 1) {
+      setIsLoginMode(true);
+      setError('');
+    } else {
+      setStep(step - 1);
+    }
+  };
+
   const toggleCategory = (c: Category) => {
     setFormData(prev => ({
       ...prev,
@@ -132,12 +211,28 @@ export function Onboarding() {
 
   const HARD_NOS = ['Clubs', 'Loud places', 'Ticketed events', 'Late nights', 'Expensive spots'];
 
-  const isStep1Valid = formData.username.length > 0 && formData.password.length >= 6;
+  const isStep1Valid = isLoginMode 
+    ? formData.username.length > 0 && formData.password.length >= 6
+    : formData.username.length > 0 && formData.password.length >= 6 && usernameStatus !== 'checking' && usernameStatus !== 'taken';
   const isStep2Valid = formData.name.length > 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center px-6 py-10 relative overflow-hidden">
       <div className="absolute top-[-20%] right-[-10%] w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
+      
+      {/* Back button - top left, always visible */}
+      {(isLoginMode || step > 1) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleBack}
+          className="absolute top-6 left-6 z-20 text-white hover:bg-white/10"
+          data-testid="button-back"
+        >
+          <ChevronLeft size={20} className="mr-1" />
+          Back
+        </Button>
+      )}
       
       <motion.div 
         key={step}
@@ -183,13 +278,36 @@ export function Onboarding() {
           <div className="space-y-6">
             <div className="space-y-2">
               <Label>Username</Label>
-              <Input 
-                data-testid="input-username"
-                value={formData.username}
-                onChange={e => setFormData({...formData, username: e.target.value})}
-                placeholder="alexsmith"
-                className="bg-white/5 border-white/10 h-12 text-lg"
-              />
+              <div className="relative">
+                <Input 
+                  data-testid="input-username"
+                  value={formData.username}
+                  onChange={e => handleUsernameChange(e.target.value)}
+                  onBlur={handleUsernameBlur}
+                  placeholder="alexsmith"
+                  className={cn(
+                    "bg-white/5 border-white/10 h-12 text-lg pr-10",
+                    !isLoginMode && usernameStatus === 'taken' && "border-red-500/50",
+                    !isLoginMode && usernameStatus === 'available' && "border-green-500/50"
+                  )}
+                />
+                {!isLoginMode && usernameStatus === 'checking' && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground animate-spin" />
+                )}
+                {!isLoginMode && usernameStatus === 'available' && (
+                  <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
+                )}
+              </div>
+              {!isLoginMode && usernameMessage && (
+                <p className={cn(
+                  "text-xs flex items-center gap-1",
+                  usernameStatus === 'taken' && "text-red-400",
+                  usernameStatus === 'available' && "text-green-400",
+                  usernameStatus === 'error' && "text-yellow-400"
+                )} data-testid="username-validation-message">
+                  {usernameMessage}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Password</Label>

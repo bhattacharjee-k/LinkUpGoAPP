@@ -32,6 +32,7 @@ export const api = {
     login: (username: string, password: string) => fetchAPI('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
     logout: () => fetchAPI('/auth/logout', { method: 'POST' }),
     me: () => fetchAPI('/auth/me'),
+    checkUsername: (username: string) => fetchAPI(`/auth/username-available?username=${encodeURIComponent(username)}`),
   },
   
   // Users

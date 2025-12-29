@@ -84,6 +84,21 @@ export async function registerRoutes(
     res.json(userWithoutPassword);
   });
 
+  app.get("/api/auth/username-available", async (req, res) => {
+    try {
+      const schema = z.object({
+        username: z.string().min(1)
+      });
+      
+      const { username } = schema.parse(req.query);
+      const existingUser = await storage.getUserByUsername(username);
+      
+      res.json({ available: !existingUser });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // User routes
   app.patch("/api/users/me", async (req, res) => {
     try {
