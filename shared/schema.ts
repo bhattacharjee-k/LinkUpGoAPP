@@ -90,6 +90,7 @@ export const suggestions = pgTable("suggestions", {
   name: text("name").notNull(),
   city: text("city").notNull().default('NYC'), // 'NYC' | 'Chicago'
   source: text("source").notNull(), // 'Web' | 'Beli' | 'Partiful' | 'Posh.vip'
+  kind: text("kind").default('venue'), // 'venue' | 'event'
   rating: text("rating").notNull(),
   turnout: text("turnout").notNull(),
   distance: text("distance").notNull(),
@@ -100,6 +101,8 @@ export const suggestions = pgTable("suggestions", {
   reservationUrl: text("reservation_url"), // Optional reservation link
   ticketUrl: text("ticket_url"), // Optional ticket purchase link
   eventUrl: text("event_url"), // Optional event page link
+  venueName: text("venue_name"), // For events - the venue hosting
+  startTime: text("start_time"), // For events - start time
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

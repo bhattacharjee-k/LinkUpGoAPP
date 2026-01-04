@@ -135,6 +135,7 @@ export async function registerRoutes(
           name: opt.title,
           city: data.city,
           source: sourceMap[opt.source] || 'Web',
+          kind: opt.optionType === 'event' ? 'event' : 'venue',
           rating: opt.rating || '4.5',
           turnout: '0/0',
           distance: opt.distance || '1.0 mi',
@@ -146,6 +147,8 @@ export async function registerRoutes(
         if (opt.reservationUrl) suggestion.reservationUrl = opt.reservationUrl;
         if (opt.ticketUrl) suggestion.ticketUrl = opt.ticketUrl;
         if (opt.eventUrl) suggestion.eventUrl = opt.eventUrl;
+        if (opt.venueName) suggestion.venueName = opt.venueName;
+        if (opt.startTime) suggestion.startTime = opt.startTime;
         return suggestion;
       });
 
@@ -674,22 +677,37 @@ export async function registerRoutes(
       );
       
       let fullResponse = '';
+      let plannerResult: any = null;
       
       try {
-        for await (const chunk of streamPlannerResponse({ ...context, user, liveEvents }, userMessage)) {
-          fullResponse += chunk;
-          res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+        const generator = streamPlannerResponse({ ...context, user, liveEvents }, userMessage);
+        
+        while (true) {
+          const { value, done } = await generator.next();
+          if (done) {
+            plannerResult = value;
+            break;
+          }
+          if (typeof value === 'string') {
+            fullResponse += value;
+            res.write(`data: ${JSON.stringify({ content: value })}\n\n`);
+          }
         }
         
         // Save the AI response
         await storage.createMessage({
           sessionId,
           sender: 'planner-ai',
-          text: fullResponse,
-          metadata: { kind: 'planner' }
+          text: fullResponse || plannerResult?.text || '',
+          metadata: { kind: 'planner', suggestionsUpdated: plannerResult?.suggestionsUpdated }
         });
         
-        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        // Send done event with suggestions updated flag
+        res.write(`data: ${JSON.stringify({ 
+          done: true, 
+          suggestionsUpdated: plannerResult?.suggestionsUpdated || false,
+          newSuggestions: plannerResult?.newSuggestions || null
+        })}\n\n`);
         res.end();
       } catch (streamError: any) {
         console.error('[Planner] Stream error:', streamError);

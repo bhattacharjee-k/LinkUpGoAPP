@@ -50,6 +50,21 @@ Preferred communication style: Simple, everyday language.
 - **Context Provider**: `AppProvider` manages user, groups, and sessions state with API synchronization
 - **Path Aliases**: `@/` for client source, `@shared/` for shared code
 
+### AI Planner with Function Calling
+- **OpenAI Function Calling**: The planner uses OpenAI's function calling to modify suggestions in real-time
+- **Available Tools**:
+  - `regenerate_suggestions`: Regenerate venue/event suggestions with new filters (categories, budget, neighborhood)
+  - `add_suggestion`: Add a specific venue or event to the current suggestion list
+  - `remove_suggestion`: Remove a specific suggestion by name
+- **Context Updates**: Tool handlers update the in-memory context for subsequent calls in the same request
+- **SSE Response**: Planner route sends `suggestionsUpdated` flag when suggestions change, with `newSuggestions` array
+
+### API Integrations
+- **Google Places API (New)**: Real venue suggestions with location data, ratings, price levels
+- **Ticketmaster Discovery API**: Live event/concert information with ticket URLs
+- **Caching**: 15-minute TTL in-memory cache keyed by city/neighborhood/categories/budget/energy/timeWindow
+- **City Filtering**: Haversine distance with 35mi (NYC) / 30mi (Chicago) radius boundaries
+
 ## External Dependencies
 
 ### Database

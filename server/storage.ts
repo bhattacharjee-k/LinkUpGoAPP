@@ -51,6 +51,8 @@ export interface IStorage {
   getSuggestion(id: string): Promise<Suggestion | undefined>;
   getSessionSuggestions(sessionId: string): Promise<Suggestion[]>;
   createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion>;
+  updateSuggestion(id: string, updates: Partial<InsertSuggestion>): Promise<Suggestion | undefined>;
+  deleteSuggestion(id: string): Promise<void>;
   deleteSessionSuggestions(sessionId: string): Promise<void>;
 
   // Votes
@@ -225,6 +227,15 @@ export class DbStorage implements IStorage {
   async createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion> {
     const [newSuggestion] = await db.insert(schema.suggestions).values(suggestion).returning();
     return newSuggestion;
+  }
+
+  async updateSuggestion(id: string, updates: Partial<InsertSuggestion>): Promise<Suggestion | undefined> {
+    const [updated] = await db.update(schema.suggestions).set(updates).where(eq(schema.suggestions.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSuggestion(id: string): Promise<void> {
+    await db.delete(schema.suggestions).where(eq(schema.suggestions.id, id));
   }
 
   async deleteSessionSuggestions(sessionId: string): Promise<void> {
