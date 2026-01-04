@@ -130,8 +130,10 @@ export function Session() {
     }
   };
 
+  const sessionInviteCode = (session.filters as any)?.inviteCode || '';
+  
   const handleCopyLink = () => {
-    const link = `${window.location.origin}/join-plan/${session.inviteCode}`;
+    const link = `${window.location.origin}/join-plan/${sessionInviteCode}`;
     const message = `Let's plan together — join my plan: ${link}`;
 
     // Try to use Web Share API if available (works on mobile)
@@ -532,7 +534,7 @@ export function Session() {
                         </div>
                         <div className="flex gap-2 items-center">
                           <div className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
-                            {window.location.origin}/join-plan/{session.inviteCode}
+                            {window.location.origin}/join-plan/{sessionInviteCode}
                           </div>
                           <Button size="sm" variant="secondary" onClick={handleCopyLink} className="bg-white/10 h-8">
                             <Copy size={12} />
@@ -663,7 +665,7 @@ export function Session() {
                                 <div className="flex flex-col gap-2 w-full">
                                     <div className="flex gap-2 w-full">
                                         <div className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
-                                            {window.location.origin}/join-plan/{session.inviteCode}
+                                            {window.location.origin}/join-plan/{sessionInviteCode}
                                         </div>
                                     </div>
                                     <Button size="sm" variant="secondary" onClick={handleCopyLink} className="w-full bg-white/10 hover:bg-white/20 border-0 h-9">
