@@ -1,6 +1,68 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { api } from './api';
 import { MOCK_SUGGESTIONS, MOCK_SUGGESTIONS_BY_CITY, CITY_COORDS, type City } from './store';
+
+// WebSocket connection for real-time updates
+let wsConnection: WebSocket | null = null;
+const messageListeners: Map<string, Set<(message: any) => void>> = new Map();
+
+function getWebSocket(): WebSocket {
+  if (!wsConnection || wsConnection.readyState === WebSocket.CLOSED) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsConnection = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    
+    wsConnection.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'new_message' && data.message?.sessionId) {
+          const listeners = messageListeners.get(data.message.sessionId);
+          if (listeners) {
+            listeners.forEach(cb => cb(data.message));
+          }
+        }
+      } catch (e) {
+        console.error('WebSocket message parse error:', e);
+      }
+    };
+  }
+  return wsConnection;
+}
+
+export function subscribeToSessionMessages(sessionId: string, callback: (message: any) => void): () => void {
+  if (!messageListeners.has(sessionId)) {
+    messageListeners.set(sessionId, new Set());
+  }
+  messageListeners.get(sessionId)!.add(callback);
+  
+  // Join the session room
+  const ws = getWebSocket();
+  const sendJoin = () => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'join', sessionId }));
+    }
+  };
+  
+  if (ws.readyState === WebSocket.OPEN) {
+    sendJoin();
+  } else {
+    ws.addEventListener('open', sendJoin, { once: true });
+  }
+  
+  // Return unsubscribe function
+  return () => {
+    const listeners = messageListeners.get(sessionId);
+    if (listeners) {
+      listeners.delete(callback);
+      if (listeners.size === 0) {
+        messageListeners.delete(sessionId);
+        // Send leave message to server when no more listeners for this session
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'leave' }));
+        }
+      }
+    }
+  };
+}
 
 export interface UserProfile {
   id: string;

@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { insertUserSchema, insertGroupSchema, insertSessionSchema } from "@shared/schema";
 import { z } from "zod";
@@ -10,10 +11,72 @@ function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
+// Store WebSocket connections by session ID
+const sessionConnections: Map<string, Set<WebSocket>> = new Map();
+// Track which session each socket is currently in
+const socketToSession: Map<WebSocket, string> = new Map();
+
+export function broadcastToSession(sessionId: string, message: any) {
+  const connections = sessionConnections.get(sessionId);
+  if (connections) {
+    const messageStr = JSON.stringify(message);
+    connections.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(messageStr);
+      }
+    });
+  }
+}
+
+function removeSocketFromSession(ws: WebSocket) {
+  const prevSessionId = socketToSession.get(ws);
+  if (prevSessionId) {
+    const connections = sessionConnections.get(prevSessionId);
+    if (connections) {
+      connections.delete(ws);
+      if (connections.size === 0) {
+        sessionConnections.delete(prevSessionId);
+      }
+    }
+    socketToSession.delete(ws);
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  
+  // Set up WebSocket server for real-time messaging
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  wss.on('connection', (ws, req) => {
+    ws.on('message', (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === 'join' && msg.sessionId) {
+          // Remove from previous session before joining new one
+          removeSocketFromSession(ws);
+          
+          const sessionId = msg.sessionId;
+          if (!sessionConnections.has(sessionId)) {
+            sessionConnections.set(sessionId, new Set());
+          }
+          sessionConnections.get(sessionId)!.add(ws);
+          socketToSession.set(ws, sessionId);
+        } else if (msg.type === 'leave') {
+          // Explicitly leave current session
+          removeSocketFromSession(ws);
+        }
+      } catch (e) {
+        // Ignore malformed messages
+      }
+    });
+    
+    ws.on('close', () => {
+      removeSocketFromSession(ws);
+    });
+  });
   
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
@@ -681,7 +744,24 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const message = await storage.createMessage(req.body);
+      // Get sender name for user messages
+      let senderName = req.body.senderName;
+      if (!senderName && req.body.sender !== 'system' && req.body.sender !== 'planner-ai') {
+        const user = await storage.getUser(userId);
+        senderName = user?.name || user?.username || 'Anonymous';
+      }
+      
+      const message = await storage.createMessage({
+        ...req.body,
+        senderName
+      });
+      
+      // Broadcast to all connected clients in this session
+      broadcastToSession(message.sessionId, {
+        type: 'new_message',
+        message
+      });
+      
       res.json(message);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

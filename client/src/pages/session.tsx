@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { useApp } from '@/lib/context';
+import { useApp, subscribeToSessionMessages } from '@/lib/context';
 import { Layout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,12 +23,13 @@ import { format } from "date-fns";
 
 export function Session() {
   const [match, params] = useRoute('/session/:id');
-  const { getSession, addMessage, sendPlannerMessage, voteForSuggestion, confirmPlan, addParticipantToSession, updateSessionFilters, regenerateSuggestions, user, groups, isAdmin, deleteSession, leaveSession } = useApp();
+  const { getSession, addMessage, sendPlannerMessage, voteForSuggestion, confirmPlan, addParticipantToSession, updateSessionFilters, regenerateSuggestions, user, groups, isAdmin, deleteSession, leaveSession, refreshSession } = useApp();
   const [input, setInput] = useState('');
   const [_, setLocation] = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [realtimeMessages, setRealtimeMessages] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
   const [newParticipantName, setNewParticipantName] = useState('');
   const [tieBreakerOpen, setTieBreakerOpen] = useState(false);
@@ -58,7 +59,29 @@ export function Session() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [session?.messages]);
+  }, [session?.messages, realtimeMessages]);
+
+  // Subscribe to real-time messages via WebSocket
+  useEffect(() => {
+    if (!session?.id) return;
+    
+    const unsubscribe = subscribeToSessionMessages(session.id, (newMessage) => {
+      // Check if message already exists in session.messages
+      const exists = session.messages.some(m => m.id === newMessage.id);
+      if (!exists) {
+        setRealtimeMessages(prev => {
+          // Avoid duplicates in realtime messages too
+          if (prev.some(m => m.id === newMessage.id)) return prev;
+          return [...prev, newMessage];
+        });
+      }
+    });
+    
+    return () => {
+      unsubscribe();
+      setRealtimeMessages([]);
+    };
+  }, [session?.id]);
 
   // Initialize edit form from session filters
   useEffect(() => {
@@ -959,10 +982,12 @@ export function Session() {
           <TabsContent value="chat" className="flex-1 flex flex-col overflow-hidden data-[state=inactive]:hidden">
             <ScrollArea className="flex-1 px-4 py-4" ref={scrollRef}>
               <div className="space-y-4 min-h-full flex flex-col justify-end pb-4">
-                {session.messages.map(msg => {
+                {[...session.messages, ...realtimeMessages.filter(rm => !session.messages.some(m => m.id === rm.id))].map(msg => {
                   const isCurrentUser = msg.sender === user?.id;
                   const isPlannerAi = msg.sender === 'planner-ai';
                   const isSystem = msg.sender === 'system';
+                  const isOtherUser = !isCurrentUser && !isPlannerAi && !isSystem;
+                  const displayName = msg.senderName || (isCurrentUser ? 'You' : isPlannerAi ? 'Planner' : isSystem ? '' : 'User');
                   
                   return (
                   <motion.div 
@@ -978,6 +1003,8 @@ export function Session() {
                     )}
                   >
                     {isPlannerAi && <div className="text-[10px] text-primary font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner</div>}
+                    {isOtherUser && <div className="text-[10px] text-blue-400 font-bold mb-1">{displayName}</div>}
+                    {isCurrentUser && <div className="text-[10px] text-black/70 font-bold mb-1">You</div>}
                     {msg.text}
                   </motion.div>
                   );
