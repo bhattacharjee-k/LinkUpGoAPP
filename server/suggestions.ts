@@ -159,6 +159,17 @@ export async function getSuggestions(req: SuggestRequest): Promise<{ options: Su
 
   let allOptions = [...placesResults, ...eventsResults];
 
+  // Deduplicate by name (case-insensitive)
+  const seenNames = new Set<string>();
+  allOptions = allOptions.filter(opt => {
+    const normalizedName = opt.title.toLowerCase().trim();
+    if (seenNames.has(normalizedName)) {
+      return false;
+    }
+    seenNames.add(normalizedName);
+    return true;
+  });
+
   allOptions = allOptions.filter(opt => {
     if (opt.lat && opt.lng) {
       return isWithinCity(req.city, opt.lat, opt.lng);
