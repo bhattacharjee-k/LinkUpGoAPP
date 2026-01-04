@@ -225,6 +225,18 @@ export class DbStorage implements IStorage {
   }
 
   async createSuggestion(suggestion: InsertSuggestion): Promise<Suggestion> {
+    // Check for duplicate by name in the same session
+    const existing = await db.select().from(schema.suggestions)
+      .where(and(
+        eq(schema.suggestions.sessionId, suggestion.sessionId),
+        eq(schema.suggestions.name, suggestion.name)
+      ));
+    
+    if (existing.length > 0) {
+      // Return existing suggestion instead of creating duplicate
+      return existing[0];
+    }
+    
     const [newSuggestion] = await db.insert(schema.suggestions).values(suggestion).returning();
     return newSuggestion;
   }
