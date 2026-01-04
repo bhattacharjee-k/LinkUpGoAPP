@@ -466,6 +466,14 @@ export async function registerRoutes(
           const suggestions = await storage.getSessionSuggestions(session.id);
           const messages = await storage.getSessionMessages(session.id);
           
+          // Get participant details (names)
+          const participantDetails = await Promise.all(
+            participants.map(async (p) => {
+              const user = await storage.getUser(p.userId);
+              return { id: p.userId, name: user?.name || user?.username || 'Unknown', status: p.status };
+            })
+          );
+          
           const suggestionsWithVotes = await Promise.all(
             suggestions.map(async (s) => {
               const votes = await storage.getSuggestionVotes(s.id);
@@ -480,6 +488,7 @@ export async function registerRoutes(
           return {
             ...session,
             participants: participants.map(p => p.userId),
+            participantDetails,
             participantStatusByUserId: participants.reduce((acc, p) => {
               acc[p.userId] = p.status;
               return acc;
@@ -547,6 +556,14 @@ export async function registerRoutes(
       const suggestions = await storage.getSessionSuggestions(session.id);
       const messages = await storage.getSessionMessages(session.id);
       
+      // Get participant details (names)
+      const participantDetails = await Promise.all(
+        participants.map(async (p) => {
+          const user = await storage.getUser(p.userId);
+          return { id: p.userId, name: user?.name || user?.username || 'Unknown', status: p.status };
+        })
+      );
+      
       // Get votes for each suggestion
       const suggestionsWithVotes = await Promise.all(
         suggestions.map(async (s) => {
@@ -562,6 +579,7 @@ export async function registerRoutes(
       res.json({
         ...session,
         participants: participants.map(p => p.userId),
+        participantDetails,
         participantStatusByUserId: participants.reduce((acc, p) => {
           acc[p.userId] = p.status;
           return acc;

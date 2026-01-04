@@ -150,7 +150,8 @@ export class DbStorage implements IStorage {
 
   async getGroupMembers(groupId: string): Promise<string[]> {
     const members = await db.select().from(schema.groupMembers).where(eq(schema.groupMembers.groupId, groupId));
-    return members.map(m => m.userId);
+    // Deduplicate member IDs in case of duplicate entries
+    return [...new Set(members.map(m => m.userId))];
   }
 
   async updateGroup(id: string, updates: Partial<InsertGroup>): Promise<Group | undefined> {
@@ -214,7 +215,12 @@ export class DbStorage implements IStorage {
 
   async getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string }>> {
     const participants = await db.select().from(schema.sessionParticipants).where(eq(schema.sessionParticipants.sessionId, sessionId));
-    return participants.map(p => ({ userId: p.userId, status: p.status }));
+    // Deduplicate by userId, keeping the last status seen
+    const uniqueParticipants = new Map<string, string>();
+    participants.forEach(p => {
+      uniqueParticipants.set(p.userId, p.status);
+    });
+    return Array.from(uniqueParticipants.entries()).map(([userId, status]) => ({ userId, status }));
   }
 
   async updateParticipantStatus(sessionId: string, userId: string, status: string): Promise<void> {

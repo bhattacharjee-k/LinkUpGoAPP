@@ -987,7 +987,9 @@ export function Session() {
                   const isPlannerAi = msg.sender === 'planner-ai';
                   const isSystem = msg.sender === 'system';
                   const isOtherUser = !isCurrentUser && !isPlannerAi && !isSystem;
-                  const displayName = msg.senderName || (isCurrentUser ? 'You' : isPlannerAi ? 'Planner' : isSystem ? '' : 'User');
+                  // Look up sender name from participantDetails if senderName not in message
+                  const participantName = session.participantDetails?.find(p => p.id === msg.sender)?.name;
+                  const displayName = msg.senderName || participantName || (isCurrentUser ? 'You' : isPlannerAi ? 'Planner' : isSystem ? '' : 'User');
                   
                   return (
                   <motion.div 

@@ -97,6 +97,12 @@ export interface Suggestion {
   votes: Record<string, string>;
 }
 
+export interface ParticipantDetail {
+  id: string;
+  name: string;
+  status: string;
+}
+
 export interface PlanningSession {
   id: string;
   name?: string;
@@ -111,6 +117,7 @@ export interface PlanningSession {
   suggestions: Suggestion[];
   messages: any[];
   participants: string[];
+  participantDetails?: ParticipantDetail[];
   inviteCode?: string;
 }
 
