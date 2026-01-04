@@ -125,22 +125,29 @@ export async function registerRoutes(
       const data = suggestSchema.parse(req.body);
       const result = await getSuggestions(data);
 
-      // Transform to match existing suggestion format
-      const suggestions = result.options.map(opt => ({
-        name: opt.title,
-        city: opt.city,
-        source: opt.source,
-        rating: opt.rating || '4.5',
-        turnout: '0/0',
-        distance: opt.distance || '1.0 mi',
-        budget: opt.priceLevel || '$$',
-        description: opt.description,
-        tags: opt.tags,
-        detailUrl: opt.detailUrl,
-        reservationUrl: opt.reservationUrl,
-        ticketUrl: opt.ticketUrl,
-        eventUrl: opt.eventUrl,
-      }));
+      const sourceMap: Record<string, string> = {
+        'Google': 'Web',
+        'Ticketmaster': 'Web',
+      };
+
+      const suggestions = result.options.map(opt => {
+        const suggestion: Record<string, any> = {
+          name: opt.title,
+          city: data.city,
+          source: sourceMap[opt.source] || 'Web',
+          rating: opt.rating || '4.5',
+          turnout: '0/0',
+          distance: opt.distance || '1.0 mi',
+          budget: opt.priceLevel || '$$',
+          description: opt.description || `A great spot in ${data.city}`,
+          tags: opt.tags || [],
+        };
+        if (opt.detailUrl) suggestion.detailUrl = opt.detailUrl;
+        if (opt.reservationUrl) suggestion.reservationUrl = opt.reservationUrl;
+        if (opt.ticketUrl) suggestion.ticketUrl = opt.ticketUrl;
+        if (opt.eventUrl) suggestion.eventUrl = opt.eventUrl;
+        return suggestion;
+      });
 
       res.json({ suggestions, meta: result.meta });
     } catch (error: any) {
