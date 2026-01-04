@@ -60,6 +60,24 @@ export function Session() {
     }
   }, [session?.messages]);
 
+  // Initialize edit form from session filters
+  useEffect(() => {
+    if (session?.filters) {
+      const f = session.filters;
+      setEditForm(prev => ({
+        ...prev,
+        budget: f.budget || '$$',
+        energy: f.energy || 'Vibey',
+        categories: f.category || [],
+        date: f.specificDate ? new Date(f.specificDate) : new Date(),
+        timeStart: f.specificTime?.split('-')[0] || '19:00',
+        timeEnd: f.specificTime?.split('-')[1] || '22:00',
+        flexibility: f.flexibility || 'strict',
+        distance: f.distance || '1 mi',
+      }));
+    }
+  }, [session?.filters]);
+
   if (!session) return (
       <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-4">
           <h2 className="text-xl font-bold">Session Not Found</h2>
@@ -151,24 +169,6 @@ export function Session() {
       addParticipantToSession(session.id, memberId);
       toast({ title: "Added", description: "Group member added to plan." });
   };
-
-  // Initialize edit form from session filters
-  useEffect(() => {
-    if (session?.filters) {
-      const f = session.filters;
-      setEditForm(prev => ({
-        ...prev,
-        budget: f.budget || '$$',
-        energy: f.energy || 'Vibey',
-        categories: f.category || [],
-        date: f.specificDate ? new Date(f.specificDate) : new Date(),
-        timeStart: f.specificTime?.split('-')[0] || '19:00',
-        timeEnd: f.specificTime?.split('-')[1] || '22:00',
-        flexibility: f.flexibility || 'strict',
-        distance: f.distance || '1 mi',
-      }));
-    }
-  }, [session?.filters]);
 
   const toggleCategory = (c: Category) => {
     setEditForm(prev => ({
