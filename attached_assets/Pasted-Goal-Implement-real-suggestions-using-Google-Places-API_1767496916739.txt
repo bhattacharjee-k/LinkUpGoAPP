@@ -1,0 +1,133 @@
+Goal: Implement real suggestions using Google Places API (New) + Ticketmaster Discovery API. Suggestions must be grounded to selected city/neighborhood/device location and return 3–5 options max.
+
+A) Add config + security
+	1.	Add env vars (server-side only):
+	•	GOOGLE_PLACES_API_KEY
+	•	TICKETMASTER_API_KEY
+	2.	Do NOT expose keys in client bundles.
+	3.	Create backend routes:
+	•	POST /api/suggest (main suggestions endpoint)
+	•	POST /api/geocode (optional; can start with city/neighborhood lookup table)
+
+B) Location grounding (fix wrong-city bug)
+	1.	On session creation, store:
+	•	city (required)
+	•	neighborhood (optional)
+	•	centerLat, centerLng (required for search)
+	2.	Determine center lat/lng in this order:
+	•	if user granted browser geolocation → use that lat/lng
+	•	else if neighborhood provided → geocode “{neighborhood}, {city}” to lat/lng (or MVP lookup table)
+	•	else → city center lookup table (hard-coded for MVP)
+	3.	Hard guardrail: Never return options outside the selected city.
+	•	For MVP: filter by checking the returned address contains the city name (Chicago / New York) AND distance <= radius.
+	•	If a candidate fails, discard it.
+	•	If no results remain, return empty with message “No options found in {city} with these filters.”
+
+C) Category → provider mapping (MVP)
+
+Use these mappings to decide what to fetch:
+	1.	Food & Drinks
+
+	•	Places types: restaurant, bar, cafe
+	•	Ticketmaster: none
+
+	2.	Night Out
+
+	•	Places types: bar, night_club, restaurant (backup)
+	•	Ticketmaster classification: music
+
+	3.	Culture
+
+	•	Places types: museum, art_gallery, performing_arts_theater
+	•	Ticketmaster classification: arts & theatre
+
+	4.	Active
+
+	•	Places types: gym, park, bowling_alley (optional)
+	•	Ticketmaster classification: sports
+
+	5.	Chill
+
+	•	Places types: cafe, restaurant, park
+	•	Ticketmaster: none (optional arts & theatre if desired)
+
+D) Google Places API (New) integration
+	1.	Use Nearby Search (New):
+	•	POST https://places.googleapis.com/v1/places:searchNearby
+	•	Headers:
+	•	X-Goog-Api-Key: {GOOGLE_PLACES_API_KEY}
+	•	X-Goog-FieldMask: places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.websiteUri,places.googleMapsUri,places.primaryType
+	2.	Body:
+	•	includedTypes: [type] (one type per request or a small loop)
+	•	locationRestriction.circle.center.{lat,lng}
+	•	locationRestriction.circle.radius (meters)
+	•	maxResultCount (e.g., 15)
+	3.	Normalize each place into an internal Option:
+	•	optionType: "place"
+	•	title
+	•	address
+	•	lat,lng
+	•	rating, userRatingCount, priceLevel
+	•	detailUrl = websiteUri if present else googleMapsUri
+	•	reservationUrl (optional; if you have a known booking URL, otherwise null)
+	•	sourceId (internal only; do not display in UI)
+
+E) Ticketmaster integration
+	1.	GET:
+	•	https://app.ticketmaster.com/discovery/v1/events.json
+	2.	Params:
+	•	apikey={TICKETMASTER_API_KEY}
+	•	latlong={centerLat},{centerLng}
+	•	radius={radiusMiles}
+	•	unit=miles
+	•	classificationName={music|sports|arts & theatre}
+	•	startDateTime / endDateTime based on selected plan window (ISO8601)
+	3.	Normalize each event into Option:
+	•	optionType: "event"
+	•	title
+	•	venueName
+	•	address (if available)
+	•	startTime
+	•	lat,lng (if available)
+	•	ticketUrl = event url
+	•	detailUrl = event url
+	•	sourceId (internal only; no UI attribution)
+
+F) Ranking + selection (AI logic)
+
+Compute a score per option and return top 3–5.
+	1.	Only use effectiveParticipants (exclude cant_make_it and left) for preference bias.
+	2.	Score factors (simple MVP):
+	•	Category match: +30
+	•	Distance (closer better): +0..20
+	•	Budget match (priceLevel within user range): +0..15
+	•	Energy match (e.g., night_club higher energy): +0..10
+	•	Quality proxy:
+	•	places: rating + ratingCount
+	•	events: time fit + venue credibility (optional)
+	3.	Enforce time window:
+	•	events must start within window
+	•	places are allowed unless you later check hours
+	4.	If results < 3:
+	•	expand radius (first)
+	•	then loosen budget one step
+	•	but NEVER change city
+
+G) Response shape (client-facing)
+
+Return:
+	•	options: Option[] (3–5)
+	•	meta (dev-only in console): city, centerLatLng, radius, counts before/after filtering
+Do not show sources in UI.
+
+H) UI changes
+	1.	On session page, show 3–5 suggestion cards.
+	2.	If ticketUrl exists → show Tickets button
+	3.	Else if reservationUrl exists → show Reserve
+	4.	Else if detailUrl exists → show Details
+Buttons open new tab.
+
+I) Caching (so you don’t hit limits)
+
+Cache /api/suggest for 10–30 minutes keyed by:
+	•	city, neighborhood, centerLatLng, radius, category, budget, energy, time window
