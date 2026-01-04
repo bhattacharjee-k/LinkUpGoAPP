@@ -170,6 +170,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const joinGroupByCode = async (inviteCode: string) => {
     const group = await api.groups.join(inviteCode);
     setGroups([...groups, group]);
+    // Also refresh sessions since joining a group adds user to active sessions
+    await loadSessions();
   };
   
   const isGroupLocked = (groupId: string) => {
