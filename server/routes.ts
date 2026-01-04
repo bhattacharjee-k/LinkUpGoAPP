@@ -312,6 +312,20 @@ export async function registerRoutes(
       }
       
       await storage.addGroupMember(group.id, userId);
+      
+      // Also add user to all active sessions of this group
+      const sessions = await storage.getGroupSessions(group.id);
+      for (const session of sessions) {
+        // Only add to active (non-locked, non-deleted) sessions
+        if (session.status !== 'locked' && !session.deletedAt) {
+          try {
+            await storage.addSessionParticipant(session.id, userId, 'active');
+          } catch (e) {
+            // Ignore if already a participant
+          }
+        }
+      }
+      
       const members = await storage.getGroupMembers(group.id);
       res.json({ ...group, members });
     } catch (error: any) {
@@ -388,8 +402,15 @@ export async function registerRoutes(
         guardrails
       });
       
-      // Add creator as participant
-      await storage.addSessionParticipant(session.id, userId, 'active');
+      // Add all group members as participants (including creator)
+      const groupMembers = await storage.getGroupMembers(groupId);
+      for (const memberId of groupMembers) {
+        try {
+          await storage.addSessionParticipant(session.id, memberId, 'active');
+        } catch (e) {
+          // Ignore if already a participant
+        }
+      }
       
       res.json(session);
     } catch (error: any) {
