@@ -664,12 +664,19 @@ export async function registerRoutes(
       res.setHeader('Connection', 'keep-alive');
       
       // Import and use the planner
-      const { streamPlannerResponse } = await import('./planner');
+      const { streamPlannerResponse, fetchLiveEvents } = await import('./planner');
+      
+      // Fetch live events for the planner context
+      const filters = context.session.filters as any;
+      const liveEvents = await fetchLiveEvents(
+        filters?.locationScope || user.city || 'NYC',
+        filters?.specificDate
+      );
       
       let fullResponse = '';
       
       try {
-        for await (const chunk of streamPlannerResponse({ ...context, user }, userMessage)) {
+        for await (const chunk of streamPlannerResponse({ ...context, user, liveEvents }, userMessage)) {
           fullResponse += chunk;
           res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
         }

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { Session, Message, User, Suggestion } from "@shared/schema";
+import { getSuggestions } from "./suggestions";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -12,10 +13,11 @@ interface PlannerContext {
   participants: { id: string; name: string; preferences: { budget: string[]; energy: string; categories: string[] } }[];
   suggestions: Suggestion[];
   recentMessages: Message[];
+  liveEvents?: { name: string; venue: string; date: string; ticketUrl: string }[];
 }
 
 function buildSystemPrompt(context: PlannerContext): string {
-  const { session, participants, suggestions } = context;
+  const { session, participants, suggestions, liveEvents } = context;
   const filters = session.filters as any;
   
   const participantSummary = participants.map(p => 
@@ -25,6 +27,10 @@ function buildSystemPrompt(context: PlannerContext): string {
   const suggestionSummary = suggestions.length > 0 
     ? suggestions.map((s, i) => `${i + 1}. ${s.name} (${s.budget}, ${s.rating}★) - ${s.description.slice(0, 50)}...`).join('\n')
     : 'No suggestions generated yet.';
+
+  const eventsSummary = liveEvents && liveEvents.length > 0
+    ? liveEvents.map((e, i) => `${i + 1}. ${e.name} at ${e.venue} (${e.date}) - Tickets: ${e.ticketUrl}`).join('\n')
+    : 'No upcoming events found for this area.';
   
   return `You are the Planner, an AI assistant helping a group of friends plan a social outing in ${filters.locationScope || 'NYC'}. You're friendly, concise, and helpful.
 
@@ -42,17 +48,21 @@ ${participantSummary || 'No participants yet.'}
 CURRENT SUGGESTIONS:
 ${suggestionSummary}
 
+LIVE CONCERTS & EVENTS (from Ticketmaster):
+${eventsSummary}
+
 YOUR ROLE:
 1. Help the group refine their plan based on preferences
 2. Suggest adjustments to filters if options seem limited
 3. Answer questions about venues, neighborhoods, or timing
-4. Encourage group consensus and decision-making
-5. Keep responses brief (2-3 sentences) unless asked for detail
+4. When asked about concerts or events, reference the LIVE CONCERTS & EVENTS section above
+5. Encourage group consensus and decision-making
+6. Keep responses brief (2-3 sentences) unless asked for detail
 
 IMPORTANT RULES:
 - Only discuss venues in ${filters.locationScope || 'NYC'} - never suggest places outside this city
 - Be conversational and fun - use casual language appropriate for young professionals
-- If asked about something outside your knowledge, admit it honestly
+- When mentioning events, include the ticket URL so users can buy tickets
 - Don't make up specific venue details you don't know`;
 }
 
@@ -131,5 +141,28 @@ export async function getPlannerResponse(
   } catch (error: any) {
     console.error('[Planner] OpenAI error:', error);
     return "I'm having trouble connecting right now. Try asking me again in a moment!";
+  }
+}
+
+export async function fetchLiveEvents(city: string, specificDate?: string): Promise<{ name: string; venue: string; date: string; ticketUrl: string }[]> {
+  try {
+    const result = await getSuggestions({
+      city,
+      categories: ['Live Music', 'Comedy', 'Club'],
+      specificDate,
+    });
+    
+    return result.options
+      .filter(opt => opt.optionType === 'event')
+      .slice(0, 10)
+      .map(opt => ({
+        name: opt.title,
+        venue: opt.venueName || 'TBA',
+        date: opt.startTime || 'Check website',
+        ticketUrl: opt.ticketUrl || opt.detailUrl || '',
+      }));
+  } catch (error) {
+    console.error('[Planner] Error fetching live events:', error);
+    return [];
   }
 }
