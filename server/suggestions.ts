@@ -84,10 +84,15 @@ const categoryToTicketmaster: Record<string, string> = {
   'Live Music': 'music',
   'Club': 'music',
   'Dancing': 'music',
+  'Drinks': 'music',
+  'Rooftop': 'music',
+  'Lounge': 'music',
   'Comedy': 'arts & theatre',
   'Culture': 'arts & theatre',
   'Museum': 'arts & theatre',
   'Active': 'sports',
+  'Big Group': 'music',
+  'Date Night': 'music',
 };
 
 const priceLevelMap: Record<string, string> = {
@@ -265,12 +270,14 @@ async function fetchTicketmasterEvents(center: LatLng, classifications: string[]
   }
 
   const results: SuggestionOption[] = [];
-  const radiusMiles = 10;
+  const radiusMiles = 25;
 
   const now = new Date();
   const startDateTime = specificDate ? new Date(specificDate) : now;
   const endDateTime = new Date(startDateTime);
-  endDateTime.setDate(endDateTime.getDate() + 7);
+  endDateTime.setDate(endDateTime.getDate() + 14);
+
+  console.log(`[Ticketmaster] Searching for ${classifications.join(', ')} near ${center.lat},${center.lng} from ${startDateTime.toISOString()} to ${endDateTime.toISOString()}`);
 
   for (const classification of classifications) {
     try {
@@ -289,12 +296,14 @@ async function fetchTicketmasterEvents(center: LatLng, classifications: string[]
       const response = await fetch(`https://app.ticketmaster.com/discovery/v2/events.json?${params}`);
 
       if (!response.ok) {
-        console.error(`Ticketmaster API error:`, await response.text());
+        const errText = await response.text();
+        console.error(`[Ticketmaster] API error for ${classification}:`, errText);
         continue;
       }
 
       const data = await response.json();
       const events = data._embedded?.events || [];
+      console.log(`[Ticketmaster] Found ${events.length} events for ${classification}`);
 
       for (const event of events) {
         const venue = event._embedded?.venues?.[0];
