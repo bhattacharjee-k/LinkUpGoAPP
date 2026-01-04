@@ -78,7 +78,9 @@ interface AppContextType {
   addMemberToGroup: (groupId: string, userId: string) => void;
   addParticipantToSession: (sessionId: string, userId: string) => void;
   updateGroup: (groupId: string, updates: Partial<Group>) => Promise<void>;
-  joinGroupByCode: (inviteCode: string) => Promise<void>;
+  joinGroupByCode: (inviteCode: string) => Promise<Group>;
+  refreshGroups: () => Promise<void>;
+  refreshSessions: () => Promise<void>;
   isGroupLocked: (groupId: string) => boolean;
   isAdmin: (groupId: string) => boolean;
 }
@@ -167,11 +169,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setGroups(prev => prev.map(g => g.id === groupId ? updated : g));
   };
 
-  const joinGroupByCode = async (inviteCode: string) => {
+  const joinGroupByCode = async (inviteCode: string): Promise<Group> => {
     const group = await api.groups.join(inviteCode);
     setGroups([...groups, group]);
     // Also refresh sessions since joining a group adds user to active sessions
     await loadSessions();
+    return group;
   };
   
   const isGroupLocked = (groupId: string) => {
@@ -444,6 +447,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUserState(updatedUser);
   };
 
+  const refreshGroups = loadGroups;
+  const refreshSessions = loadSessions;
+
   const value: AppContextType = {
     user,
     groups,
@@ -471,6 +477,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addParticipantToSession,
     updateGroup,
     joinGroupByCode,
+    refreshGroups,
+    refreshSessions,
     isGroupLocked,
     isAdmin,
   };
