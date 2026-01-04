@@ -333,6 +333,55 @@ export async function registerRoutes(
     }
   });
 
+  // Join a session directly via session invite code
+  app.post("/api/sessions/join/:inviteCode", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const session = await storage.getSessionByInviteCode(req.params.inviteCode);
+      if (!session) {
+        return res.status(404).json({ message: "Invalid session invite code" });
+      }
+      
+      if (session.deletedAt) {
+        return res.status(404).json({ message: "This plan no longer exists" });
+      }
+      
+      if (session.status === 'locked' || session.status === 'archived' || session.status === 'completed') {
+        return res.status(403).json({ message: "This plan is no longer accepting new participants" });
+      }
+      
+      // First add user to the group if not already a member
+      const group = await storage.getGroup(session.groupId);
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      
+      const members = await storage.getGroupMembers(group.id);
+      if (!members.includes(userId)) {
+        if (group.locked) {
+          return res.status(403).json({ message: "Group is locked" });
+        }
+        await storage.addGroupMember(group.id, userId);
+      }
+      
+      // Add user to the session as participant
+      try {
+        await storage.addSessionParticipant(session.id, userId, 'active');
+      } catch (e) {
+        // Ignore if already a participant
+      }
+      
+      res.json({ session, group: { ...group, members: await storage.getGroupMembers(group.id) } });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Session routes
   app.get("/api/sessions", async (req, res) => {
     try {

@@ -59,6 +59,7 @@ export const api = {
     update: (id: string, updates: any) => fetchAPI(`/sessions/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
     delete: (id: string) => fetchAPI(`/sessions/${id}`, { method: 'DELETE' }),
     leave: (id: string) => fetchAPI(`/sessions/${id}/leave`, { method: 'POST' }),
+    join: (inviteCode: string) => fetchAPI(`/sessions/join/${inviteCode}`, { method: 'POST' }),
     addParticipant: (id: string, status?: string) => fetchAPI(`/sessions/${id}/participants`, { method: 'POST', body: JSON.stringify({ status }) }),
     updateParticipantStatus: (sessionId: string, participantId: string, status: string) => 
       fetchAPI(`/sessions/${sessionId}/participants/${participantId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),

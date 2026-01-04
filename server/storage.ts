@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import * as schema from '@shared/schema';
 import type {
   User, InsertUser,
@@ -38,6 +38,7 @@ export interface IStorage {
 
   // Sessions
   getSession(id: string): Promise<Session | undefined>;
+  getSessionByInviteCode(inviteCode: string): Promise<Session | undefined>;
   getGroupSessions(groupId: string): Promise<Session[]>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: string, updates: Partial<InsertSession>): Promise<Session | undefined>;
@@ -160,6 +161,17 @@ export class DbStorage implements IStorage {
   // Sessions
   async getSession(id: string): Promise<Session | undefined> {
     const [session] = await db.select().from(schema.sessions).where(eq(schema.sessions.id, id));
+    return session;
+  }
+
+  async getSessionByInviteCode(inviteCode: string): Promise<Session | undefined> {
+    // Session invite code is stored in filters.inviteCode (JSONB column)
+    const [session] = await db.select().from(schema.sessions).where(
+      and(
+        sql`${schema.sessions.filters}->>'inviteCode' = ${inviteCode}`,
+        isNull(schema.sessions.deletedAt)
+      )
+    );
     return session;
   }
 
