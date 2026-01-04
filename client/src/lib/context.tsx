@@ -252,19 +252,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Generate city-aware suggestions
-    const suggestions = generateSuggestionsForSession(initialFilters);
-    
-    // Create suggestions in database
-    for (const mockSugg of suggestions) {
-      const { id, votes, score, ...suggestionData } = mockSugg as any;
-      await api.suggestions.create({
-        sessionId: session.id,
-        ...suggestionData
+    try {
+      const result = await api.suggestions.fetch({
+        city: initialFilters.locationScope || user?.city || 'NYC',
+        neighborhood: initialFilters.neighborhood,
+        userLat: user?.lastKnownLat ? parseFloat(user.lastKnownLat) : undefined,
+        userLng: user?.lastKnownLng ? parseFloat(user.lastKnownLng) : undefined,
+        categories: initialFilters.category || ['Drinks'],
+        budget: initialFilters.budget,
+        energy: initialFilters.energy,
+        timeWindow: initialFilters.timeWindow,
+        specificDate: initialFilters.specificDate,
+        specificTime: initialFilters.specificTime,
       });
+      
+      for (const suggestion of result.suggestions) {
+        await api.suggestions.create({
+          sessionId: session.id,
+          ...suggestion
+        });
+      }
+      
+      console.log('[Session] Fetched suggestions from APIs:', result.meta);
+    } catch (error) {
+      console.error('[Session] API fetch failed, using fallback:', error);
+      const suggestions = generateSuggestionsForSession(initialFilters);
+      for (const mockSugg of suggestions) {
+        const { id, votes, score, ...suggestionData } = mockSugg as any;
+        await api.suggestions.create({
+          sessionId: session.id,
+          ...suggestionData
+        });
+      }
     }
 
-    // Add initial system message
     await api.messages.create({
       sessionId: session.id,
       sender: 'system',

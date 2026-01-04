@@ -159,11 +159,14 @@ export async function getSuggestions(req: SuggestRequest): Promise<{ options: Su
       return isWithinCity(req.city, opt.lat, opt.lng);
     }
     const cityLower = req.city.toLowerCase();
-    const addressLower = opt.address.toLowerCase();
+    const addressLower = (opt.address || '').toLowerCase();
+    const optCityLower = (opt.city || '').toLowerCase();
     if (req.city === 'NYC') {
-      return addressLower.includes('new york') || addressLower.includes('brooklyn') || addressLower.includes('queens') || addressLower.includes('manhattan');
+      return addressLower.includes('new york') || addressLower.includes('brooklyn') || 
+             addressLower.includes('queens') || addressLower.includes('manhattan') ||
+             optCityLower.includes('new york') || optCityLower === 'nyc';
     }
-    return addressLower.includes(cityLower);
+    return addressLower.includes(cityLower) || optCityLower.includes(cityLower);
   });
 
   allOptions = scoreAndRank(allOptions, req, center);
@@ -329,11 +332,9 @@ function scoreAndRank(options: SuggestionOption[], req: SuggestRequest, center: 
   const reqBudgetLevel = budgetScore[req.budget || '$$'] || 2;
 
   for (const opt of options) {
-    let score = 0;
+    let score = 30;
 
-    score += 30;
-
-    if (opt.lat && opt.lng) {
+    if (opt.lat != null && opt.lng != null && !isNaN(opt.lat) && !isNaN(opt.lng)) {
       const dist = haversineDistance(center.lat, center.lng, opt.lat, opt.lng);
       score += Math.max(0, 20 - dist * 4);
     }
@@ -342,14 +343,18 @@ function scoreAndRank(options: SuggestionOption[], req: SuggestRequest, center: 
       const optLevel = budgetScore[opt.priceLevel] || 2;
       const diff = Math.abs(optLevel - reqBudgetLevel);
       score += Math.max(0, 15 - diff * 5);
+    } else {
+      score += 10;
     }
 
     if (opt.rating) {
       const rating = parseFloat(opt.rating);
-      score += rating * 3;
+      if (!isNaN(rating)) {
+        score += rating * 3;
+      }
     }
 
-    if (opt.ratingCount) {
+    if (opt.ratingCount && !isNaN(opt.ratingCount)) {
       score += Math.min(10, opt.ratingCount / 100);
     }
 
