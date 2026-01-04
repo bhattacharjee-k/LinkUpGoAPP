@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertUserSchema, insertGroupSchema, insertSessionSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { getSuggestions, SuggestionOption } from "./suggestions";
 
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -95,6 +96,55 @@ export async function registerRoutes(
       
       res.json({ available: !existingUser });
     } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Suggestions endpoint - uses real Google Places and Ticketmaster APIs
+  app.post("/api/suggest", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const suggestSchema = z.object({
+        city: z.string(),
+        neighborhood: z.string().optional(),
+        userLat: z.number().optional(),
+        userLng: z.number().optional(),
+        categories: z.array(z.string()),
+        budget: z.string().optional(),
+        energy: z.string().optional(),
+        timeWindow: z.string().optional(),
+        specificDate: z.string().optional(),
+        specificTime: z.string().optional(),
+      });
+
+      const data = suggestSchema.parse(req.body);
+      const result = await getSuggestions(data);
+
+      // Transform to match existing suggestion format
+      const suggestions = result.options.map(opt => ({
+        name: opt.title,
+        city: opt.city,
+        source: opt.source,
+        rating: opt.rating || '4.5',
+        turnout: '0/0',
+        distance: opt.distance || '1.0 mi',
+        budget: opt.priceLevel || '$$',
+        description: opt.description,
+        tags: opt.tags,
+        detailUrl: opt.detailUrl,
+        reservationUrl: opt.reservationUrl,
+        ticketUrl: opt.ticketUrl,
+        eventUrl: opt.eventUrl,
+      }));
+
+      res.json({ suggestions, meta: result.meta });
+    } catch (error: any) {
+      console.error('Suggest error:', error);
       res.status(400).json({ message: error.message });
     }
   });

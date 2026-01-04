@@ -30,6 +30,10 @@ export interface UserProfile {
   energy: Energy;
   categories: Category[]; // Interests
   hardNos: string[]; // Using string array to be flexible, but could be HardNo[]
+  lastKnownLat?: string | null;
+  lastKnownLng?: string | null;
+  lastLocationTimestamp?: string | null;
+  locationPermission?: 'granted' | 'denied' | 'pending';
 }
 
 export interface Group {

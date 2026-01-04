@@ -354,23 +354,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const regenerateSuggestions = async (sessionId: string) => {
-    // Get current session to access filters
     const session = getSession(sessionId);
     if (!session) return;
     
-    // Delete existing suggestions first
     await api.suggestions.deleteForSession(sessionId);
     
-    // Generate new city-aware suggestions based on current filters
-    const suggestions = generateSuggestionsForSession(session.filters);
-    
-    // Create new suggestions in database
-    for (const mockSugg of suggestions) {
-      const { id, votes, score, ...suggestionData } = mockSugg as any;
-      await api.suggestions.create({
-        sessionId,
-        ...suggestionData
+    try {
+      const filters = session.filters || {};
+      const result = await api.suggestions.fetch({
+        city: filters.locationScope || user?.city || 'NYC',
+        neighborhood: filters.neighborhood,
+        userLat: user?.lastKnownLat ? parseFloat(user.lastKnownLat) : undefined,
+        userLng: user?.lastKnownLng ? parseFloat(user.lastKnownLng) : undefined,
+        categories: filters.category || ['Drinks'],
+        budget: filters.budget,
+        energy: filters.energy,
+        timeWindow: filters.timeWindow,
+        specificDate: filters.specificDate,
+        specificTime: filters.specificTime,
       });
+      
+      for (const suggestion of result.suggestions) {
+        await api.suggestions.create({
+          sessionId,
+          ...suggestion
+        });
+      }
+      
+      console.log('[Suggestions] Fetched from APIs:', result.meta);
+    } catch (error) {
+      console.error('[Suggestions] API fetch failed, using fallback:', error);
+      const suggestions = generateSuggestionsForSession(session.filters);
+      for (const mockSugg of suggestions) {
+        const { id, votes, score, ...suggestionData } = mockSugg as any;
+        await api.suggestions.create({
+          sessionId,
+          ...suggestionData
+        });
+      }
     }
     
     await api.messages.create({
