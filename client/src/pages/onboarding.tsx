@@ -266,13 +266,13 @@ export function Onboarding() {
         className="z-10 w-full max-w-md mx-auto space-y-8"
       >
         {/* Logo centered at top */}
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center items-center mb-8">
           <img 
             src={logoImg} 
             alt="LinkUpGo" 
-            width={200}
-            height={50}
-            className="w-[200px] max-w-[160px] sm:max-w-[200px] h-auto object-contain"
+            width={280}
+            height={70}
+            className="w-[240px] sm:w-[280px] h-auto object-contain"
             data-testid="img-logo-onboarding"
           />
         </div>

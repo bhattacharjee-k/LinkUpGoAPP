@@ -65,9 +65,9 @@ export function Home() {
             <img 
               src={logoImg} 
               alt="LinkUpGo" 
-              width={120} 
-              height={30} 
-              className="h-[28px] w-auto object-contain"
+              width={160} 
+              height={40} 
+              className="h-[40px] w-auto object-contain"
             />
           </button>
           <div className="flex items-center gap-2">
