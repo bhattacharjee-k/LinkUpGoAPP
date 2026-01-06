@@ -948,5 +948,102 @@ export async function registerRoutes(
     }
   });
 
+  // Notification routes
+  app.get("/api/notifications", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const notifications = await storage.getUserNotifications(userId);
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const count = await storage.getUnreadCount(userId);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/read", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { id } = req.body;
+      if (!id) {
+        return res.status(400).json({ message: "Notification id is required" });
+      }
+      
+      await storage.markAsRead(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/read-all", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      await storage.markAllAsRead(userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notification-prefs", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const prefs = await storage.getNotificationPrefs(userId);
+      res.json(prefs || { emailEnabled: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notification-prefs", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { emailEnabled } = req.body;
+      const prefs = await storage.upsertNotificationPrefs(userId, emailEnabled);
+      res.json(prefs);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   return httpServer;
 }
