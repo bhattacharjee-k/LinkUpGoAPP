@@ -1,0 +1,97 @@
+Task: Add MVP notifications to LinkUpGo (in-app inbox + optional email).
+First, detect the stack automatically by inspecting package.json, routes, and folder structure (Express/Vite/React, Next.js, Remix, etc.). Implement accordingly.
+
+1) In-app notifications (required)
+
+Create persistent storage for notifications using whatever database/storage already exists. If there is no DB, add SQLite server-side so notifications persist across refresh.
+
+Create notifications table/collection:
+	•	id (uuid)
+	•	userId
+	•	type (INVITE, AVAILABILITY_NUDGE, VOTE_OPEN, PLAN_LOCKED, PLAN_UPDATED)
+	•	title
+	•	body
+	•	url (deep link path like /plan/:id or /squad/:id/plan/:id)
+	•	isRead (default false)
+	•	createdAt
+
+Create notification_prefs:
+	•	userId (unique)
+	•	emailEnabled (default true)
+
+2) API endpoints (required)
+
+Add these routes using the project’s existing API style:
+	•	GET /api/notifications (current user)
+	•	POST /api/notifications/read { id }
+	•	POST /api/notifications/read-all
+	•	GET /api/notifications/unread-count
+	•	GET /api/notification-prefs
+	•	POST /api/notification-prefs { emailEnabled }
+
+3) UI (required)
+	•	Add bell icon in top nav with unread badge
+	•	Add an Updates page listing notifications (unread highlighted)
+	•	Clicking a notification opens url and marks it read
+	•	Add “Mark all read”
+	•	Add Settings toggle: “Email notifications”
+Keep black + lime theme.
+
+4) Notification creation helper (single source of truth)
+
+Add createNotification({ userId, type, title, body, url, sendEmail?: boolean }) that:
+	•	inserts into notifications
+	•	respects prefs
+	•	optionally sends email (see below)
+	•	returns created notification
+
+5) Event triggers (required)
+
+Create notifications on:
+	•	Join plan (invite link auto-join):
+	•	notify joiner: “You joined {Plan}”
+	•	notify admin: “{User} joined {Plan}”
+	•	Voting opens (options generated):
+	•	notify all effective participants: “Voting is open”
+	•	Plan locked:
+	•	notify all participants: “Plan locked: {Winning option}”
+	•	include ticket/reserve/details deep link if present
+	•	Availability nudge:
+	•	notify only missing users
+	•	dedupe: max 1 per user per plan per 12 hours
+
+Important: users marked cant_make_it or left must NOT be counted for quorum/scoring and must NOT receive “you’re missing availability” nudges.
+
+6) Email notifications (optional but implement) — MUST deep-link back into app
+
+Add Resend support but do not break app if env vars are missing.
+
+Env vars:
+	•	RESEND_API_KEY
+	•	FROM_EMAIL
+	•	APP_BASE_URL (e.g., deployed Replit URL)
+	•	(optional) LOGIN_PATH default /login
+
+Deep link rule (required):
+Every email must take the user back into the app to the exact context:
+	•	Build deepLink = ${APP_BASE_URL}${url}
+
+Auth redirect rule (required):
+If user may be logged out, email links must support redirect-after-login:
+	•	Use deepLinkWithRedirect = ${APP_BASE_URL}/login?redirect=${encodeURIComponent(url)}
+	•	Use this link as the primary CTA in the email.
+
+Email format:
+	•	Subject = title
+	•	Body includes body + one CTA button: “Open plan” linking to deepLinkWithRedirect
+	•	Also include a plain text fallback link.
+
+Send emails only for: INVITE, AVAILABILITY_NUDGE, PLAN_LOCKED and only if emailEnabled === true.
+
+7) Acceptance criteria
+	•	Notifications persist and show in Updates inbox
+	•	Bell shows unread count
+	•	Mark read / mark all read works
+	•	Join/voting/locked/nudge notifications appear correctly
+	•	Email (if configured) contains an Open plan CTA that deep-links into app
+	•	If logged out, user logs in and is redirected back to the plan

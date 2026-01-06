@@ -137,3 +137,40 @@ export const messages = pgTable("messages", {
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;
+
+// Notifications
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type: text("type").notNull(), // 'INVITE' | 'AVAILABILITY_NUDGE' | 'VOTE_OPEN' | 'PLAN_LOCKED' | 'PLAN_UPDATED'
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  url: text("url").notNull(), // Deep link path like /session/:id
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, isRead: true });
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
+// Notification types
+export const NotificationType = {
+  INVITE: 'INVITE',
+  AVAILABILITY_NUDGE: 'AVAILABILITY_NUDGE',
+  VOTE_OPEN: 'VOTE_OPEN',
+  PLAN_LOCKED: 'PLAN_LOCKED',
+  PLAN_UPDATED: 'PLAN_UPDATED',
+} as const;
+export type NotificationType = typeof NotificationType[keyof typeof NotificationType];
+
+// Notification preferences
+export const notificationPrefs = pgTable("notification_prefs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  emailEnabled: boolean("email_enabled").notNull().default(true),
+});
+
+export const insertNotificationPrefsSchema = createInsertSchema(notificationPrefs).omit({ id: true });
+export type InsertNotificationPrefs = z.infer<typeof insertNotificationPrefsSchema>;
+export type NotificationPrefs = typeof notificationPrefs.$inferSelect;
