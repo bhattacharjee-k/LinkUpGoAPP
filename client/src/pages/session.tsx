@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useApp, subscribeToSessionMessages } from '@/lib/context';
+import { api } from '@/lib/api';
 import { Layout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +48,25 @@ export function Session() {
   const [downvoteModalOpen, setDownvoteModalOpen] = useState(false);
   const [downvoteSuggestion, setDownvoteSuggestion] = useState<{id: string; name: string} | null>(null);
   const [rankingInfoOpen, setRankingInfoOpen] = useState(false);
+  const [proposeTimeOpen, setProposeTimeOpen] = useState(false);
+  const [proposedTimes, setProposedTimes] = useState<Array<{
+    id: string;
+    sessionId: string;
+    userId: string;
+    proposedDate: string;
+    timeStart: string;
+    timeEnd: string;
+    note?: string | null;
+    votes: string[];
+    proposerName: string;
+    createdAt: string;
+  }>>([]);
+  const [proposeTimeForm, setProposeTimeForm] = useState({
+    date: new Date(),
+    timeStart: '19:00',
+    timeEnd: '22:00',
+    note: ''
+  });
   const [editForm, setEditForm] = useState({
     date: new Date(),
     timeStart: '19:00',
@@ -105,6 +125,55 @@ export function Session() {
       }));
     }
   }, [session?.filters]);
+
+  // Load proposed times
+  useEffect(() => {
+    if (session?.id) {
+      api.proposedTimes.list(session.id).then(setProposedTimes).catch(console.error);
+    }
+  }, [session?.id]);
+
+  const handleProposeTime = async () => {
+    if (!session?.id) return;
+    try {
+      await api.proposedTimes.create(session.id, {
+        proposedDate: proposeTimeForm.date.toISOString(),
+        timeStart: proposeTimeForm.timeStart,
+        timeEnd: proposeTimeForm.timeEnd,
+        note: proposeTimeForm.note || undefined
+      });
+      const updated = await api.proposedTimes.list(session.id);
+      setProposedTimes(updated);
+      setProposeTimeOpen(false);
+      setProposeTimeForm({ date: new Date(), timeStart: '19:00', timeEnd: '22:00', note: '' });
+      toast({ title: "Time proposed", description: "Your alternative time has been added." });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleVoteForTime = async (timeId: string) => {
+    if (!session?.id) return;
+    try {
+      await api.proposedTimes.vote(timeId);
+      const updated = await api.proposedTimes.list(session.id);
+      setProposedTimes(updated);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteProposedTime = async (timeId: string) => {
+    if (!session?.id) return;
+    try {
+      await api.proposedTimes.delete(timeId);
+      const updated = await api.proposedTimes.list(session.id);
+      setProposedTimes(updated);
+      toast({ title: "Deleted", description: "Proposed time removed." });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
 
   if (!session) return (
       <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-4">
@@ -665,6 +734,133 @@ export function Session() {
               </Badge>
             ))}
           </div>
+
+          {/* Proposed Times Section */}
+          {!isLocked && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Alternative Times</span>
+                <Dialog open={proposeTimeOpen} onOpenChange={setProposeTimeOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="ghost" className="h-6 text-[10px] text-primary hover:text-primary hover:bg-primary/10 -mr-2" data-testid="button-propose-time">
+                      <Clock size={10} className="mr-1" /> Propose New Time
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Propose a New Time</DialogTitle>
+                      <DialogDescription>Suggest an alternative date and time for this plan.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs">Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start text-left font-normal bg-white/5 border-white/10">
+                              <Calendar size={14} className="mr-2" />
+                              {format(proposeTimeForm.date, 'PPP')}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 bg-card border-white/10" align="start">
+                            <CalendarPicker
+                              mode="single"
+                              selected={proposeTimeForm.date}
+                              onSelect={(d) => d && setProposeTimeForm(prev => ({ ...prev, date: d }))}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Start Time</Label>
+                          <Input 
+                            type="time" 
+                            value={proposeTimeForm.timeStart} 
+                            onChange={(e) => setProposeTimeForm(prev => ({ ...prev, timeStart: e.target.value }))}
+                            className="bg-white/5 border-white/10"
+                            data-testid="input-propose-time-start"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">End Time</Label>
+                          <Input 
+                            type="time" 
+                            value={proposeTimeForm.timeEnd} 
+                            onChange={(e) => setProposeTimeForm(prev => ({ ...prev, timeEnd: e.target.value }))}
+                            className="bg-white/5 border-white/10"
+                            data-testid="input-propose-time-end"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Note (optional)</Label>
+                        <Input 
+                          placeholder="e.g., Works better for me because..."
+                          value={proposeTimeForm.note}
+                          onChange={(e) => setProposeTimeForm(prev => ({ ...prev, note: e.target.value }))}
+                          className="bg-white/5 border-white/10"
+                          data-testid="input-propose-time-note"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter className="mt-4">
+                      <Button onClick={handleProposeTime} className="w-full bg-primary text-black font-bold" data-testid="button-submit-propose-time">
+                        Propose This Time
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {proposedTimes.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No alternative times proposed yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {proposedTimes.map((pt) => (
+                    <div key={pt.id} className="bg-white/5 rounded-lg p-2 space-y-1" data-testid={`proposed-time-${pt.id}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="bg-primary/20 text-primary text-[10px]">
+                            <Calendar size={10} className="mr-1" /> {format(new Date(pt.proposedDate), 'MMM d')}
+                          </Badge>
+                          <Badge variant="secondary" className="bg-white/10 text-[10px]">
+                            <Clock size={10} className="mr-1" /> {pt.timeStart}-{pt.timeEnd}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            size="sm" 
+                            variant={pt.votes.includes(user?.id || '') ? "default" : "ghost"}
+                            className={cn("h-6 text-[10px] px-2", pt.votes.includes(user?.id || '') && "bg-primary text-black")}
+                            onClick={() => handleVoteForTime(pt.id)}
+                            data-testid={`button-vote-time-${pt.id}`}
+                          >
+                            <ThumbsUp size={10} className="mr-1" /> {pt.votes.length}
+                          </Button>
+                          {pt.userId === user?.id && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-6 w-6 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              onClick={() => handleDeleteProposedTime(pt.id)}
+                              data-testid={`button-delete-time-${pt.id}`}
+                            >
+                              <X size={12} />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span>by {pt.proposerName}</span>
+                        {pt.note && <span>• {pt.note}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Locked Banner */}
           {isLocked && (
