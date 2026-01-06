@@ -1,0 +1,61 @@
+Objective: Remove “New Squad” as a primary concept. Squads are persistent like group chats. Plans are primary. Users should be able to create multiple plans within the same squad.
+
+1) UX changes
+
+Home
+	•	Remove/disable any New Squad button.
+	•	Add a primary CTA: New Plan
+	•	Keep “Your Groups” (formerly “Your Squads”) list as persistent containers.
+	•	Each group card shows:
+	•	Group name
+	•	Member count
+	•	Admin badge (if me)
+	•	Locked badge (if group locked)
+	•	Secondary CTA: Open
+
+New Plan entry
+	•	Clicking New Plan opens “Who’s going?”
+	•	Option A: choose an existing group
+	•	Option B: select friends ad-hoc
+	•	If ad-hoc selection matches an existing group’s member set → reuse it
+	•	Else → silently create a new group (no separate “create squad” flow)
+
+Inside a group (drawer/modal)
+	•	Add a prominent CTA: New Plan
+	•	Show list of plans for that group:
+	•	Active / Voting / Locked
+	•	Past (empty state if none)
+
+2) Data model (required)
+
+Ensure:
+	•	Group (Squad) is persistent:
+	•	id, memberIds[], adminId, name (auto-generated), isLocked
+	•	Plan belongs to a group:
+	•	id, groupId, status, filters, participants, suggestions, votes, etc.
+	•	Relationship: one Group → many Plans
+
+3) Group naming (no friction)
+	•	Do not require naming a group on creation.
+	•	Auto-name groups like:
+	•	"Alex, Sam +2"
+	•	Allow rename later from group settings (admin only)
+
+4) Routing cleanup
+	•	Remove any standalone “Create Squad” screens/routes.
+	•	If any legacy route exists like /create-squad, redirect to /new-plan.
+
+5) Permissions
+	•	Group creator remains admin for that group.
+	•	Admin permissions apply across all plans in that group.
+
+6) Edge cases
+	•	If group is locked:
+	•	existing members can still create new plans inside it
+	•	new members cannot join via invite link
+	•	If a user leaves a plan, they remain in the group unless they explicitly leave the group (separate action later)
+
+7) Acceptance criteria
+	•	A user can open an existing group and create multiple plans inside it.
+	•	“New Plan” is the primary CTA from Home and from inside a group.
+	•	No screen requires creating a group explicitly.
