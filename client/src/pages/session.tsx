@@ -1028,11 +1028,21 @@ export function Session() {
                  )}
                </div>
              ) : (
-               sortedSuggestions.map((suggestion, idx) => {
+               (() => {
+                 // Calculate max score for highlighting leader
+                 const allScores = sortedSuggestions.map(s => {
+                   const vd = getSuggestionVoteData(s);
+                   return getVoteSummary(vd).score;
+                 });
+                 const maxScore = Math.max(...allScores);
+                 const hasVotes = maxScore > 0;
+                 
+                 return sortedSuggestions.map((suggestion, idx) => {
                const myVote = getMyVote(suggestion);
                const voteData = getSuggestionVoteData(suggestion);
                const voteSummary = getVoteSummary(voteData);
                const score = voteSummary.score;
+               const isLeading = hasVotes && score === maxScore && !isLocked;
                
                return (
                <motion.div 
@@ -1042,12 +1052,18 @@ export function Session() {
                  key={suggestion.id} 
                  className={cn(
                    "group relative rounded-2xl overflow-hidden border transition-all duration-300",
-                   session.winningOptionId === suggestion.id ? "border-green-500 ring-2 ring-green-500/50" : "border-white/10 bg-white/5 hover:bg-white/10"
+                   session.winningOptionId === suggestion.id ? "border-green-500 ring-2 ring-green-500/50" : 
+                   isLeading ? "border-primary ring-1 ring-primary/30 bg-primary/5" : "border-white/10 bg-white/5 hover:bg-white/10"
                  )}
                >
                  {session.winningOptionId === suggestion.id && (
                      <div className="absolute top-2 right-2 z-10 bg-green-500 text-black text-xs font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1">
                          <Check size={10} /> WINNER
+                     </div>
+                 )}
+                 {isLeading && !session.winningOptionId && (
+                     <div className="absolute top-2 left-2 z-10 bg-primary text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1">
+                         <Star size={10} className="fill-black" /> LEADING
                      </div>
                  )}
 
@@ -1085,10 +1101,10 @@ export function Session() {
                            <span className="text-xs font-bold uppercase text-muted-foreground">Score: {score}</span>
                            <button 
                              onClick={() => setRankingInfoOpen(true)}
-                             className="text-muted-foreground hover:text-foreground transition-colors"
+                             className="p-1 rounded-full bg-white/10 text-muted-foreground hover:text-foreground hover:bg-white/20 transition-colors"
                              data-testid={`button-info-ranking-${suggestion.id}`}
                            >
-                             <Info size={12} />
+                             <Info size={14} />
                            </button>
                          </div>
                          {myVote && !isLocked && (
@@ -1178,7 +1194,8 @@ export function Session() {
                  </div>
                </motion.div>
              );
-             })
+             });
+             })()
              )}
              
              {/* Admin Confirm All / Tie Breaker Button */}
