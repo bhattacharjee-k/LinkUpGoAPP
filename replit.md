@@ -73,8 +73,17 @@ Preferred communication style: Simple, everyday language.
 ### API Integrations
 - **Google Places API (New)**: Real venue suggestions with location data, ratings, price levels
 - **Ticketmaster Discovery API**: Live event/concert information with ticket URLs
-- **Caching**: 15-minute TTL in-memory cache keyed by city/neighborhood/categories/budget/energy/timeWindow
+- **Caching**: LRU cache with stale-while-revalidate (10m suggestions, 15m Places, 5m events)
 - **City Filtering**: Haversine distance with 35mi (NYC) / 30mi (Chicago) radius boundaries
+
+### Production Quality Infrastructure
+- **API Validation**: Zod schemas in `shared/api-schemas.ts` for all request/response types
+- **Permission Middleware**: `server/middleware/auth.ts` with requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant
+- **Error Handling**: Centralized error handler in `server/middleware/error-handler.ts` with custom error classes
+- **Logging**: Structured logging with correlation IDs in `server/logger.ts`
+- **Caching Layer**: LRU cache implementation in `server/cache.ts`
+- **UAT Checklist**: `docs/UAT-CHECKLIST.md` with golden paths and edge cases
+- **Load Testing**: `scripts/load-test.cjs` using autocannon for p95 latency and error rate testing
 
 ## External Dependencies
 

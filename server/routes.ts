@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
@@ -7,6 +7,10 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { getSuggestions, SuggestionOption } from "./suggestions";
 import { notifyPlanJoined, notifyPlanLocked } from "./notifications";
+import { requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant, requireSessionNotLocked } from "./middleware/auth";
+import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from "./middleware/error-handler";
+import { LoginRequestSchema, RegisterRequestSchema, SuggestRequestSchema, CreateGroupRequestSchema, VoteRequestSchema, CreateMessageRequestSchema, ProposeTimeRequestSchema } from "@shared/api-schemas";
+import { logger } from "./logger";
 
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -164,64 +168,39 @@ export async function registerRoutes(
     }
   });
 
-  // Suggestions endpoint - uses real Google Places and Ticketmaster APIs
-  app.post("/api/suggest", async (req, res) => {
-    try {
-      // @ts-ignore
-      const userId = req.session?.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
+  app.post("/api/suggest", requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const data = SuggestRequestSchema.parse(req.body);
+    const result = await getSuggestions(data);
 
-      const suggestSchema = z.object({
-        city: z.string(),
-        neighborhood: z.string().optional(),
-        userLat: z.number().optional(),
-        userLng: z.number().optional(),
-        categories: z.array(z.string()),
-        budget: z.string().optional(),
-        energy: z.string().optional(),
-        timeWindow: z.string().optional(),
-        specificDate: z.string().optional(),
-        specificTime: z.string().optional(),
-      });
+    const sourceMap: Record<string, string> = {
+      'Google': 'Web',
+      'Ticketmaster': 'Web',
+    };
 
-      const data = suggestSchema.parse(req.body);
-      const result = await getSuggestions(data);
-
-      const sourceMap: Record<string, string> = {
-        'Google': 'Web',
-        'Ticketmaster': 'Web',
+    const suggestions = result.options.map(opt => {
+      const suggestion: Record<string, any> = {
+        name: opt.title,
+        city: data.city,
+        source: sourceMap[opt.source] || 'Web',
+        kind: opt.optionType === 'event' ? 'event' : 'venue',
+        rating: opt.rating || '4.5',
+        turnout: '0/0',
+        distance: opt.distance || '1.0 mi',
+        budget: opt.priceLevel || '$$',
+        description: opt.description || `A great spot in ${data.city}`,
+        tags: opt.tags || [],
       };
+      if (opt.detailUrl) suggestion.detailUrl = opt.detailUrl;
+      if (opt.reservationUrl) suggestion.reservationUrl = opt.reservationUrl;
+      if (opt.ticketUrl) suggestion.ticketUrl = opt.ticketUrl;
+      if (opt.eventUrl) suggestion.eventUrl = opt.eventUrl;
+      if (opt.venueName) suggestion.venueName = opt.venueName;
+      if (opt.startTime) suggestion.startTime = opt.startTime;
+      return suggestion;
+    });
 
-      const suggestions = result.options.map(opt => {
-        const suggestion: Record<string, any> = {
-          name: opt.title,
-          city: data.city,
-          source: sourceMap[opt.source] || 'Web',
-          kind: opt.optionType === 'event' ? 'event' : 'venue',
-          rating: opt.rating || '4.5',
-          turnout: '0/0',
-          distance: opt.distance || '1.0 mi',
-          budget: opt.priceLevel || '$$',
-          description: opt.description || `A great spot in ${data.city}`,
-          tags: opt.tags || [],
-        };
-        if (opt.detailUrl) suggestion.detailUrl = opt.detailUrl;
-        if (opt.reservationUrl) suggestion.reservationUrl = opt.reservationUrl;
-        if (opt.ticketUrl) suggestion.ticketUrl = opt.ticketUrl;
-        if (opt.eventUrl) suggestion.eventUrl = opt.eventUrl;
-        if (opt.venueName) suggestion.venueName = opt.venueName;
-        if (opt.startTime) suggestion.startTime = opt.startTime;
-        return suggestion;
-      });
-
-      res.json({ suggestions, meta: result.meta });
-    } catch (error: any) {
-      console.error('Suggest error:', error);
-      res.status(400).json({ message: error.message });
-    }
-  });
+    res.json({ suggestions, meta: result.meta });
+  }));
 
   // User routes
   app.patch("/api/users/me", async (req, res) => {
@@ -289,29 +268,19 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/groups", async (req, res) => {
-    try {
-      // @ts-ignore
-      const userId = req.session?.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
-      
-      const { name } = req.body;
-      const inviteCode = generateInviteCode();
-      
-      const group = await storage.createGroup({
-        name,
-        adminId: userId,
-        locked: false
-      }, inviteCode);
-      
-      const members = await storage.getGroupMembers(group.id);
-      res.json({ ...group, members });
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
-    }
-  });
+  app.post("/api/groups", requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const { name } = CreateGroupRequestSchema.parse(req.body);
+    const inviteCode = generateInviteCode();
+    
+    const group = await storage.createGroup({
+      name,
+      adminId: req.userId!,
+      locked: false
+    }, inviteCode);
+    
+    const members = await storage.getGroupMembers(group.id);
+    res.json({ ...group, members });
+  }));
 
   app.get("/api/groups/:id", async (req, res) => {
     try {
@@ -333,69 +302,29 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/groups/:id", async (req, res) => {
-    try {
-      // @ts-ignore
-      const userId = req.session?.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
-      
-      const group = await storage.getGroup(req.params.id);
-      if (!group) {
-        return res.status(404).json({ message: "Group not found" });
-      }
-      
-      if (group.adminId !== userId) {
-        return res.status(403).json({ message: "Only admin can modify group" });
-      }
-      
-      const updated = await storage.updateGroup(req.params.id, req.body);
-      const members = await storage.getGroupMembers(req.params.id);
-      res.json({ ...updated, members });
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
-    }
-  });
+  app.patch("/api/groups/:id", requireAuth, requireGroupAdmin, asyncHandler(async (req: Request, res: Response) => {
+    const updated = await storage.updateGroup(req.params.id, req.body);
+    const members = await storage.getGroupMembers(req.params.id);
+    res.json({ ...updated, members });
+  }));
 
-  // Add member to group (admin only, for ad-hoc group creation)
-  app.post("/api/groups/:id/members", async (req, res) => {
-    try {
-      // @ts-ignore
-      const userId = req.session?.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
-      
-      const group = await storage.getGroup(req.params.id);
-      if (!group) {
-        return res.status(404).json({ message: "Group not found" });
-      }
-      
-      // Only admin can add members directly
-      if (group.adminId !== userId) {
-        return res.status(403).json({ message: "Only admin can add members" });
-      }
-      
-      const { memberId } = req.body;
-      if (!memberId) {
-        return res.status(400).json({ message: "memberId is required" });
-      }
-      
-      // Verify the member exists
-      const member = await storage.getUser(memberId);
-      if (!member) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      await storage.addGroupMember(group.id, memberId);
-      
-      const members = await storage.getGroupMembers(group.id);
-      res.json({ ...group, members });
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+  app.post("/api/groups/:id/members", requireAuth, requireGroupAdmin, asyncHandler(async (req: Request, res: Response) => {
+    const { memberId } = req.body;
+    if (!memberId) {
+      throw new ValidationError("memberId is required");
     }
-  });
+    
+    const member = await storage.getUser(memberId);
+    if (!member) {
+      throw new NotFoundError("User");
+    }
+    
+    const group = await storage.getGroup(req.params.id);
+    await storage.addGroupMember(group!.id, memberId);
+    
+    const members = await storage.getGroupMembers(group!.id);
+    res.json({ ...group, members });
+  }));
 
   app.post("/api/groups/join/:inviteCode", async (req, res) => {
     try {
