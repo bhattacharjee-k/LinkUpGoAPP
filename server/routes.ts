@@ -6,6 +6,7 @@ import { insertUserSchema, insertGroupSchema, insertSessionSchema } from "@share
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { getSuggestions, SuggestionOption } from "./suggestions";
+import { notifyPlanJoined, notifyPlanLocked } from "./notifications";
 
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -474,6 +475,16 @@ export async function registerRoutes(
       // Add user to the session as participant
       try {
         await storage.addSessionParticipant(session.id, userId, 'active');
+        
+        // Send notifications asynchronously
+        const user = await storage.getUser(userId);
+        notifyPlanJoined({
+          sessionId: session.id,
+          sessionName: session.name || 'the plan',
+          joinerId: userId,
+          joinerName: user?.name || 'Someone',
+          adminId: group.adminId,
+        }).catch(err => console.error('[Notify] Error sending join notification:', err));
       } catch (e) {
         // Ignore if already a participant
       }
@@ -650,6 +661,22 @@ export async function registerRoutes(
       }
       
       const updated = await storage.updateSession(req.params.id, req.body);
+      
+      // If session was just locked, notify all participants
+      if (req.body.status === 'locked' && session.status !== 'locked') {
+        const participants = await storage.getSessionParticipants(req.params.id);
+        const participantIds = participants.filter(p => p.status !== 'left').map(p => p.userId);
+        const suggestions = await storage.getSessionSuggestions(req.params.id);
+        const winningOption = suggestions.find(s => s.isLocked)?.name || suggestions[0]?.name || 'the plan';
+        
+        notifyPlanLocked({
+          sessionId: req.params.id,
+          sessionName: session.name || 'Your plan',
+          winningOption,
+          participantIds,
+        }).catch(err => console.error('[Notify] Error sending lock notification:', err));
+      }
+      
       res.json(updated);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
