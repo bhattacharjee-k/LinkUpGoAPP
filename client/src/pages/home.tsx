@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
+import { NotificationBell } from '@/components/notification-bell';
 
 export function Home() {
   const { user, sessions, groups, updateGroup, isAdmin, isGroupLocked } = useApp();
@@ -60,7 +61,10 @@ export function Home() {
               <MapPin size={14} /> {user.city}
             </p>
           </div>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-blue-500 border-2 border-white/20" />
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-blue-500 border-2 border-white/20" />
+          </div>
         </div>
 
         {/* Action Card */}

@@ -9,6 +9,7 @@ import { GroupDetails } from "@/pages/group-details";
 import { Groups } from "@/pages/groups";
 import { Profile } from "@/pages/profile";
 import { History } from "@/pages/history";
+import { UpdatesPage } from "@/pages/updates";
 import { useEffect, useState } from "react";
 import { api } from "./lib/api";
 
@@ -154,6 +155,10 @@ function Router() {
       
       <Route path="/history">
         <PrivateRoute component={History} />
+      </Route>
+      
+      <Route path="/updates">
+        <PrivateRoute component={UpdatesPage} />
       </Route>
       
       {/* New Session Creation Mock */}

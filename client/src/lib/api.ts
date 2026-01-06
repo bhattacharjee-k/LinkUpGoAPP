@@ -144,4 +144,14 @@ export const api = {
       }
     },
   },
+
+  // Notifications
+  notifications: {
+    list: () => fetchAPI('/notifications'),
+    unreadCount: () => fetchAPI('/notifications/unread-count'),
+    markAsRead: (id: string) => fetchAPI('/notifications/read', { method: 'POST', body: JSON.stringify({ id }) }),
+    markAllAsRead: () => fetchAPI('/notifications/read-all', { method: 'POST' }),
+    getPrefs: () => fetchAPI('/notification-prefs'),
+    updatePrefs: (emailEnabled: boolean) => fetchAPI('/notification-prefs', { method: 'POST', body: JSON.stringify({ emailEnabled }) }),
+  },
 };
