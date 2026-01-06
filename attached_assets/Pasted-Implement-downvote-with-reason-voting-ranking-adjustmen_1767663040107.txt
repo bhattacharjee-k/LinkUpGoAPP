@@ -1,0 +1,115 @@
+Implement downvote-with-reason voting + ranking adjustments + ℹ️ explanation.
+
+1) Simplify voting
+	•	Replace current voting with Upvote (👍) and Downvote (👎) only.
+	•	Keep existing rules: effectiveParticipants excludes cant_make_it and left users from planning and scoring.
+
+2) Downvote modal UX
+
+When a user clicks 👎 (and session is not locked):
+	•	Open a modal: “What didn’t work?”
+	•	Show chips (multi-select allowed, encourage 1–2):
+	•	Too far
+	•	Too expensive
+	•	Bad timing
+	•	Not my vibe
+	•	Not my taste
+	•	Doesn’t fit group
+	•	Wrong neighborhood
+	•	Other
+	•	Show an optional text field: “Tell us more (optional)”
+	•	Validation rule: require either:
+	•	at least 1 chip selected OR
+	•	free-text length ≥ 3–5 characters
+	•	Allow editing the downvote reason until plan is locked.
+
+3) Data model update
+
+Store votes like:
+
+votesByUserId[userId] = { type: 'up' | 'down', reasons?: ReasonEnum[], note?: string }
+
+ReasonEnum:
+	•	TOO_FAR
+	•	TOO_EXPENSIVE
+	•	BAD_TIMING
+	•	NOT_MY_VIBE
+	•	NOT_MY_TASTE
+	•	DOESNT_FIT_GROUP
+	•	WRONG_NEIGHBORHOOD
+	•	OTHER
+
+4) Ranking algorithm
+
+Compute per option:
+
+TotalScore = FitScore + VoteScore + ReasonPenalty + MajorityDownvotePenalty
+
+VoteScore
+Let:
+	•	U = # upvotes from effectiveParticipants
+	•	D = # downvotes from effectiveParticipants
+	•	N = # effectiveParticipants
+
+Use:
+	•	net = U - 1.5 * D
+	•	confidence = min(1, (U + D) / 3)
+	•	Vmax = 18
+	•	VoteScore = clamp( Vmax * (net / max(1,N)) * confidence, -Vmax, +Vmax )
+
+Majority downvote penalty
+If D >= ceil(N/2), add:
+	•	MajorityDownvotePenalty = -12
+Else 0.
+
+ReasonPenalty (do NOT stack per user)
+Apply each penalty at most once per option if any effective participant selected that reason (or if free-text maps confidently):
+	•	TOO_FAR: -8
+	•	TOO_EXPENSIVE: -10
+	•	BAD_TIMING: -12
+	•	NOT_MY_VIBE: -8
+	•	NOT_MY_TASTE: -6
+	•	DOESNT_FIT_GROUP: -10
+	•	WRONG_NEIGHBORHOOD: -6
+	•	OTHER: 0
+
+Free-text mapping (only apply ONE inferred reason max)
+If a user downvotes with text but no chips, attempt lightweight keyword mapping:
+	•	distance: “far”, “too far”, “drive”, “commute” → TOO_FAR
+	•	money: “expensive”, “pricey”, “cost” → TOO_EXPENSIVE
+	•	timing: “late”, “early”, “time”, “timing” → BAD_TIMING
+	•	vibe: “vibe”, “loud”, “hype”, “chill” → NOT_MY_VIBE
+	•	taste: “not into”, “hate”, “cuisine”, “food” → NOT_MY_TASTE
+
+If no match, apply no reason penalty beyond the downvote.
+
+Hard constraints still filter (not rank)
+	•	Wrong city → discard
+	•	Outside radius → discard
+	•	Event outside time window → discard
+
+5) UI updates on option cards
+	•	Show 👍 count and 👎 count per option
+	•	Add ℹ️ icon: opens “Why ranked this way” panel containing:
+	•	Fit breakdown (distance/budget/energy/category/time/quality)
+	•	Votes summary (U/D)
+	•	Aggregated downvote reasons (chips) + show “Other: {note}” (truncate)
+	•	If reason penalties applied, show: “Adjusted ranking based on feedback: {closer/cheaper/better timing/etc.}”
+	•	Mark the top-ranked option with Suggested badge only if majority-downvote is NOT triggered.
+
+6) Locked state behavior
+
+If session is locked:
+	•	Disable voting + reason editing
+	•	Show “Plan locked — voting closed”
+
+7) Theme/accessibility
+	•	Keep black + lime theme
+	•	Ensure button contrast: lime bg uses dark text
+
+Acceptance tests:
+	•	Downvote requires either chip or text.
+	•	Downvote reasons change ordering.
+	•	Majority downvote craters an option.
+	•	ℹ️ panel matches the actual factors used in ranking.
+	•	Suggested badge only appears when not majority-downvoted.

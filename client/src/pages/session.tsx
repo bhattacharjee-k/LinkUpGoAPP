@@ -49,6 +49,7 @@ export function Session() {
   const [downvoteSuggestion, setDownvoteSuggestion] = useState<{id: string; name: string} | null>(null);
   const [rankingInfoOpen, setRankingInfoOpen] = useState(false);
   const [infoSuggestion, setInfoSuggestion] = useState<any>(null);
+  const [infoVoteData, setInfoVoteData] = useState<any[]>([]);
   const [proposeTimeOpen, setProposeTimeOpen] = useState(false);
   const [proposedTimes, setProposedTimes] = useState<Array<{
     id: string;
@@ -1043,7 +1044,9 @@ export function Session() {
                const voteData = getSuggestionVoteData(suggestion);
                const voteSummary = getVoteSummary(voteData);
                const score = voteSummary.score;
-               const isLeading = hasVotes && score === maxScore && !isLocked;
+               const effectiveCount = session.participantDetails?.filter((p: any) => p.status === 'active').length || 1;
+               const isMajorityDownvoted = voteSummary.downvotes >= Math.ceil(effectiveCount / 2);
+               const isLeading = hasVotes && score === maxScore && !isLocked && !isMajorityDownvoted;
                
                return (
                <motion.div 
@@ -1101,7 +1104,7 @@ export function Session() {
                          <div className="flex items-center gap-2">
                            <span className="text-xs font-bold uppercase text-muted-foreground">Score: {score}</span>
                            <button 
-                             onClick={() => { setInfoSuggestion(suggestion); setRankingInfoOpen(true); }}
+                             onClick={() => { setInfoSuggestion(suggestion); setInfoVoteData(voteData); setRankingInfoOpen(true); }}
                              className="p-1 rounded-full bg-white/10 text-muted-foreground hover:text-foreground hover:bg-white/20 transition-colors"
                              data-testid={`button-info-ranking-${suggestion.id}`}
                            >
@@ -1397,116 +1400,103 @@ export function Session() {
           suggestionName={downvoteSuggestion?.name || ''}
         />
 
-        {/* Suggestion Pros & Cons Dialog */}
-        <Dialog open={rankingInfoOpen} onOpenChange={(open) => { setRankingInfoOpen(open); if (!open) setInfoSuggestion(null); }}>
+        {/* Why Ranked This Way Dialog */}
+        <Dialog open={rankingInfoOpen} onOpenChange={(open) => { setRankingInfoOpen(open); if (!open) { setInfoSuggestion(null); setInfoVoteData([]); } }}>
           <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
             <DialogHeader>
-              <DialogTitle className="truncate">{infoSuggestion?.name || 'Place Details'}</DialogTitle>
+              <DialogTitle className="truncate">{infoSuggestion?.name || 'Ranking Details'}</DialogTitle>
             </DialogHeader>
-            {infoSuggestion && (
+            {infoSuggestion && (() => {
+              const summary = getVoteSummary(infoVoteData);
+              const downvotes = infoVoteData.filter((v: any) => v.voteType === 'down');
+              const allReasons = downvotes.flatMap((v: any) => v.reasons || []);
+              const uniqueReasons = [...new Set(allReasons)];
+              const otherNotes = downvotes.filter((v: any) => v.note).map((v: any) => v.note);
+              const effectiveCount = session.participantDetails?.filter((p: any) => p.status === 'active').length || 1;
+              const isMajorityDownvoted = summary.downvotes >= Math.ceil(effectiveCount / 2);
+              
+              const reasonLabels: Record<string, string> = {
+                'TOO_FAR': 'Too far',
+                'TOO_EXPENSIVE': 'Too expensive',
+                'BAD_TIMING': 'Bad timing',
+                'NOT_MY_VIBE': 'Not my vibe',
+                'NOT_MY_TASTE': 'Not my taste',
+                'DOESNT_FIT_GROUP': "Doesn't fit group",
+                'WRONG_NEIGHBORHOOD': 'Wrong neighborhood',
+                'OTHER': 'Other'
+              };
+              
+              return (
               <div className="space-y-4 py-2 text-sm">
                 <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase text-green-400 flex items-center gap-1"><ThumbsUp size={12} /> Pros</p>
-                  <ul className="space-y-1.5">
-                    {parseFloat(infoSuggestion.rating) >= 4.5 && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <Star size={12} className="text-green-400 mt-0.5 shrink-0" />
-                        <span>Highly rated ({infoSuggestion.rating} stars)</span>
-                      </li>
-                    )}
-                    {parseFloat(infoSuggestion.rating) >= 4.0 && parseFloat(infoSuggestion.rating) < 4.5 && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <Star size={12} className="text-green-400 mt-0.5 shrink-0" />
-                        <span>Good ratings ({infoSuggestion.rating} stars)</span>
-                      </li>
-                    )}
-                    {infoSuggestion.distance && parseFloat(infoSuggestion.distance) <= 0.5 && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <MapPin size={12} className="text-green-400 mt-0.5 shrink-0" />
-                        <span>Very close by ({infoSuggestion.distance})</span>
-                      </li>
-                    )}
-                    {infoSuggestion.budget === '$' && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <DollarSign size={12} className="text-green-400 mt-0.5 shrink-0" />
-                        <span>Budget-friendly option</span>
-                      </li>
-                    )}
-                    {infoSuggestion.budget === session.filters.budget && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <Check size={12} className="text-green-400 mt-0.5 shrink-0" />
-                        <span>Matches your budget preference</span>
-                      </li>
-                    )}
-                    {infoSuggestion.tags?.some((t: string) => session.filters.category?.map((c: string) => c.toLowerCase()).includes(t.toLowerCase())) && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <Zap size={12} className="text-green-400 mt-0.5 shrink-0" />
-                        <span>Matches your category interests</span>
-                      </li>
-                    )}
-                    {infoSuggestion.kind === 'event' && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <Calendar size={12} className="text-green-400 mt-0.5 shrink-0" />
-                        <span>Live event happening during your time</span>
-                      </li>
-                    )}
-                    {infoSuggestion.reservationUrl && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <Check size={12} className="text-green-400 mt-0.5 shrink-0" />
-                        <span>Easy online reservations</span>
-                      </li>
-                    )}
-                  </ul>
-                </div>
-                
-                <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase text-red-400 flex items-center gap-1"><ThumbsDown size={12} /> Cons</p>
-                  <ul className="space-y-1.5">
-                    {infoSuggestion.distance && parseFloat(infoSuggestion.distance) > 1.0 && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <MapPin size={12} className="text-red-400 mt-0.5 shrink-0" />
-                        <span>A bit farther away ({infoSuggestion.distance})</span>
-                      </li>
-                    )}
-                    {infoSuggestion.budget === '$$$' && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <DollarSign size={12} className="text-red-400 mt-0.5 shrink-0" />
-                        <span>Pricier option</span>
-                      </li>
-                    )}
-                    {infoSuggestion.budget === '$$$$' && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <DollarSign size={12} className="text-red-400 mt-0.5 shrink-0" />
-                        <span>High-end pricing</span>
-                      </li>
-                    )}
-                    {parseFloat(infoSuggestion.rating) < 4.0 && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <Star size={12} className="text-red-400 mt-0.5 shrink-0" />
-                        <span>Mixed reviews ({infoSuggestion.rating} stars)</span>
-                      </li>
-                    )}
-                    {!infoSuggestion.reservationUrl && infoSuggestion.kind === 'venue' && (
-                      <li className="flex items-start gap-2 text-muted-foreground">
-                        <X size={12} className="text-red-400 mt-0.5 shrink-0" />
-                        <span>May need to walk in or call ahead</span>
-                      </li>
-                    )}
-                  </ul>
-                </div>
-                
-                {infoSuggestion.tags && infoSuggestion.tags.length > 0 && (
-                  <div className="pt-2 border-t border-white/5">
-                    <p className="text-xs text-muted-foreground mb-2">Tags:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {infoSuggestion.tags.map((tag: string, i: number) => (
-                        <span key={i} className="px-2 py-0.5 text-xs rounded-full bg-white/10">{tag}</span>
-                      ))}
+                  <p className="text-xs font-bold uppercase text-muted-foreground">Votes</p>
+                  <div className="flex gap-4">
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 flex-1">
+                      <ThumbsUp size={16} className="text-green-400" />
+                      <span className="font-bold text-green-400">{summary.upvotes}</span>
+                      <span className="text-muted-foreground text-xs">upvotes</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 flex-1">
+                      <ThumbsDown size={16} className="text-red-400" />
+                      <span className="font-bold text-red-400">{summary.downvotes}</span>
+                      <span className="text-muted-foreground text-xs">downvotes</span>
                     </div>
                   </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-primary/10 border border-primary/20">
+                    <span className="text-xs font-medium">Total Score</span>
+                    <span className={cn("font-bold", summary.score >= 0 ? "text-primary" : "text-red-400")}>{summary.score > 0 ? '+' : ''}{summary.score}</span>
+                  </div>
+                </div>
+                
+                {isMajorityDownvoted && (
+                  <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                    <Ban size={12} className="inline mr-1" /> Majority of group downvoted this option
+                  </div>
                 )}
+                
+                {uniqueReasons.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold uppercase text-muted-foreground">Downvote Reasons</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {uniqueReasons.map((reason: string, i: number) => (
+                        <span key={i} className="px-2 py-1 text-xs rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                          {reasonLabels[reason] || reason}
+                        </span>
+                      ))}
+                    </div>
+                    {uniqueReasons.length > 0 && (
+                      <p className="text-xs text-muted-foreground italic">
+                        Ranking adjusted based on: {uniqueReasons.map(r => reasonLabels[r]?.toLowerCase() || r).join(', ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {otherNotes.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-bold uppercase text-muted-foreground">Additional Feedback</p>
+                    {otherNotes.slice(0, 3).map((note: string, i: number) => (
+                      <p key={i} className="text-xs text-muted-foreground p-2 rounded bg-white/5 italic">"{note.slice(0, 100)}{note.length > 100 ? '...' : ''}"</p>
+                    ))}
+                  </div>
+                )}
+                
+                {summary.upvotes === 0 && summary.downvotes === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">No votes yet. Be the first to vote!</p>
+                )}
+                
+                <div className="pt-2 border-t border-white/5">
+                  <p className="text-xs text-muted-foreground">
+                    <Star size={10} className="inline mr-1" /> {infoSuggestion.rating} stars
+                    <span className="mx-2">•</span>
+                    <MapPin size={10} className="inline mr-1" /> {infoSuggestion.distance}
+                    <span className="mx-2">•</span>
+                    <DollarSign size={10} className="inline mr-1" /> {infoSuggestion.budget}
+                  </p>
+                </div>
               </div>
-            )}
+              );
+            })()}
           </DialogContent>
         </Dialog>
       </div>
