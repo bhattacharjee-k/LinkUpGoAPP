@@ -12,7 +12,8 @@ import type {
   InsertVote,
   Message, InsertMessage,
   Notification, InsertNotification,
-  NotificationPrefs, InsertNotificationPrefs
+  NotificationPrefs, InsertNotificationPrefs,
+  ProposedTime, InsertProposedTime
 } from '@shared/schema';
 
 const pool = new pg.Pool({
@@ -85,6 +86,12 @@ export interface IStorage {
   getNotificationPrefs(userId: string): Promise<NotificationPrefs | undefined>;
   upsertNotificationPrefs(userId: string, emailEnabled: boolean): Promise<NotificationPrefs>;
   getRecentNudge(userId: string, sessionId: string): Promise<Notification | undefined>;
+
+  // Proposed times
+  getSessionProposedTimes(sessionId: string): Promise<Array<ProposedTime & { proposerName: string }>>;
+  createProposedTime(data: InsertProposedTime): Promise<ProposedTime>;
+  voteForProposedTime(proposedTimeId: string, userId: string): Promise<ProposedTime | undefined>;
+  deleteProposedTime(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -463,6 +470,48 @@ export class DbStorage implements IStorage {
         sql`${schema.notifications.createdAt} > ${twelveHoursAgo}`
       ));
     return nudge;
+  }
+
+  // Proposed times
+  async getSessionProposedTimes(sessionId: string): Promise<Array<ProposedTime & { proposerName: string }>> {
+    const times = await db.select().from(schema.proposedTimes)
+      .where(eq(schema.proposedTimes.sessionId, sessionId))
+      .orderBy(schema.proposedTimes.createdAt);
+    
+    const enriched = await Promise.all(times.map(async (t) => {
+      const user = await this.getUser(t.userId);
+      return { ...t, proposerName: user?.name || user?.username || 'Unknown' };
+    }));
+    return enriched;
+  }
+
+  async createProposedTime(data: InsertProposedTime): Promise<ProposedTime> {
+    const [created] = await db.insert(schema.proposedTimes).values(data).returning();
+    return created;
+  }
+
+  async voteForProposedTime(proposedTimeId: string, userId: string): Promise<ProposedTime | undefined> {
+    const [existing] = await db.select().from(schema.proposedTimes)
+      .where(eq(schema.proposedTimes.id, proposedTimeId));
+    if (!existing) return undefined;
+    
+    const currentVotes = existing.votes || [];
+    let newVotes: string[];
+    if (currentVotes.includes(userId)) {
+      newVotes = currentVotes.filter(v => v !== userId);
+    } else {
+      newVotes = [...currentVotes, userId];
+    }
+    
+    const [updated] = await db.update(schema.proposedTimes)
+      .set({ votes: newVotes })
+      .where(eq(schema.proposedTimes.id, proposedTimeId))
+      .returning();
+    return updated;
+  }
+
+  async deleteProposedTime(id: string): Promise<void> {
+    await db.delete(schema.proposedTimes).where(eq(schema.proposedTimes.id, id));
   }
 }
 

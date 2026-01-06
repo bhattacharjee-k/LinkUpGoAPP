@@ -190,3 +190,20 @@ export const notificationPrefs = pgTable("notification_prefs", {
 export const insertNotificationPrefsSchema = createInsertSchema(notificationPrefs).omit({ id: true });
 export type InsertNotificationPrefs = z.infer<typeof insertNotificationPrefsSchema>;
 export type NotificationPrefs = typeof notificationPrefs.$inferSelect;
+
+// Proposed times for sessions
+export const proposedTimes = pgTable("proposed_times", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  proposedDate: timestamp("proposed_date").notNull(),
+  timeStart: text("time_start").notNull(), // "19:00"
+  timeEnd: text("time_end").notNull(), // "22:00"
+  note: text("note"), // Optional explanation
+  votes: text("votes").array().notNull().default(sql`'{}'::text[]`), // User IDs who support this time
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProposedTimeSchema = createInsertSchema(proposedTimes).omit({ id: true, createdAt: true, votes: true });
+export type InsertProposedTime = z.infer<typeof insertProposedTimeSchema>;
+export type ProposedTime = typeof proposedTimes.$inferSelect;
