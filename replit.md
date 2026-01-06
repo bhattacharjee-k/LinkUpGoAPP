@@ -37,12 +37,22 @@ Preferred communication style: Simple, everyday language.
   - `suggestions`: Event suggestions with voting data
   - `messages`: Chat messages within sessions
   - `votes`: Individual votes on suggestions
+  - `notifications`: In-app notifications with type, title, body, url, isRead
+  - `notification_prefs`: Per-user email notification preferences
 
 ### Authentication Flow
 - Registration collects user preferences during onboarding (multi-step form)
 - Session stored in PostgreSQL, cookie-based authentication
 - Protected routes redirect to onboarding if no user session exists
 - Join links (`/join/:code`) handle group invites with auth redirect
+
+### Notifications System
+- **In-App Notifications**: Bell icon with unread badge, Updates page (`/updates`) for viewing all notifications
+- **Notification Types**: INVITE, AVAILABILITY_NUDGE, VOTE_OPEN, PLAN_LOCKED, PLAN_UPDATED
+- **Email Support**: Optional email notifications via Resend API (requires RESEND_API_KEY, FROM_EMAIL, APP_BASE_URL)
+- **Triggers**: Join session, lock plan, voting open, availability nudge (with 12-hour cooldown)
+- **Preferences**: Per-user email toggle stored in notification_prefs table
+- **Helper Module**: `server/notifications.ts` handles creation and email sending
 
 ### Key Design Patterns
 - **Shared Types**: Schema definitions in `shared/` directory used by both client and server
