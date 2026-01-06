@@ -2,7 +2,6 @@ import React from 'react';
 import { useLocation } from 'wouter';
 import { Home, Users, User, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-// import bgImage from '@assets/generated_images/abstract_vibrant_social_connection_nightlife_background.png';
 
 interface LayoutProps {
   children: React.ReactNode;

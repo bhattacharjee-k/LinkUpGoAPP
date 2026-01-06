@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 import { NotificationBell } from '@/components/notification-bell';
+import logoImg from '@/assets/brand/linkupgo-logo.png';
 
 export function Home() {
   const { user, sessions, groups, updateGroup, isAdmin, isGroupLocked } = useApp();
@@ -53,18 +54,34 @@ export function Home() {
     <Layout>
       <div className="px-6 py-8 space-y-8">
         
-        {/* Header */}
+        {/* Header with Logo */}
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-display font-bold">Hey, {user.name}</h1>
-            <p className="text-muted-foreground flex items-center gap-1 mt-1">
-              <MapPin size={14} /> {user.city}
-            </p>
-          </div>
+          <button 
+            onClick={() => setLocation('/')}
+            className="min-h-[44px] flex items-center"
+            data-testid="link-home-logo"
+            aria-label="Go to home"
+          >
+            <img 
+              src={logoImg} 
+              alt="LinkUpGo" 
+              width={120} 
+              height={30} 
+              className="h-[28px] w-auto object-contain"
+            />
+          </button>
           <div className="flex items-center gap-2">
             <NotificationBell />
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-blue-500 border-2 border-white/20" />
           </div>
+        </div>
+        
+        {/* User greeting */}
+        <div>
+          <h1 className="text-3xl font-display font-bold">Hey, {user.name}</h1>
+          <p className="text-muted-foreground flex items-center gap-1 mt-1">
+            <MapPin size={14} /> {user.city}
+          </p>
         </div>
 
         {/* Action Card */}

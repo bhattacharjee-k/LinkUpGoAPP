@@ -9,6 +9,7 @@ import { ChevronRight, ChevronLeft, MapPin, Ban, AlertCircle, Loader2, CheckCirc
 import { City, Budget, Energy, Category, HardNo } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import logoImg from '@/assets/brand/linkupgo-logo.png';
 
 const RETURNING_USER_KEY = 'vibecheck_has_account';
 
@@ -264,6 +265,18 @@ export function Onboarding() {
         exit={{ opacity: 0, x: -20 }}
         className="z-10 w-full max-w-md mx-auto space-y-8"
       >
+        {/* Logo centered at top */}
+        <div className="flex justify-center mb-6">
+          <img 
+            src={logoImg} 
+            alt="LinkUpGo" 
+            width={200}
+            height={50}
+            className="w-[200px] max-w-[160px] sm:max-w-[200px] h-auto object-contain"
+            data-testid="img-logo-onboarding"
+          />
+        </div>
+
         <div className="space-y-2">
           {!isLoginMode && <div className="text-primary font-bold tracking-widest text-xs uppercase" data-testid="text-step-indicator">Step {step} of 5</div>}
           <h1 className="text-4xl font-display font-bold text-white leading-tight" data-testid="text-step-title">
