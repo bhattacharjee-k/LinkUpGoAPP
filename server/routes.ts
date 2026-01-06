@@ -527,9 +527,9 @@ export async function registerRoutes(
           const suggestionsWithVotes = await Promise.all(
             suggestions.map(async (s) => {
               const votes = await storage.getSuggestionVotes(s.id);
-              const votesRecord: Record<string, string> = {};
+              const votesRecord: Record<string, { voteType: string; reasons?: string[] | null; note?: string | null }> = {};
               votes.forEach(v => {
-                votesRecord[v.userId] = v.vote;
+                votesRecord[v.userId] = { voteType: v.voteType, reasons: v.reasons, note: v.note };
               });
               return { ...s, votes: votesRecord };
             })
@@ -618,9 +618,9 @@ export async function registerRoutes(
       const suggestionsWithVotes = await Promise.all(
         suggestions.map(async (s) => {
           const votes = await storage.getSuggestionVotes(s.id);
-          const votesRecord: Record<string, string> = {};
+          const votesRecord: Record<string, { voteType: string; reasons?: string[] | null; note?: string | null }> = {};
           votes.forEach(v => {
-            votesRecord[v.userId] = v.vote;
+            votesRecord[v.userId] = { voteType: v.voteType, reasons: v.reasons, note: v.note };
           });
           return { ...s, votes: votesRecord };
         })
