@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
+  email: text("email"), // Optional email for notifications
   city: text("city").notNull(), // 'NYC' | 'Chicago'
   budget: text("budget").array().notNull(), // ['$', '$$', '$$$', '$$$$']
   energy: text("energy").notNull(), // 'Chill' | 'Vibey' | 'Going out' | 'Full send'

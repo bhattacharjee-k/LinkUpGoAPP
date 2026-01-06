@@ -68,11 +68,16 @@ export interface UserProfile {
   id: string;
   name: string;
   username: string;
+  email?: string;
   city: string;
   budget: string[];
   energy: string;
   categories: string[];
   hardNos: string[];
+  lastKnownLat?: string | null;
+  lastKnownLng?: string | null;
+  lastLocationTimestamp?: string | null;
+  locationPermission?: 'granted' | 'denied' | 'pending';
 }
 
 export interface Group {

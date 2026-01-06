@@ -25,6 +25,7 @@ export type HardNo = 'Clubs' | 'Loud places' | 'Ticketed events' | 'Late nights'
 export interface UserProfile {
   id: string;
   name: string;
+  email?: string; // Optional email for notifications
   city: City;
   budget: Budget[];
   energy: Energy;

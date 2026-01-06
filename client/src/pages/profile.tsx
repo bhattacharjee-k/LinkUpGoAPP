@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, LogOut, Check, MapPin, DollarSign, Zap, X } from 'lucide-react';
+import { ArrowLeft, LogOut, Check, MapPin, DollarSign, Zap, X, Mail } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { City, Budget, Energy, Category } from '@/lib/store';
@@ -25,6 +25,7 @@ export function Profile() {
 
   const [formData, setFormData] = useState({
     name: user?.name || '',
+    email: user?.email || '',
     city: user?.city || 'NYC',
     budget: user?.budget || ['$$'],
     energy: user?.energy || 'Vibey',
@@ -107,7 +108,23 @@ export function Profile() {
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               className="bg-white/5 border-white/10"
+              data-testid="input-name"
             />
+          </div>
+
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2">
+              <Mail size={14} /> Email for notifications
+            </Label>
+            <Input 
+              type="email"
+              placeholder="your@email.com"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              className="bg-white/5 border-white/10"
+              data-testid="input-email"
+            />
+            <p className="text-xs text-muted-foreground">Optional - used for important plan updates</p>
           </div>
 
           <div className="space-y-3">

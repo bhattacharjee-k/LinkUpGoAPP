@@ -62,6 +62,11 @@ async function sendEmailNotification(params: {
       return;
     }
 
+    if (!user.email) {
+      console.log('[Email] User has no email address:', userId);
+      return;
+    }
+
     const deepLinkWithRedirect = `${appBaseUrl}${loginPath}?redirect=${encodeURIComponent(url)}`;
     const directLink = `${appBaseUrl}${url}`;
 
@@ -96,7 +101,7 @@ async function sendEmailNotification(params: {
       },
       body: JSON.stringify({
         from: fromEmail,
-        to: user.username.includes('@') ? user.username : `${user.username}@example.com`,
+        to: user.email,
         subject: title,
         html: htmlContent,
         text: textContent,
