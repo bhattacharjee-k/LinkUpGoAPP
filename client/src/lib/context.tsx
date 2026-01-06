@@ -145,7 +145,8 @@ interface AppContextType {
   leaveSession: (sessionId: string) => Promise<void>;
   addMessage: (sessionId: string, text: string) => Promise<void>;
   sendPlannerMessage: (sessionId: string, text: string, onStream: (chunk: string) => void) => Promise<string>;
-  voteForSuggestion: (sessionId: string, suggestionId: string, vote: string) => Promise<void>;
+  upvoteForSuggestion: (sessionId: string, suggestionId: string) => Promise<void>;
+  downvoteForSuggestion: (sessionId: string, suggestionId: string, reasons: string[], note?: string) => Promise<void>;
   confirmPlan: (sessionId: string, suggestionId: string) => Promise<void>;
   updateSessionFilters: (sessionId: string, filters: any) => Promise<void>;
   regenerateSuggestions: (sessionId: string) => Promise<void>;
@@ -427,14 +428,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return fullResponse;
   };
 
-  const voteForSuggestion = async (sessionId: string, suggestionId: string, vote: string) => {
-    await api.votes.vote(suggestionId, vote);
-
-    // Update participant status if voting "cant"
-    if (vote === 'cant' && user?.id) {
-      await api.sessions.updateParticipantStatus(sessionId, user.id, 'cant_make_it');
-    }
-
+  const upvoteForSuggestion = async (sessionId: string, suggestionId: string) => {
+    await api.votes.upvote(suggestionId);
+    await refreshSession(sessionId);
+  };
+  
+  const downvoteForSuggestion = async (sessionId: string, suggestionId: string, reasons: string[], note?: string) => {
+    await api.votes.downvote(suggestionId, reasons, note);
     await refreshSession(sessionId);
   };
 
@@ -543,7 +543,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     leaveSession,
     addMessage,
     sendPlannerMessage,
-    voteForSuggestion,
+    upvoteForSuggestion,
+    downvoteForSuggestion,
     confirmPlan,
     updateSessionFilters,
     regenerateSuggestions,

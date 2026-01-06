@@ -9,7 +9,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Send, ThumbsUp, ThumbsDown, Flame, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield, Lock, Ban, ArrowLeft, Pencil, RefreshCw, Calendar, Clock, Zap, MoreVertical, LogOut, Trash2 } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield, Lock, Ban, ArrowLeft, Pencil, RefreshCw, Calendar, Clock, Zap, MoreVertical, LogOut, Trash2, Info } from 'lucide-react';
+import { DownvoteModal } from '@/components/downvote-modal';
+import { calculateScore, getVoteSummary, REASON_PENALTIES } from '@shared/ranking';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -23,7 +25,7 @@ import { format } from "date-fns";
 
 export function Session() {
   const [match, params] = useRoute('/session/:id');
-  const { getSession, addMessage, sendPlannerMessage, voteForSuggestion, confirmPlan, addParticipantToSession, updateSessionFilters, regenerateSuggestions, user, groups, isAdmin, deleteSession, leaveSession, refreshSession } = useApp();
+  const { getSession, addMessage, sendPlannerMessage, upvoteForSuggestion, downvoteForSuggestion, confirmPlan, addParticipantToSession, updateSessionFilters, regenerateSuggestions, user, groups, isAdmin, deleteSession, leaveSession, refreshSession } = useApp();
   const [input, setInput] = useState('');
   const [_, setLocation] = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -42,6 +44,9 @@ export function Session() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [streamingResponse, setStreamingResponse] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [downvoteModalOpen, setDownvoteModalOpen] = useState(false);
+  const [downvoteSuggestion, setDownvoteSuggestion] = useState<{id: string; name: string} | null>(null);
+  const [rankingInfoOpen, setRankingInfoOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     date: new Date(),
     timeStart: '19:00',
@@ -235,32 +240,56 @@ export function Session() {
     }
   };
 
-  const calculateScore = (suggestion: any) => {
-      let score = 0;
-      // Only count votes from active participants (exclude 'cant_make_it' and 'left')
-      Object.entries(suggestion.votes).forEach(([uid, vote]) => {
-          const status = session.participantStatusByUserId?.[uid];
-          // Skip if user has left or can't make it
-          if (status === 'cant_make_it' || status === 'left') {
-              return;
-          }
-
-          if (vote === 'yes') score += 1;
-          if (vote === 'fire') score += 2;
-          if (vote === 'no') score -= 1;
+  const getSuggestionVoteData = (suggestion: any) => {
+    const votesList = Object.entries(suggestion.votes || {})
+      .filter(([uid]) => {
+        const status = session.participantStatusByUserId?.[uid];
+        return status !== 'cant_make_it' && status !== 'left';
+      })
+      .map(([userId, v]) => {
+        if (typeof v === 'object' && v !== null) {
+          return { userId, voteType: (v as any).voteType || 'up', reasons: (v as any).reasons, note: (v as any).note };
+        }
+        const voteType = (v === 'yes' || v === 'fire') ? 'up' : 'down';
+        return { userId, voteType, reasons: null, note: null };
       });
-      return score;
+    return votesList;
+  };
+  
+  const getScore = (suggestion: any) => {
+    const votes = getSuggestionVoteData(suggestion);
+    return calculateScore(votes);
+  };
+  
+  const getMyVote = (suggestion: any) => {
+    const vote = suggestion.votes?.[user?.id || ''];
+    if (!vote) return null;
+    if (typeof vote === 'object') return vote.voteType;
+    return (vote === 'yes' || vote === 'fire') ? 'up' : 'down';
+  };
+
+  const handleUpvote = async (suggestionId: string) => {
+    await upvoteForSuggestion(session.id, suggestionId);
+  };
+
+  const handleDownvote = (suggestionId: string, name: string) => {
+    setDownvoteSuggestion({ id: suggestionId, name });
+    setDownvoteModalOpen(true);
+  };
+
+  const submitDownvote = async (reasons: string[], note?: string) => {
+    if (downvoteSuggestion) {
+      await downvoteForSuggestion(session.id, downvoteSuggestion.id, reasons, note);
+    }
   };
 
   const handleLockIn = (suggestionId: string) => {
-      // If manually clicking "Lock It In", just do it
       confirmPlan(session.id, suggestionId);
       toast({ title: "Plan Locked!", description: "The group is going!" });
   };
   
   const handleAdminLock = () => {
-      // Find winner based on scores
-      const scoredSuggestions = session.suggestions.map(s => ({ ...s, score: calculateScore(s) }));
+      const scoredSuggestions = session.suggestions.map(s => ({ ...s, score: getScore(s) }));
       const maxScore = Math.max(...scoredSuggestions.map(s => s.score));
       const winners = scoredSuggestions.filter(s => s.score === maxScore);
 
@@ -270,7 +299,6 @@ export function Session() {
       } else if (winners.length === 1) {
           handleLockIn(winners[0].id);
       } else {
-          // No votes? Just pick the first one or show error
           handleLockIn(session.suggestions[0].id);
       }
   };
@@ -302,12 +330,11 @@ export function Session() {
   };
 
   const sortedSuggestions = [...session.suggestions].sort((a, b) => {
-      // If locked, pin winner to top
       if (session.winningOptionId) {
           if (a.id === session.winningOptionId) return -1;
           if (b.id === session.winningOptionId) return 1;
       }
-      return calculateScore(b) - calculateScore(a);
+      return getScore(b) - getScore(a);
   });
 
   // --- EMPTY STATES ---
@@ -806,8 +833,10 @@ export function Session() {
                </div>
              ) : (
                sortedSuggestions.map((suggestion, idx) => {
-               const myVote = suggestion.votes[user?.id || 'me'];
-               const score = calculateScore(suggestion);
+               const myVote = getMyVote(suggestion);
+               const voteData = getSuggestionVoteData(suggestion);
+               const voteSummary = getVoteSummary(voteData);
+               const score = voteSummary.score;
                
                return (
                <motion.div 
@@ -855,57 +884,45 @@ export function Session() {
 
                    {/* Voting Actions */}
                    <div className="pt-2 border-t border-white/5">
-                     <div className="flex justify-between items-center mb-2">
-                         <span className="text-xs font-bold uppercase text-muted-foreground">Score: {score}</span>
+                     <div className="flex justify-between items-center mb-3">
+                         <div className="flex items-center gap-2">
+                           <span className="text-xs font-bold uppercase text-muted-foreground">Score: {score}</span>
+                           <button 
+                             onClick={() => setRankingInfoOpen(true)}
+                             className="text-muted-foreground hover:text-foreground transition-colors"
+                             data-testid={`button-info-ranking-${suggestion.id}`}
+                           >
+                             <Info size={12} />
+                           </button>
+                         </div>
                          {myVote && !isLocked && (
-                             <span className="text-[10px] text-primary">You voted {myVote}</span>
+                             <span className="text-[10px] text-primary">You voted {myVote === 'up' ? '👍' : '👎'}</span>
                          )}
                      </div>
 
-                     <div className="grid grid-cols-4 gap-2">
+                     <div className="grid grid-cols-2 gap-2">
                        <Button 
                          variant="ghost" 
                          size="sm"
-                         className={cn("h-10 rounded-lg border border-white/5", myVote === 'yes' ? "bg-primary text-black border-primary font-bold" : "bg-white/5 hover:bg-white/10")}
-                         onClick={() => voteForSuggestion(session.id, suggestion.id, 'yes')}
+                         className={cn("h-12 rounded-lg border border-white/5 flex-col gap-0.5", myVote === 'up' ? "bg-primary text-black border-primary font-bold" : "bg-white/5 hover:bg-white/10")}
+                         onClick={() => handleUpvote(suggestion.id)}
                          disabled={isLocked}
+                         data-testid={`button-upvote-${suggestion.id}`}
                        >
-                         <ThumbsUp size={16} className={cn("mr-1", myVote === 'yes' ? "fill-black" : "")} />
-                         <span className="text-xs">{Object.values(suggestion.votes).filter(v => v === 'yes').length}</span>
+                         <ThumbsUp size={18} className={cn(myVote === 'up' ? "fill-black" : "")} />
+                         <span className="text-xs">{voteSummary.upvotes}</span>
                        </Button>
                        
                        <Button 
                          variant="ghost" 
                          size="sm"
-                         className={cn("h-10 rounded-lg border border-white/5", myVote === 'fire' ? "bg-orange-500 text-white border-orange-500 font-bold" : "bg-white/5 hover:bg-white/10")}
-                         onClick={() => voteForSuggestion(session.id, suggestion.id, 'fire')}
+                         className={cn("h-12 rounded-lg border border-white/5 flex-col gap-0.5", myVote === 'down' ? "bg-red-500 text-white border-red-500 font-bold" : "bg-white/5 hover:bg-white/10")}
+                         onClick={() => handleDownvote(suggestion.id, suggestion.name)}
                          disabled={isLocked}
+                         data-testid={`button-downvote-${suggestion.id}`}
                        >
-                         <Flame size={16} className={cn("mr-1", myVote === 'fire' ? "fill-white" : "")} />
-                         <span className="text-xs">{Object.values(suggestion.votes).filter(v => v === 'fire').length}</span>
-                       </Button>
-
-                       <Button 
-                         variant="ghost" 
-                         size="sm"
-                         className={cn("h-10 rounded-lg border border-white/5", myVote === 'no' ? "bg-red-500 text-white border-red-500 font-bold" : "bg-white/5 hover:bg-white/10")}
-                         onClick={() => voteForSuggestion(session.id, suggestion.id, 'no')}
-                         disabled={isLocked}
-                       >
-                         <ThumbsDown size={16} className="mr-1" />
-                         <span className="text-xs">{Object.values(suggestion.votes).filter(v => v === 'no').length}</span>
-                       </Button>
-
-                       <Button 
-                         variant="ghost" 
-                         size="sm"
-                         className={cn("h-10 rounded-lg border border-white/5", myVote === 'cant' ? "bg-gray-600 text-white border-gray-600 font-bold" : "bg-white/5 hover:bg-white/10")}
-                         onClick={() => voteForSuggestion(session.id, suggestion.id, 'cant')}
-                         disabled={isLocked}
-                         title="Can't make this option"
-                       >
-                         <Ban size={16} className="mr-1" />
-                         <span className="text-[10px]">Can't</span>
+                         <ThumbsDown size={18} />
+                         <span className="text-xs">{voteSummary.downvotes}</span>
                        </Button>
                      </div>
                    </div>
@@ -1073,7 +1090,7 @@ export function Session() {
                         return (
                             <Button key={optId} onClick={() => { handleLockIn(optId); setTieBreakerOpen(false); }} className="w-full justify-between" variant="outline">
                                 <span>{opt.name}</span>
-                                <Badge>{calculateScore(opt)} pts</Badge>
+                                <Badge>{getScore(opt)} pts</Badge>
                             </Button>
                         )
                     })}
@@ -1152,6 +1169,51 @@ export function Session() {
                 Delete Forever
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Downvote Modal */}
+        <DownvoteModal
+          open={downvoteModalOpen}
+          onClose={() => {
+            setDownvoteModalOpen(false);
+            setDownvoteSuggestion(null);
+          }}
+          onSubmit={submitDownvote}
+          suggestionName={downvoteSuggestion?.name || ''}
+        />
+
+        {/* Ranking Info Dialog */}
+        <Dialog open={rankingInfoOpen} onOpenChange={setRankingInfoOpen}>
+          <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>How scoring works</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4 text-sm">
+              <div className="space-y-2">
+                <p className="text-muted-foreground">Options are ranked by total score. Upvotes add points, downvotes subtract based on reasons:</p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                  <span className="text-green-400">👍 Upvote</span>
+                  <span className="font-mono text-green-400">+1</span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                  <span className="text-red-400">👎 Downvote (base)</span>
+                  <span className="font-mono text-red-400">-1</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground uppercase font-bold">Reason penalties:</p>
+                {Object.entries(REASON_PENALTIES).map(([reason, penalty]) => (
+                  <div key={reason} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{reason.replace(/_/g, ' ').toLowerCase()}</span>
+                    <span className="font-mono text-red-400">-{penalty}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Multiple reasons stack. Higher scores = better match for the group!</p>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
