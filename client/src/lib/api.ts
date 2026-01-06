@@ -86,7 +86,9 @@ export const api = {
   
   // Votes
   votes: {
-    vote: (suggestionId: string, vote: string) => fetchAPI('/votes', { method: 'POST', body: JSON.stringify({ suggestionId, vote }) }),
+    upvote: (suggestionId: string) => fetchAPI('/votes', { method: 'POST', body: JSON.stringify({ suggestionId, voteType: 'up' }) }),
+    downvote: (suggestionId: string, reasons: string[], note?: string) => fetchAPI('/votes', { method: 'POST', body: JSON.stringify({ suggestionId, voteType: 'down', reasons, note }) }),
+    remove: (suggestionId: string) => fetchAPI(`/votes/${suggestionId}`, { method: 'DELETE' }),
   },
   
   // Messages
