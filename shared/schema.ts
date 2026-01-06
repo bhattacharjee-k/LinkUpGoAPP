@@ -111,12 +111,27 @@ export const insertSuggestionSchema = createInsertSchema(suggestions).omit({ id:
 export type InsertSuggestion = z.infer<typeof insertSuggestionSchema>;
 export type Suggestion = typeof suggestions.$inferSelect;
 
+// Downvote reason enum
+export const DownvoteReason = {
+  TOO_FAR: 'TOO_FAR',
+  TOO_EXPENSIVE: 'TOO_EXPENSIVE',
+  BAD_TIMING: 'BAD_TIMING',
+  NOT_MY_VIBE: 'NOT_MY_VIBE',
+  NOT_MY_TASTE: 'NOT_MY_TASTE',
+  DOESNT_FIT_GROUP: 'DOESNT_FIT_GROUP',
+  WRONG_NEIGHBORHOOD: 'WRONG_NEIGHBORHOOD',
+  OTHER: 'OTHER',
+} as const;
+export type DownvoteReason = typeof DownvoteReason[keyof typeof DownvoteReason];
+
 // Votes
 export const votes = pgTable("votes", {
   id: serial("id").primaryKey(),
   suggestionId: varchar("suggestion_id").notNull().references(() => suggestions.id, { onDelete: 'cascade' }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
-  vote: text("vote").notNull(), // 'yes' | 'no' | 'fire' | 'cant'
+  voteType: text("vote_type").notNull(), // 'up' | 'down'
+  reasons: text("reasons").array(), // Array of DownvoteReason for downvotes
+  note: text("note"), // Optional free-text for downvotes
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

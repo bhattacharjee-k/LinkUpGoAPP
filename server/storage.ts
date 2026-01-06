@@ -59,8 +59,8 @@ export interface IStorage {
   deleteSessionSuggestions(sessionId: string): Promise<void>;
 
   // Votes
-  vote(suggestionId: string, userId: string, voteType: string): Promise<void>;
-  getSuggestionVotes(suggestionId: string): Promise<Array<{ userId: string; vote: string }>>;
+  vote(suggestionId: string, userId: string, voteType: 'up' | 'down', reasons?: string[], note?: string): Promise<void>;
+  getSuggestionVotes(suggestionId: string): Promise<Array<{ userId: string; voteType: string; reasons?: string[] | null; note?: string | null }>>;
   clearUserVotes(sessionId: string, userId: string): Promise<void>;
 
   // Messages
@@ -289,7 +289,7 @@ export class DbStorage implements IStorage {
   }
 
   // Votes
-  async vote(suggestionId: string, userId: string, voteType: string): Promise<void> {
+  async vote(suggestionId: string, userId: string, voteType: 'up' | 'down', reasons?: string[], note?: string): Promise<void> {
     // Delete existing vote
     await db.delete(schema.votes).where(
       and(
@@ -298,12 +298,18 @@ export class DbStorage implements IStorage {
       )
     );
     // Insert new vote
-    await db.insert(schema.votes).values({ suggestionId, userId, vote: voteType });
+    await db.insert(schema.votes).values({ 
+      suggestionId, 
+      userId, 
+      voteType,
+      reasons: reasons || null,
+      note: note || null
+    });
   }
 
-  async getSuggestionVotes(suggestionId: string): Promise<Array<{ userId: string; vote: string }>> {
+  async getSuggestionVotes(suggestionId: string): Promise<Array<{ userId: string; voteType: string; reasons?: string[] | null; note?: string | null }>> {
     const votes = await db.select().from(schema.votes).where(eq(schema.votes.suggestionId, suggestionId));
-    return votes.map(v => ({ userId: v.userId, vote: v.vote }));
+    return votes.map(v => ({ userId: v.userId, voteType: v.voteType, reasons: v.reasons, note: v.note }));
   }
 
   async clearUserVotes(sessionId: string, userId: string): Promise<void> {
