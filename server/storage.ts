@@ -10,7 +10,9 @@ import type {
   InsertSessionParticipant,
   Suggestion, InsertSuggestion,
   InsertVote,
-  Message, InsertMessage
+  Message, InsertMessage,
+  Notification, InsertNotification,
+  NotificationPrefs, InsertNotificationPrefs
 } from '@shared/schema';
 
 const pool = new pg.Pool({
@@ -73,6 +75,16 @@ export interface IStorage {
     suggestions: Suggestion[];
     recentMessages: Message[];
   } | undefined>;
+
+  // Notifications
+  getUserNotifications(userId: string): Promise<Notification[]>;
+  getUnreadCount(userId: string): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markAsRead(id: string): Promise<void>;
+  markAllAsRead(userId: string): Promise<void>;
+  getNotificationPrefs(userId: string): Promise<NotificationPrefs | undefined>;
+  upsertNotificationPrefs(userId: string, emailEnabled: boolean): Promise<NotificationPrefs>;
+  getRecentNudge(userId: string, sessionId: string): Promise<Notification | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -377,6 +389,74 @@ export class DbStorage implements IStorage {
       suggestions,
       recentMessages
     };
+  }
+
+  // Notifications
+  async getUserNotifications(userId: string): Promise<Notification[]> {
+    return db.select().from(schema.notifications)
+      .where(eq(schema.notifications.userId, userId))
+      .orderBy(sql`${schema.notifications.createdAt} DESC`);
+  }
+
+  async getUnreadCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(schema.notifications)
+      .where(and(
+        eq(schema.notifications.userId, userId),
+        eq(schema.notifications.isRead, false)
+      ));
+    return Number(result[0]?.count || 0);
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [newNotification] = await db.insert(schema.notifications).values(notification).returning();
+    return newNotification;
+  }
+
+  async markAsRead(id: string): Promise<void> {
+    await db.update(schema.notifications)
+      .set({ isRead: true })
+      .where(eq(schema.notifications.id, id));
+  }
+
+  async markAllAsRead(userId: string): Promise<void> {
+    await db.update(schema.notifications)
+      .set({ isRead: true })
+      .where(eq(schema.notifications.userId, userId));
+  }
+
+  async getNotificationPrefs(userId: string): Promise<NotificationPrefs | undefined> {
+    const [prefs] = await db.select().from(schema.notificationPrefs)
+      .where(eq(schema.notificationPrefs.userId, userId));
+    return prefs;
+  }
+
+  async upsertNotificationPrefs(userId: string, emailEnabled: boolean): Promise<NotificationPrefs> {
+    const existing = await this.getNotificationPrefs(userId);
+    if (existing) {
+      const [updated] = await db.update(schema.notificationPrefs)
+        .set({ emailEnabled })
+        .where(eq(schema.notificationPrefs.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(schema.notificationPrefs)
+        .values({ userId, emailEnabled })
+        .returning();
+      return created;
+    }
+  }
+
+  async getRecentNudge(userId: string, sessionId: string): Promise<Notification | undefined> {
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    const [nudge] = await db.select().from(schema.notifications)
+      .where(and(
+        eq(schema.notifications.userId, userId),
+        eq(schema.notifications.type, 'AVAILABILITY_NUDGE'),
+        sql`${schema.notifications.url} LIKE ${`%${sessionId}%`}`,
+        sql`${schema.notifications.createdAt} > ${twelveHoursAgo}`
+      ));
+    return nudge;
   }
 }
 
