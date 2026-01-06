@@ -1396,36 +1396,49 @@ export function Session() {
           suggestionName={downvoteSuggestion?.name || ''}
         />
 
-        {/* Ranking Info Dialog */}
+        {/* Why These Suggestions Dialog */}
         <Dialog open={rankingInfoOpen} onOpenChange={setRankingInfoOpen}>
           <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
             <DialogHeader>
-              <DialogTitle>How scoring works</DialogTitle>
+              <DialogTitle>Why these places?</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4 text-sm">
+              <p className="text-muted-foreground">These suggestions were picked based on your group's preferences:</p>
+              
               <div className="space-y-2">
-                <p className="text-muted-foreground">Options are ranked by total score. Upvotes add points, downvotes subtract based on reasons:</p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-                  <span className="text-green-400">👍 Upvote</span>
-                  <span className="font-mono text-green-400">+1</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-                  <span className="text-red-400">👎 Downvote (base)</span>
-                  <span className="font-mono text-red-400">-1</span>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-xs text-muted-foreground uppercase font-bold">Reason penalties:</p>
-                {Object.entries(REASON_PENALTIES).map(([reason, penalty]) => (
-                  <div key={reason} className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">{reason.replace(/_/g, ' ').toLowerCase()}</span>
-                    <span className="font-mono text-red-400">-{penalty}</span>
+                {session.filters.locationScope && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
+                    <MapPin size={14} className="text-primary" />
+                    <span>Location: <span className="text-foreground font-medium">{session.filters.locationScope}</span></span>
                   </div>
-                ))}
+                )}
+                {session.filters.category && session.filters.category.length > 0 && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
+                    <Zap size={14} className="text-primary" />
+                    <span>Categories: <span className="text-foreground font-medium">{session.filters.category.join(', ')}</span></span>
+                  </div>
+                )}
+                {session.filters.budget && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
+                    <DollarSign size={14} className="text-primary" />
+                    <span>Budget: <span className="text-foreground font-medium">{session.filters.budget}</span></span>
+                  </div>
+                )}
+                {session.filters.energy && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
+                    <Star size={14} className="text-primary" />
+                    <span>Vibe: <span className="text-foreground font-medium">{session.filters.energy}</span></span>
+                  </div>
+                )}
+                {session.filters.timeWindow && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
+                    <Clock size={14} className="text-primary" />
+                    <span>Time: <span className="text-foreground font-medium">{session.filters.timeWindow}</span></span>
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground">Multiple reasons stack. Higher scores = better match for the group!</p>
+              
+              <p className="text-xs text-muted-foreground">Chat with @Planner to refine suggestions or ask for different types of places!</p>
             </div>
           </DialogContent>
         </Dialog>
