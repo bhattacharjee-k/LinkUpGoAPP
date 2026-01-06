@@ -145,7 +145,9 @@ export class DbStorage implements IStorage {
   }
 
   async addGroupMember(groupId: string, userId: string): Promise<void> {
-    await db.insert(schema.groupMembers).values({ groupId, userId });
+    await db.insert(schema.groupMembers)
+      .values({ groupId, userId })
+      .onConflictDoNothing();
   }
 
   async getGroupMembers(groupId: string): Promise<string[]> {
@@ -210,7 +212,9 @@ export class DbStorage implements IStorage {
   }
 
   async addSessionParticipant(sessionId: string, userId: string, status: string = 'active'): Promise<void> {
-    await db.insert(schema.sessionParticipants).values({ sessionId, userId, status });
+    await db.insert(schema.sessionParticipants)
+      .values({ sessionId, userId, status })
+      .onConflictDoNothing();
   }
 
   async getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string }>> {

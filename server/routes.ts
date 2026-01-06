@@ -357,6 +357,45 @@ export async function registerRoutes(
     }
   });
 
+  // Add member to group (admin only, for ad-hoc group creation)
+  app.post("/api/groups/:id/members", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const group = await storage.getGroup(req.params.id);
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      
+      // Only admin can add members directly
+      if (group.adminId !== userId) {
+        return res.status(403).json({ message: "Only admin can add members" });
+      }
+      
+      const { memberId } = req.body;
+      if (!memberId) {
+        return res.status(400).json({ message: "memberId is required" });
+      }
+      
+      // Verify the member exists
+      const member = await storage.getUser(memberId);
+      if (!member) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      await storage.addGroupMember(group.id, memberId);
+      
+      const members = await storage.getGroupMembers(group.id);
+      res.json({ ...group, members });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.post("/api/groups/join/:inviteCode", async (req, res) => {
     try {
       // @ts-ignore
@@ -625,7 +664,23 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      await storage.addSessionParticipant(req.params.id, userId, req.body.status || 'active');
+      const session = await storage.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      // If memberId is provided, admin can add other users
+      const { memberId, status } = req.body;
+      if (memberId) {
+        const group = await storage.getGroup(session.groupId);
+        if (group?.adminId !== userId) {
+          return res.status(403).json({ message: "Only admin can add other participants" });
+        }
+        await storage.addSessionParticipant(req.params.id, memberId, status || 'active');
+      } else {
+        // Self-join
+        await storage.addSessionParticipant(req.params.id, userId, status || 'active');
+      }
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });

@@ -3,11 +3,9 @@ import { useApp } from '@/lib/context';
 import { Layout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Plus, Calendar, MapPin, Users, ArrowRight, PlusCircle, Lock, Shield, Copy, Check, UserPlus, Link as LinkIcon, Unlock } from 'lucide-react';
+import { Plus, MapPin, Users, ArrowRight, Lock, Shield, Copy, Check, Unlock } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -16,11 +14,9 @@ import { cn } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 
 export function Home() {
-  const { user, sessions, groups, createGroup, updateGroup, isAdmin, isGroupLocked } = useApp();
+  const { user, sessions, groups, updateGroup, isAdmin, isGroupLocked } = useApp();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
-  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
   const [selectedSquadId, setSelectedSquadId] = useState<string | null>(null);
   const [isSquadDrawerOpen, setIsSquadDrawerOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -30,17 +26,6 @@ export function Home() {
 
   const selectedSquad = groups.find(g => g.id === selectedSquadId);
 
-  const handleCreateGroup = async () => {
-    if (!newGroupName.trim()) return;
-    try {
-      await createGroup(newGroupName);
-      setNewGroupName('');
-      setIsCreateGroupOpen(false);
-      toast({ title: "Squad Created!", description: `${newGroupName} is ready to go.` });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to create squad", variant: "destructive" });
-    }
-  };
 
   const openSquadDrawer = (groupId: string) => {
     setSelectedSquadId(groupId);
@@ -58,7 +43,7 @@ export function Home() {
   const toggleLock = (groupId: string, checked: boolean) => {
     updateGroup(groupId, { locked: checked });
     toast({ 
-      title: checked ? "Squad Locked" : "Squad Unlocked", 
+      title: checked ? "Group Locked" : "Group Unlocked", 
       description: checked ? "New members cannot join via invite link." : "Invite links are now active." 
     });
   };
@@ -139,18 +124,17 @@ export function Home() {
           )}
         </div>
 
-        {/* Your Squads */}
+        {/* Your Groups */}
         <div className="space-y-4">
-           <h3 className="text-lg font-bold">Your Squads</h3>
+           <h3 className="text-lg font-bold">Your Groups</h3>
            <div className="space-y-3">
              {groups.map(group => {
                const isUserAdmin = isAdmin(group.id);
                const locked = isGroupLocked(group.id);
-               const squadSessions = sessions.filter(s => s.groupId === group.id);
                
                return (
                  <Card key={group.id} className="p-4 bg-white/5 border-white/10 hover:border-white/20 transition-all">
-                   <div className="flex items-start justify-between mb-3" onClick={() => openSquadDrawer(group.id)} data-testid={`card-squad-${group.id}`}>
+                   <div className="flex items-start justify-between mb-3" onClick={() => openSquadDrawer(group.id)} data-testid={`card-group-${group.id}`}>
                      <div className="flex-1 cursor-pointer">
                        <div className="flex items-center gap-2 mb-1">
                          <h4 className="font-bold text-base">{group.name}</h4>
@@ -172,7 +156,7 @@ export function Home() {
                      <Button 
                        size="sm" 
                        className="flex-1 bg-primary hover:bg-primary/90 text-[#0a0a0a] font-bold"
-                       onClick={() => setLocation('/new-session')}
+                       onClick={() => setLocation(`/new-session?groupId=${group.id}`)}
                        data-testid={`button-new-plan-${group.id}`}
                      >
                        <Plus size={14} className="mr-1" /> New Plan
@@ -190,43 +174,12 @@ export function Home() {
                  </Card>
                );
              })}
-             
-             <Dialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
-               <DialogTrigger asChild>
-                 <button className="w-full rounded-xl border border-dashed border-white/20 flex items-center justify-center gap-2 p-4 hover:bg-white/5 transition-all text-muted-foreground hover:text-primary" data-testid="button-create-squad">
-                   <PlusCircle size={20} />
-                   <span className="text-sm font-medium">Create New Squad</span>
-                 </button>
-               </DialogTrigger>
-               <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
-                 <DialogHeader>
-                   <DialogTitle>Name your new squad</DialogTitle>
-                 </DialogHeader>
-                 <div className="space-y-4 py-4">
-                   <div className="space-y-2">
-                     <Label>Squad Name</Label>
-                     <Input 
-                       placeholder="e.g. Friday Crew, Chicago Friends" 
-                       value={newGroupName}
-                       onChange={(e) => setNewGroupName(e.target.value)}
-                       className="bg-white/5 border-white/10"
-                       data-testid="input-squad-name"
-                     />
-                   </div>
-                 </div>
-                 <DialogFooter>
-                   <Button onClick={handleCreateGroup} disabled={!newGroupName.trim()} className="w-full bg-primary text-[#0a0a0a] font-bold" data-testid="button-submit-squad">
-                     Create Squad
-                   </Button>
-                 </DialogFooter>
-               </DialogContent>
-             </Dialog>
            </div>
         </div>
 
       </div>
 
-      {/* Squad Details Drawer */}
+      {/* Group Details Drawer */}
       <Sheet open={isSquadDrawerOpen} onOpenChange={setIsSquadDrawerOpen}>
         <SheetContent side="bottom" className="bg-background border-t border-white/10 h-[85vh] rounded-t-2xl">
           {selectedSquad && (
@@ -254,8 +207,58 @@ export function Home() {
                 </div>
               </SheetHeader>
 
-              <div className="space-y-6 overflow-y-auto max-h-[calc(85vh-8rem)] pb-4">
-                {/* Send Link */}
+              {/* Primary New Plan CTA */}
+              <Button 
+                className="w-full bg-primary hover:bg-primary/90 text-[#0a0a0a] font-bold h-12"
+                onClick={() => {
+                  setIsSquadDrawerOpen(false);
+                  setLocation(`/new-session?groupId=${selectedSquad.id}`);
+                }}
+                data-testid="button-new-plan-drawer"
+              >
+                <Plus size={18} className="mr-2" /> New Plan
+              </Button>
+
+              <div className="space-y-6 overflow-y-auto max-h-[calc(85vh-12rem)] pb-4">
+                {/* Plans for this Group */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-muted-foreground">Plans</Label>
+                  {sessions.filter(s => s.groupId === selectedSquad.id).length > 0 ? (
+                    <div className="space-y-2">
+                      {sessions
+                        .filter(s => s.groupId === selectedSquad.id)
+                        .map(session => (
+                          <Link key={session.id} href={`/session/${session.id}`}>
+                            <Card className="p-3 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer group" data-testid={`plan-${session.id}`}>
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className={cn(
+                                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                                      session.status === 'locked' ? "bg-green-500/20 text-green-400" : "bg-primary/20 text-primary"
+                                    )}>
+                                      {session.status === 'locked' ? 'Confirmed' : 'Voting'}
+                                    </span>
+                                    {session.name && <span className="text-sm font-medium">{session.name}</span>}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground line-clamp-1">
+                                    {session.filters.category.join(', ')} • {session.filters.energy}
+                                  </p>
+                                </div>
+                                <ArrowRight size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                              </div>
+                            </Card>
+                          </Link>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 border border-dashed border-white/10 rounded-xl">
+                      <p className="text-muted-foreground text-sm">No plans yet</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Invite Link */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-muted-foreground">Invite Link</Label>
                   <div className="flex gap-2">
@@ -275,7 +278,7 @@ export function Home() {
                       <div className="space-y-1">
                         <Label className="text-sm font-medium flex items-center gap-2">
                           {isGroupLocked(selectedSquad.id) ? <Lock size={14} /> : <Unlock size={14} />} 
-                          Lock Squad
+                          Lock Group
                         </Label>
                         <p className="text-xs text-muted-foreground">
                           Prevent new members from joining
@@ -284,7 +287,7 @@ export function Home() {
                       <Switch 
                         checked={isGroupLocked(selectedSquad.id)} 
                         onCheckedChange={(checked) => toggleLock(selectedSquad.id, checked)}
-                        data-testid="switch-lock-squad"
+                        data-testid="switch-lock-group"
                       />
                     </div>
                   </Card>
@@ -313,40 +316,6 @@ export function Home() {
                     ))}
                   </div>
                 </div>
-
-                {/* Recent Plans */}
-                {sessions.filter(s => s.groupId === selectedSquad.id).length > 0 && (
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium text-muted-foreground">Recent Plans</Label>
-                    <div className="space-y-2">
-                      {sessions
-                        .filter(s => s.groupId === selectedSquad.id)
-                        .slice(0, 3)
-                        .map(session => (
-                          <Link key={session.id} href={`/session/${session.id}`}>
-                            <Card className="p-3 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer group" data-testid={`plan-${session.id}`}>
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className={cn(
-                                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                                      session.status === 'locked' ? "bg-green-500/20 text-green-400" : "bg-primary/20 text-primary"
-                                    )}>
-                                      {session.status === 'locked' ? 'Confirmed' : 'Voting'}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground line-clamp-1">
-                                    {session.filters.category.join(', ')} • {session.filters.energy}
-                                  </p>
-                                </div>
-                                <ArrowRight size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                              </div>
-                            </Card>
-                          </Link>
-                        ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}

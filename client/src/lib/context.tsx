@@ -256,9 +256,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return group?.adminId === user?.id;
   };
 
-  const addMemberToGroup = (groupId: string, userId: string) => {
-    // This is handled by the backend now via joinGroupByCode
-    // Keep for compatibility
+  const addMemberToGroup = async (groupId: string, memberId: string): Promise<void> => {
+    const updatedGroup = await api.groups.addMember(groupId, memberId);
+    setGroups(prev => prev.map(g => g.id === groupId ? updatedGroup : g));
   };
 
   const addParticipantToSession = (sessionId: string, userId: string) => {

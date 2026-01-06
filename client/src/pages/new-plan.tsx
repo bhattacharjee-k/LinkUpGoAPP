@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '@/lib/context';
-import { useLocation } from 'wouter';
-import { motion } from 'framer-motion';
+import { api } from '@/lib/api';
+import { useLocation, useSearch } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon, Clock, ChevronRight, MapPin, DollarSign, UserPlus, Users, Link as LinkIcon, Check, Copy, Navigation, X } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronRight, MapPin, UserPlus, Users, Link as LinkIcon, Check, Copy, Navigation, X, ChevronLeft } from 'lucide-react';
 import { City, Budget, Energy, Category } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { Calendar } from "@/components/ui/calendar";
@@ -13,87 +13,159 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 export function NewPlan() {
-  const { startSession, user, groups, addParticipantToSession, createGroup, updateUserLocation } = useApp();
+  const { startSession, user, groups, createGroup, updateUserLocation, addMemberToGroup } = useApp();
   const [_, setLocation] = useLocation();
-  const [step, setStep] = useState(1);
+  const searchString = useSearch();
   const { toast } = useToast();
+  
+  // Parse URL params
+  const urlParams = new URLSearchParams(searchString);
+  const preselectedGroupId = urlParams.get('groupId');
+  
+  // Step: 0 = Who's going?, 1 = Plan details
+  const [step, setStep] = useState(preselectedGroupId ? 1 : 0);
+  const [selectionMode, setSelectionMode] = useState<'group' | 'adhoc' | null>(preselectedGroupId ? 'group' : null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(preselectedGroupId);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([user?.id || '']);
   
   const [formData, setFormData] = useState({
     name: '',
     date: new Date(),
     timeStart: '19:00',
     timeEnd: '22:00',
-    flexibility: 'strict', // strict, flexible
     locationScope: user?.city || 'NYC',
     neighborhood: '',
     budget: '$$' as Budget,
     energy: user?.energy || 'Vibey',
     categories: [] as Category[],
-    participants: [user?.id || 'me'], // Current user is always a participant
   });
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [newParticipantName, setNewParticipantName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [locationPermission, setLocationPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [showLocationPrompt, setShowLocationPrompt] = useState(true);
-  // Pre-generate invite code for display
   const [draftInviteCode] = useState(Math.random().toString(36).substr(2, 6).toUpperCase());
 
-  // Find user's primary group or first available group
-  const userGroup = groups.find(g => g.members.includes(user?.id || 'me')) || groups[0];
+  // Get selected group
+  const selectedGroup = groups.find(g => g.id === selectedGroupId);
+
+  // Generate auto-name for ad-hoc group
+  const generateGroupName = (memberIds: string[]): string => {
+    if (memberIds.length === 0) return 'New Group';
+    if (memberIds.length === 1) return user?.name || 'My Group';
+    
+    // For now, use "You +N" format since we don't have all user names
+    const othersCount = memberIds.filter(id => id !== user?.id).length;
+    if (othersCount === 0) return user?.name?.split(' ')[0] || 'My Plans';
+    if (othersCount === 1) return `${user?.name?.split(' ')[0] || 'You'} +1`;
+    return `${user?.name?.split(' ')[0] || 'You'} +${othersCount}`;
+  };
+
+  // Check if ad-hoc selection matches an existing group
+  const findMatchingGroup = (memberIds: string[]) => {
+    const sortedMemberIds = [...memberIds].sort();
+    return groups.find(g => {
+      const sortedGroupMembers = [...g.members].sort();
+      return sortedMemberIds.length === sortedGroupMembers.length &&
+        sortedMemberIds.every((id, idx) => id === sortedGroupMembers[idx]);
+    });
+  };
+
+  const handleSelectGroup = (groupId: string) => {
+    setSelectedGroupId(groupId);
+    setSelectionMode('group');
+    setStep(1);
+  };
+
+  const handleAdHocContinue = async () => {
+    if (selectedFriendIds.length === 0) {
+      toast({ title: "Select at least yourself", variant: "destructive" });
+      return;
+    }
+
+    // Check if ad-hoc matches existing group
+    const matchingGroup = findMatchingGroup(selectedFriendIds);
+    if (matchingGroup) {
+      setSelectedGroupId(matchingGroup.id);
+      setSelectionMode('group');
+    } else {
+      setSelectionMode('adhoc');
+    }
+    setStep(1);
+  };
 
   const handleCreate = async () => {
     if (!user || isCreating) return;
     setIsCreating(true);
     
-    // Format "Day-TimeBlock" approximation for the MVP data model compatibility
     const hour = parseInt(formData.timeStart.split(':')[0]);
-    let timeWindow = 'Fri-Night'; // Default fallback
-    
-    const dayName = format(formData.date, 'EEE'); // Mon, Tue...
+    const dayName = format(formData.date, 'EEE');
     let timeBlock = 'Night';
     if (hour < 17) timeBlock = 'Day';
     else if (hour < 20) timeBlock = 'Evening';
-    
-    timeWindow = `${dayName}-${timeBlock}`;
+    const timeWindow = `${dayName}-${timeBlock}`;
 
-    // Use user's group or create one if they don't have any
-    let groupId = userGroup?.id;
-    if (!groupId) {
+    let groupId = selectedGroupId;
+
+    // If ad-hoc mode and no matching group, create a new group silently and add members
+    if (selectionMode === 'adhoc' && !groupId) {
       try {
-        const newGroup = await createGroup(formData.name || 'My Plans');
+        const autoName = generateGroupName(selectedFriendIds);
+        const newGroup = await createGroup(autoName);
         groupId = newGroup.id;
+        
+        // Add selected friends to the new group (exclude current user who is already admin)
+        const friendsToAdd = selectedFriendIds.filter(id => id !== user.id);
+        for (const friendId of friendsToAdd) {
+          try {
+            await addMemberToGroup(newGroup.id, friendId);
+          } catch (e) {
+            console.error('Failed to add member:', friendId, e);
+          }
+        }
       } catch (error: any) {
-        toast({ title: "Error", description: "Failed to create group. Please try again.", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to create group.", variant: "destructive" });
         setIsCreating(false);
         return;
       }
     }
 
+    if (!groupId) {
+      toast({ title: "Error", description: "Please select a group first.", variant: "destructive" });
+      setIsCreating(false);
+      return;
+    }
+
     try {
       const id = await startSession(groupId, {
-          timeWindow, 
-          locationScope: formData.locationScope,
-          neighborhood: formData.neighborhood || undefined,
-          category: formData.categories.length > 0 ? formData.categories : ['Drinks'],
-          energy: formData.energy,
-          budget: formData.budget,
-          specificDate: formData.date,
-          specificTime: `${formData.timeStart}-${formData.timeEnd}`,
-          inviteCode: draftInviteCode
+        timeWindow, 
+        locationScope: formData.locationScope,
+        neighborhood: formData.neighborhood || undefined,
+        category: formData.categories.length > 0 ? formData.categories : ['Drinks'],
+        energy: formData.energy,
+        budget: formData.budget,
+        specificDate: formData.date,
+        specificTime: `${formData.timeStart}-${formData.timeEnd}`,
+        inviteCode: draftInviteCode
       }, formData.name || undefined);
 
-      // Add selected participants to the new session
-      formData.participants.forEach(pid => {
-          if (pid !== user.id) {
-              addParticipantToSession(id, pid);
+      // For ad-hoc plans, add selected friends as session participants
+      if (selectionMode === 'adhoc') {
+        const friendsToAdd = selectedFriendIds.filter(friendId => friendId !== user.id);
+        for (const friendId of friendsToAdd) {
+          try {
+            await api.sessions.addParticipant(id, 'active', friendId);
+          } catch (e) {
+            console.error('Failed to add session participant:', friendId, e);
           }
-      });
+        }
+      }
 
       setLocation(`/session/${id}`);
     } catch (error: any) {
@@ -106,33 +178,22 @@ export function NewPlan() {
     const link = `${window.location.origin}/join-plan/${draftInviteCode}`;
     const message = `Let's plan together — join my plan: ${link}`;
     
-    // Try to use Web Share API if available (works on mobile)
     if (navigator.share) {
-        navigator.share({
-            title: 'Join my plan',
-            text: `Let's plan together — join my plan:`,
-            url: link,
-        }).then(() => {
-             toast({ title: "Shared successfully!" });
-        }).catch(() => {
-             // Fallback to clipboard if share cancelled or failed
-             navigator.clipboard.writeText(message);
-             setCopied(true);
-             setTimeout(() => setCopied(false), 2000);
-             toast({
-                title: "Link & Message copied!",
-                description: "Paste it to your friends.",
-            });
-        });
-    } else {
-        // Fallback for desktop
+      navigator.share({
+        title: 'Join my plan',
+        text: `Let's plan together — join my plan:`,
+        url: link,
+      }).catch(() => {
         navigator.clipboard.writeText(message);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-        toast({
-            title: "Link & Message copied!",
-            description: "Paste it to your friends.",
-        });
+        toast({ title: "Link & Message copied!", description: "Paste it to your friends." });
+      });
+    } else {
+      navigator.clipboard.writeText(message);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({ title: "Link & Message copied!", description: "Paste it to your friends." });
     }
   };
 
@@ -145,28 +206,13 @@ export function NewPlan() {
     }));
   };
 
-  const handleAddParticipant = () => {
-    if (!newParticipantName.trim()) return;
-    const mockId = `user-${Math.random().toString(36).substr(2, 5)}`;
-    // In a real app, this would validate the user exists first
-    setFormData(prev => ({
-        ...prev,
-        participants: [...prev.participants, mockId]
-    }));
-    setNewParticipantName('');
-    toast({ title: "Added", description: "User added to plan list." });
-  };
-
-  const toggleParticipant = (pid: string) => {
-      setFormData(prev => {
-          const isSelected = prev.participants.includes(pid);
-          return {
-              ...prev,
-              participants: isSelected 
-                ? prev.participants.filter(p => p !== pid)
-                : [...prev.participants, pid]
-          };
-      });
+  const toggleFriend = (friendId: string) => {
+    if (friendId === user?.id) return; // Can't remove self
+    setSelectedFriendIds(prev => 
+      prev.includes(friendId)
+        ? prev.filter(id => id !== friendId)
+        : [...prev, friendId]
+    );
   };
 
   const handleRequestLocation = async () => {
@@ -182,11 +228,7 @@ export function NewPlan() {
       async (position) => {
         const { latitude, longitude } = position.coords;
         try {
-          await updateUserLocation(
-            latitude.toString(), 
-            longitude.toString(), 
-            'granted'
-          );
+          await updateUserLocation(latitude.toString(), longitude.toString(), 'granted');
           setLocationPermission('granted');
           toast({ title: "Location saved", description: "Your location has been saved for better suggestions." });
           setShowLocationPrompt(false);
@@ -197,18 +239,16 @@ export function NewPlan() {
         }
       },
       (error) => {
-        console.error('Location error:', error);
         setLocationPermission('denied');
         setIsGettingLocation(false);
-        toast({ 
-          title: "Location denied", 
-          description: "You can still manually enter your neighborhood.", 
-          variant: "destructive" 
-        });
+        toast({ title: "Location denied", description: "You can still manually enter your neighborhood.", variant: "destructive" });
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
+
+  // All unique friends from all groups (excluding current user)
+  const allFriends = Array.from(new Set(groups.flatMap(g => g.members))).filter(id => id !== user?.id);
 
   return (
     <div className="min-h-screen bg-background flex flex-col px-6 py-6 relative overflow-hidden">
@@ -216,302 +256,288 @@ export function NewPlan() {
       
       <div className="z-10 w-full max-w-md mx-auto flex-1 flex flex-col">
         <div className="mb-8">
-            <Button variant="ghost" className="pl-0 hover:bg-transparent text-muted-foreground" onClick={() => setLocation('/')}>
-                ← Cancel
-            </Button>
-            <h1 className="text-3xl font-display font-bold mt-2 text-white">LinkUpGo Plan</h1>
-            <p className="text-muted-foreground">Who, when, and what's the vibe?</p>
+          <Button 
+            variant="ghost" 
+            className="pl-0 hover:bg-transparent text-muted-foreground" 
+            onClick={() => step === 0 ? setLocation('/') : setStep(0)}
+            data-testid="button-back"
+          >
+            {step === 0 ? '← Cancel' : '← Back'}
+          </Button>
+          <h1 className="text-3xl font-display font-bold mt-2 text-white">
+            {step === 0 ? "Who's going?" : 'Plan Details'}
+          </h1>
+          <p className="text-muted-foreground">
+            {step === 0 ? 'Pick a group or select friends' : 'When and what\'s the vibe?'}
+          </p>
         </div>
 
-        <div className="space-y-8 flex-1">
-            
-            {/* Plan Name Section */}
-            <div className="space-y-4">
-                <Label className="text-lg">What are we calling this?</Label>
-                <Input 
-                    placeholder="e.g. Friday Drinks, Birthday Bash, Work Happy Hour" 
-                    className="bg-white/5 border-white/10 h-12 text-lg" 
-                    value={formData.name}
-                    onChange={e => setFormData({...formData, name: e.target.value})}
-                />
+        {step === 0 ? (
+          <div className="space-y-6 flex-1">
+            {/* Option A: Select existing group */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-muted-foreground">Your Groups</Label>
+              {groups.length > 0 ? (
+                <div className="space-y-2">
+                  {groups.map(group => (
+                    <Card 
+                      key={group.id}
+                      onClick={() => handleSelectGroup(group.id)}
+                      className={cn(
+                        "p-4 cursor-pointer transition-all border",
+                        selectedGroupId === group.id 
+                          ? "bg-primary/10 border-primary" 
+                          : "bg-white/5 border-white/10 hover:border-white/20"
+                      )}
+                      data-testid={`select-group-${group.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-bold text-base">{group.name}</h4>
+                          <p className="text-xs text-muted-foreground">{group.members.length} member{group.members.length !== 1 ? 's' : ''}</p>
+                        </div>
+                        <ChevronRight size={18} className="text-muted-foreground" />
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 border border-dashed border-white/10 rounded-xl">
+                  <p className="text-muted-foreground text-sm">No groups yet</p>
+                </div>
+              )}
             </div>
 
-            {/* Participants Section */}
-            <div className="space-y-4">
-                <Label className="text-lg flex justify-between items-center">
-                    Who's going?
-                    <span className="text-xs text-muted-foreground font-normal">{formData.participants.length} selected</span>
-                </Label>
-                
-                <div className="flex flex-wrap gap-2">
-                    {/* Add Button */}
-                    <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" className="rounded-full h-10 w-10 p-0 border-dashed border-white/30 bg-white/5">
-                                <UserPlus size={16} />
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
-                            <DialogHeader>
-                                <DialogTitle>Add to Plan</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 pt-4 overflow-y-auto max-h-[60vh] pr-1">
-                                {/* Share Link - Added as requested */}
-                                <div className="space-y-2 pb-4 border-b border-white/10">
-                                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Share Plan Link</h4>
-                                    <div className="flex flex-col gap-2 w-full">
-                                        <div className="flex gap-2 w-full">
-                                            <div className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
-                                                {window.location.origin}/join-plan/{draftInviteCode}
-                                            </div>
-                                        </div>
-                                        <Button size="sm" variant="secondary" onClick={handleCopyLink} className="w-full bg-white/10 hover:bg-white/20 border-0 h-9">
-                                            {copied ? <Check size={14} className="mr-2 text-green-500" /> : <LinkIcon size={14} className="mr-2" />}
-                                            {copied ? "Link Copied" : "Copy Invite Link"}
-                                        </Button>
-                                        <p className="text-[10px] text-muted-foreground text-center italic">Link becomes active once you click "Find Options"</p>
-                                    </div>
-                                </div>
+            {/* Divider */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-xs text-muted-foreground">or</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
 
-                                {userGroup && (
-                                <div className="space-y-2">
-                                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">From {userGroup.name}</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {userGroup.members.map(m => (
-                                            <Button 
-                                                key={m} 
-                                                variant={formData.participants.includes(m) ? "default" : "outline"} 
-                                                size="sm" 
-                                                onClick={() => toggleParticipant(m)} 
-                                                className="text-xs h-8"
-                                            >
-                                                {m === user?.id ? 'You' : m.substr(0,4)}
-                                                {formData.participants.includes(m) && <Check size={12} className="ml-1" />}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </div>
-                                )}
-                                <div className="space-y-2">
-                                     <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Add by Name</h4>
-                                     <div className="flex gap-2">
-                                        <Input 
-                                            placeholder="@username" 
-                                            className="bg-white/5 border-white/10" 
-                                            value={newParticipantName}
-                                            onChange={e => setNewParticipantName(e.target.value)}
-                                        />
-                                        <Button onClick={handleAddParticipant} disabled={!newParticipantName}>Add</Button>
-                                     </div>
-                                </div>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-
-                    {/* Selected Avatars */}
-                    {formData.participants.map((pid, i) => (
-                        <div key={pid} className="relative group">
-                            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-blue-500/20 border border-white/10 flex items-center justify-center text-xs font-bold">
-                                {pid === user?.id ? 'ME' : `U${i}`}
-                            </div>
-                            {pid !== user?.id && (
-                                <button 
-                                    onClick={() => toggleParticipant(pid)}
-                                    className="absolute -top-1 -right-1 bg-red-500 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <Users size={8} className="text-white" />
-                                </button>
-                            )}
-                        </div>
-                    ))}
+            {/* Option B: Select friends ad-hoc */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-muted-foreground">Pick Friends</Label>
+              <div className="flex flex-wrap gap-2">
+                {/* Current user always selected */}
+                <div className="h-10 px-4 rounded-full bg-primary/20 border border-primary flex items-center gap-2 text-sm font-medium">
+                  <Check size={14} className="text-primary" /> You
                 </div>
+                
+                {allFriends.map(friendId => (
+                  <button
+                    key={friendId}
+                    onClick={() => toggleFriend(friendId)}
+                    className={cn(
+                      "h-10 px-4 rounded-full border text-sm font-medium transition-all",
+                      selectedFriendIds.includes(friendId)
+                        ? "bg-primary/20 border-primary text-white"
+                        : "bg-white/5 border-white/10 text-muted-foreground hover:border-white/20"
+                    )}
+                    data-testid={`toggle-friend-${friendId}`}
+                  >
+                    {selectedFriendIds.includes(friendId) && <Check size={14} className="inline mr-1" />}
+                    {friendId.substring(0, 6)}...
+                  </button>
+                ))}
+
+                {allFriends.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No friends in your groups yet. Share your invite link!</p>
+                )}
+              </div>
+
+              {selectedFriendIds.length > 1 && (
+                <Button 
+                  onClick={handleAdHocContinue}
+                  className="w-full bg-white/10 hover:bg-white/20 mt-4"
+                  data-testid="button-continue-adhoc"
+                >
+                  Continue with {selectedFriendIds.length} people <ChevronRight size={16} className="ml-1" />
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-8 flex-1">
+            {/* Selected group indicator */}
+            {selectedGroup && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
+                <Users size={16} className="text-muted-foreground" />
+                <span className="text-sm">{selectedGroup.name}</span>
+                <Badge variant="outline" className="ml-auto text-[10px] border-white/20">
+                  {selectedGroup.members.length} members
+                </Badge>
+              </div>
+            )}
+
+            {/* Plan Name Section */}
+            <div className="space-y-4">
+              <Label className="text-lg">What are we calling this?</Label>
+              <Input 
+                placeholder="e.g. Friday Drinks, Birthday Bash" 
+                className="bg-white/5 border-white/10 h-12 text-lg" 
+                value={formData.name}
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                data-testid="input-plan-name"
+              />
+            </div>
+
+            {/* Invite Link */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <LinkIcon size={14} /> Share Plan Link
+              </Label>
+              <div className="flex gap-2">
+                <div className="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
+                  {window.location.origin}/join-plan/{draftInviteCode}
+                </div>
+                <Button size="icon" variant="outline" onClick={handleCopyLink} className="border-white/10" data-testid="button-copy-link">
+                  {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic">Link becomes active once you click "Find Options"</p>
             </div>
 
             {/* Location & Neighborhood Section */}
             <div className="space-y-4 pt-4 border-t border-white/10">
-                <Label className="text-lg">Where?</Label>
-                
-                {/* Location Permission Card */}
-                {showLocationPrompt && locationPermission !== 'granted' && (
-                  <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-primary/20 rounded-lg">
-                        <Navigation size={18} className="text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm">Better suggestions with your location</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Share your location for more accurate neighborhood-based recommendations.
-                        </p>
-                      </div>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="h-6 w-6 -mt-1 -mr-1"
-                        onClick={() => setShowLocationPrompt(false)}
-                        data-testid="button-close-location-prompt"
-                      >
-                        <X size={14} />
-                      </Button>
+              <Label className="text-lg">Where?</Label>
+              
+              {showLocationPrompt && locationPermission !== 'granted' && (
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-primary/20 rounded-lg">
+                      <Navigation size={18} className="text-primary" />
                     </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={handleRequestLocation}
-                        disabled={isGettingLocation}
-                        className="flex-1 bg-primary text-black hover:bg-primary/90 h-9 text-sm font-medium"
-                        data-testid="button-request-location"
-                      >
-                        {isGettingLocation ? "Getting location..." : "Share Location"}
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        onClick={() => setShowLocationPrompt(false)}
-                        className="flex-1 border-white/10 bg-white/5 h-9 text-sm"
-                        data-testid="button-skip-location"
-                      >
-                        Skip
-                      </Button>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm">Better suggestions with your location</h4>
+                      <p className="text-xs text-muted-foreground mt-1">Share your location for more accurate recommendations.</p>
                     </div>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setShowLocationPrompt(false)} data-testid="button-close-location">
+                      <X size={14} />
+                    </Button>
                   </div>
-                )}
-
-                {/* Neighborhood Input */}
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                    <MapPin size={12} />
-                    Neighborhood (optional)
-                  </Label>
-                  <Input 
-                    placeholder={formData.locationScope === 'Chicago' ? "e.g. River North, West Loop" : "e.g. Williamsburg, East Village"}
-                    className="bg-white/5 border-white/10 h-10" 
-                    value={formData.neighborhood}
-                    onChange={e => setFormData({...formData, neighborhood: e.target.value})}
-                    data-testid="input-neighborhood"
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    Helps us find options closer to where you are
-                  </p>
+                  <div className="flex gap-2">
+                    <Button onClick={handleRequestLocation} disabled={isGettingLocation} className="flex-1 bg-primary text-black h-9 text-sm font-medium" data-testid="button-request-location">
+                      {isGettingLocation ? "Getting location..." : "Share Location"}
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowLocationPrompt(false)} className="flex-1 border-white/10 bg-white/5 h-9 text-sm" data-testid="button-skip-location">
+                      Skip
+                    </Button>
+                  </div>
                 </div>
+              )}
+
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                  <MapPin size={12} /> Neighborhood (optional)
+                </Label>
+                <Input 
+                  placeholder={formData.locationScope === 'Chicago' ? "e.g. River North, West Loop" : "e.g. Williamsburg, East Village"}
+                  className="bg-white/5 border-white/10 h-10" 
+                  value={formData.neighborhood}
+                  onChange={e => setFormData({...formData, neighborhood: e.target.value})}
+                  data-testid="input-neighborhood"
+                />
+              </div>
             </div>
 
             {/* Date & Time Selection */}
             <div className="space-y-4 pt-4 border-t border-white/10">
-                <Label className="text-lg">When?</Label>
-                
-                <div className="flex gap-4">
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full justify-start text-left font-normal bg-white/5 border-white/10 h-12",
-                                    !formData.date && "text-muted-foreground"
-                                )}
-                            >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {formData.date ? format(formData.date, "PPP") : <span>Pick a date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 bg-card border-white/10" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={formData.date}
-                                onSelect={(d) => d && setFormData({...formData, date: d})}
-                                initialFocus
-                            />
-                        </PopoverContent>
-                    </Popover>
-                </div>
+              <Label className="text-lg">When?</Label>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal bg-white/5 border-white/10 h-12", !formData.date && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.date ? format(formData.date, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-card border-white/10" align="start">
+                  <Calendar mode="single" selected={formData.date} onSelect={(d) => d && setFormData({...formData, date: d})} initialFocus />
+                </PopoverContent>
+              </Popover>
 
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Start</Label>
-                        <Input 
-                            type="time" 
-                            className="bg-white/5 border-white/10" 
-                            value={formData.timeStart}
-                            onChange={e => setFormData({...formData, timeStart: e.target.value})}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">End</Label>
-                        <Input 
-                            type="time" 
-                            className="bg-white/5 border-white/10"
-                            value={formData.timeEnd}
-                            onChange={e => setFormData({...formData, timeEnd: e.target.value})}
-                        />
-                    </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Start</Label>
+                  <Input type="time" className="bg-white/5 border-white/10" value={formData.timeStart} onChange={e => setFormData({...formData, timeStart: e.target.value})} />
                 </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">End</Label>
+                  <Input type="time" className="bg-white/5 border-white/10" value={formData.timeEnd} onChange={e => setFormData({...formData, timeEnd: e.target.value})} />
+                </div>
+              </div>
             </div>
 
             {/* Vibe Constraints */}
             <div className="space-y-4 pt-4 border-t border-white/10">
-                <Label className="text-lg">The Vibe?</Label>
-                
-                <div className="space-y-3">
-                    <Label className="text-xs text-muted-foreground">Budget</Label>
-                    <div className="flex gap-2">
-                        {['$', '$$', '$$$', '$$$$'].map((b) => (
-                        <button
-                            key={b}
-                            onClick={() => setFormData({...formData, budget: b as Budget})}
-                            className={cn(
-                            "flex-1 h-10 rounded-lg border border-white/10 font-bold transition-all text-sm",
-                            formData.budget === b ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-white/5 text-muted-foreground"
-                            )}
-                        >
-                            {b}
-                        </button>
-                        ))}
-                    </div>
+              <Label className="text-lg">The Vibe?</Label>
+              
+              <div className="space-y-3">
+                <Label className="text-xs text-muted-foreground">Budget</Label>
+                <div className="flex gap-2">
+                  {['$', '$$', '$$$', '$$$$'].map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => setFormData({...formData, budget: b as Budget})}
+                      className={cn(
+                        "flex-1 h-10 rounded-lg border border-white/10 font-bold transition-all text-sm",
+                        formData.budget === b ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-white/5 text-muted-foreground"
+                      )}
+                    >
+                      {b}
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                <div className="space-y-3">
-                    <Label className="text-xs text-muted-foreground">Energy</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                        {['Chill', 'Vibey', 'Going out', 'Full send'].map((e) => (
-                        <button
-                            key={e}
-                            onClick={() => setFormData({...formData, energy: e as Energy})}
-                            className={cn(
-                            "h-10 rounded-lg border border-white/10 text-sm font-medium transition-all",
-                            formData.energy === e ? "bg-primary text-black border-primary font-bold" : "bg-white/5 text-muted-foreground"
-                            )}
-                        >
-                            {e}
-                        </button>
-                        ))}
-                    </div>
+              <div className="space-y-3">
+                <Label className="text-xs text-muted-foreground">Energy</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['Chill', 'Vibey', 'Going out', 'Full send'].map((e) => (
+                    <button
+                      key={e}
+                      onClick={() => setFormData({...formData, energy: e as Energy})}
+                      className={cn(
+                        "h-10 rounded-lg border border-white/10 text-sm font-medium transition-all",
+                        formData.energy === e ? "bg-primary text-black border-primary font-bold" : "bg-white/5 text-muted-foreground"
+                      )}
+                    >
+                      {e}
+                    </button>
+                  ))}
                 </div>
-                
-                 <div className="space-y-3">
-                    <Label className="text-xs text-muted-foreground">Category (Optional)</Label>
-                    <div className="flex flex-wrap gap-2">
-                        {['Dinner', 'Drinks', 'Brunch', 'Club', 'Activity'].map((c) => (
-                        <button
-                            key={c}
-                            onClick={() => toggleCategory(c as Category)}
-                            className={cn(
-                            "px-3 py-2 rounded-lg border border-white/10 text-xs font-medium transition-all",
-                            formData.categories.includes(c as Category) ? "bg-primary text-black border-primary font-bold" : "bg-white/5 text-muted-foreground"
-                            )}
-                        >
-                            {c}
-                        </button>
-                        ))}
-                    </div>
+              </div>
+              
+              <div className="space-y-3">
+                <Label className="text-xs text-muted-foreground">Category (Optional)</Label>
+                <div className="flex flex-wrap gap-2">
+                  {['Dinner', 'Drinks', 'Brunch', 'Club', 'Activity'].map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => toggleCategory(c as Category)}
+                      className={cn(
+                        "px-3 py-2 rounded-lg border border-white/10 text-xs font-medium transition-all",
+                        formData.categories.includes(c as Category) ? "bg-primary text-black border-primary font-bold" : "bg-white/5 text-muted-foreground"
+                      )}
+                    >
+                      {c}
+                    </button>
+                  ))}
                 </div>
+              </div>
             </div>
-        </div>
 
-        <Button 
-          onClick={handleCreate} 
-          disabled={isCreating}
-          className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/20 mt-8"
-        >
-          {isCreating ? 'Creating...' : 'Find Options'} {!isCreating && <ChevronRight className="ml-2" />}
-        </Button>
+            <Button 
+              onClick={handleCreate} 
+              disabled={isCreating}
+              className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/20 mt-8"
+              data-testid="button-find-options"
+            >
+              {isCreating ? 'Creating...' : 'Find Options'} {!isCreating && <ChevronRight className="ml-2" />}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

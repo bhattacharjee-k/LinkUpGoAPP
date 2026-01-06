@@ -49,6 +49,7 @@ export const api = {
     create: (name: string) => fetchAPI('/groups', { method: 'POST', body: JSON.stringify({ name }) }),
     update: (id: string, updates: any) => fetchAPI(`/groups/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
     join: (inviteCode: string) => fetchAPI(`/groups/join/${inviteCode}`, { method: 'POST' }),
+    addMember: (groupId: string, memberId: string) => fetchAPI(`/groups/${groupId}/members`, { method: 'POST', body: JSON.stringify({ memberId }) }),
   },
   
   // Sessions
@@ -60,7 +61,7 @@ export const api = {
     delete: (id: string) => fetchAPI(`/sessions/${id}`, { method: 'DELETE' }),
     leave: (id: string) => fetchAPI(`/sessions/${id}/leave`, { method: 'POST' }),
     join: (inviteCode: string) => fetchAPI(`/sessions/join/${inviteCode}`, { method: 'POST' }),
-    addParticipant: (id: string, status?: string) => fetchAPI(`/sessions/${id}/participants`, { method: 'POST', body: JSON.stringify({ status }) }),
+    addParticipant: (id: string, status?: string, memberId?: string) => fetchAPI(`/sessions/${id}/participants`, { method: 'POST', body: JSON.stringify({ status, memberId }) }),
     updateParticipantStatus: (sessionId: string, participantId: string, status: string) => 
       fetchAPI(`/sessions/${sessionId}/participants/${participantId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   },
