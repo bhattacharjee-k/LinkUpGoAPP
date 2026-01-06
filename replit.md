@@ -39,6 +39,7 @@ Preferred communication style: Simple, everyday language.
   - `votes`: Individual votes on suggestions
   - `notifications`: In-app notifications with type, title, body, url, isRead
   - `notification_prefs`: Per-user email notification preferences
+  - `proposedTimes`: Alternative time proposals for sessions with voting support
 
 ### Authentication Flow
 - Registration collects user preferences during onboarding (multi-step form)
