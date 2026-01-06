@@ -48,6 +48,7 @@ export function Session() {
   const [downvoteModalOpen, setDownvoteModalOpen] = useState(false);
   const [downvoteSuggestion, setDownvoteSuggestion] = useState<{id: string; name: string} | null>(null);
   const [rankingInfoOpen, setRankingInfoOpen] = useState(false);
+  const [infoSuggestion, setInfoSuggestion] = useState<any>(null);
   const [proposeTimeOpen, setProposeTimeOpen] = useState(false);
   const [proposedTimes, setProposedTimes] = useState<Array<{
     id: string;
@@ -1100,7 +1101,7 @@ export function Session() {
                          <div className="flex items-center gap-2">
                            <span className="text-xs font-bold uppercase text-muted-foreground">Score: {score}</span>
                            <button 
-                             onClick={() => setRankingInfoOpen(true)}
+                             onClick={() => { setInfoSuggestion(suggestion); setRankingInfoOpen(true); }}
                              className="p-1 rounded-full bg-white/10 text-muted-foreground hover:text-foreground hover:bg-white/20 transition-colors"
                              data-testid={`button-info-ranking-${suggestion.id}`}
                            >
@@ -1396,50 +1397,116 @@ export function Session() {
           suggestionName={downvoteSuggestion?.name || ''}
         />
 
-        {/* Why These Suggestions Dialog */}
-        <Dialog open={rankingInfoOpen} onOpenChange={setRankingInfoOpen}>
+        {/* Suggestion Pros & Cons Dialog */}
+        <Dialog open={rankingInfoOpen} onOpenChange={(open) => { setRankingInfoOpen(open); if (!open) setInfoSuggestion(null); }}>
           <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
             <DialogHeader>
-              <DialogTitle>Why these places?</DialogTitle>
+              <DialogTitle className="truncate">{infoSuggestion?.name || 'Place Details'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4 text-sm">
-              <p className="text-muted-foreground">These suggestions were picked based on your group's preferences:</p>
-              
-              <div className="space-y-2">
-                {session.filters.locationScope && (
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
-                    <MapPin size={14} className="text-primary" />
-                    <span>Location: <span className="text-foreground font-medium">{session.filters.locationScope}</span></span>
-                  </div>
-                )}
-                {session.filters.category && session.filters.category.length > 0 && (
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
-                    <Zap size={14} className="text-primary" />
-                    <span>Categories: <span className="text-foreground font-medium">{session.filters.category.join(', ')}</span></span>
-                  </div>
-                )}
-                {session.filters.budget && (
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
-                    <DollarSign size={14} className="text-primary" />
-                    <span>Budget: <span className="text-foreground font-medium">{session.filters.budget}</span></span>
-                  </div>
-                )}
-                {session.filters.energy && (
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
-                    <Star size={14} className="text-primary" />
-                    <span>Vibe: <span className="text-foreground font-medium">{session.filters.energy}</span></span>
-                  </div>
-                )}
-                {session.filters.timeWindow && (
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5">
-                    <Clock size={14} className="text-primary" />
-                    <span>Time: <span className="text-foreground font-medium">{session.filters.timeWindow}</span></span>
+            {infoSuggestion && (
+              <div className="space-y-4 py-2 text-sm">
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase text-green-400 flex items-center gap-1"><ThumbsUp size={12} /> Pros</p>
+                  <ul className="space-y-1.5">
+                    {parseFloat(infoSuggestion.rating) >= 4.5 && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <Star size={12} className="text-green-400 mt-0.5 shrink-0" />
+                        <span>Highly rated ({infoSuggestion.rating} stars)</span>
+                      </li>
+                    )}
+                    {parseFloat(infoSuggestion.rating) >= 4.0 && parseFloat(infoSuggestion.rating) < 4.5 && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <Star size={12} className="text-green-400 mt-0.5 shrink-0" />
+                        <span>Good ratings ({infoSuggestion.rating} stars)</span>
+                      </li>
+                    )}
+                    {infoSuggestion.distance && parseFloat(infoSuggestion.distance) <= 0.5 && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <MapPin size={12} className="text-green-400 mt-0.5 shrink-0" />
+                        <span>Very close by ({infoSuggestion.distance})</span>
+                      </li>
+                    )}
+                    {infoSuggestion.budget === '$' && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <DollarSign size={12} className="text-green-400 mt-0.5 shrink-0" />
+                        <span>Budget-friendly option</span>
+                      </li>
+                    )}
+                    {infoSuggestion.budget === session.filters.budget && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <Check size={12} className="text-green-400 mt-0.5 shrink-0" />
+                        <span>Matches your budget preference</span>
+                      </li>
+                    )}
+                    {infoSuggestion.tags?.some((t: string) => session.filters.category?.map((c: string) => c.toLowerCase()).includes(t.toLowerCase())) && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <Zap size={12} className="text-green-400 mt-0.5 shrink-0" />
+                        <span>Matches your category interests</span>
+                      </li>
+                    )}
+                    {infoSuggestion.kind === 'event' && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <Calendar size={12} className="text-green-400 mt-0.5 shrink-0" />
+                        <span>Live event happening during your time</span>
+                      </li>
+                    )}
+                    {infoSuggestion.reservationUrl && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <Check size={12} className="text-green-400 mt-0.5 shrink-0" />
+                        <span>Easy online reservations</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+                
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase text-red-400 flex items-center gap-1"><ThumbsDown size={12} /> Cons</p>
+                  <ul className="space-y-1.5">
+                    {infoSuggestion.distance && parseFloat(infoSuggestion.distance) > 1.0 && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <MapPin size={12} className="text-red-400 mt-0.5 shrink-0" />
+                        <span>A bit farther away ({infoSuggestion.distance})</span>
+                      </li>
+                    )}
+                    {infoSuggestion.budget === '$$$' && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <DollarSign size={12} className="text-red-400 mt-0.5 shrink-0" />
+                        <span>Pricier option</span>
+                      </li>
+                    )}
+                    {infoSuggestion.budget === '$$$$' && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <DollarSign size={12} className="text-red-400 mt-0.5 shrink-0" />
+                        <span>High-end pricing</span>
+                      </li>
+                    )}
+                    {parseFloat(infoSuggestion.rating) < 4.0 && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <Star size={12} className="text-red-400 mt-0.5 shrink-0" />
+                        <span>Mixed reviews ({infoSuggestion.rating} stars)</span>
+                      </li>
+                    )}
+                    {!infoSuggestion.reservationUrl && infoSuggestion.kind === 'venue' && (
+                      <li className="flex items-start gap-2 text-muted-foreground">
+                        <X size={12} className="text-red-400 mt-0.5 shrink-0" />
+                        <span>May need to walk in or call ahead</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+                
+                {infoSuggestion.tags && infoSuggestion.tags.length > 0 && (
+                  <div className="pt-2 border-t border-white/5">
+                    <p className="text-xs text-muted-foreground mb-2">Tags:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {infoSuggestion.tags.map((tag: string, i: number) => (
+                        <span key={i} className="px-2 py-0.5 text-xs rounded-full bg-white/10">{tag}</span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-              
-              <p className="text-xs text-muted-foreground">Chat with @Planner to refine suggestions or ask for different types of places!</p>
-            </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
