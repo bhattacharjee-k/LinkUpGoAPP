@@ -51,6 +51,14 @@ export const insertGroupMemberSchema = createInsertSchema(groupMembers).omit({ i
 export type InsertGroupMember = z.infer<typeof insertGroupMemberSchema>;
 export type GroupMember = typeof groupMembers.$inferSelect;
 
+// Reference venue type for style anchoring
+export interface ReferenceVenue {
+  placeId: string;
+  name: string;
+  lat: number;
+  lng: number;
+}
+
 // Planning sessions table
 export const sessions = pgTable("sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -63,6 +71,7 @@ export const sessions = pgTable("sessions", {
   filters: jsonb("filters").notNull(),
   guardrails: jsonb("guardrails").notNull(),
   neighborhood: text("neighborhood"),
+  referenceVenues: jsonb("reference_venues").$type<ReferenceVenue[]>(), // Optional style anchors
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

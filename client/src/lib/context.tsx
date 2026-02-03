@@ -329,7 +329,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       guardrails: {
         minTurnout: 'balanced',
         priority: 'turnout',
-      }
+      },
+      referenceVenues: initialFilters.referenceVenues,
     });
 
     try {
@@ -344,6 +345,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         timeWindow: initialFilters.timeWindow,
         specificDate: initialFilters.specificDate,
         specificTime: initialFilters.specificTime,
+        referenceVenues: initialFilters.referenceVenues,
       });
       
       for (const suggestion of result.suggestions) {

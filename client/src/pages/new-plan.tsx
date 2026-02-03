@@ -15,6 +15,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PlacesAutocomplete } from '@/components/places-autocomplete';
+import type { ReferenceVenue } from '@shared/schema';
+
+interface PlaceResult {
+  placeId: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
 
 export function NewPlan() {
   const { startSession, user, groups, createGroup, updateUserLocation, addMemberToGroup } = useApp();
@@ -42,6 +52,7 @@ export function NewPlan() {
     budget: '$$' as Budget,
     energy: user?.energy || 'Vibey',
     categories: [] as Category[],
+    referenceVenues: [] as PlaceResult[],
   });
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -143,6 +154,13 @@ export function NewPlan() {
     }
 
     try {
+      const referenceVenues: ReferenceVenue[] = formData.referenceVenues.map(p => ({
+        placeId: p.placeId,
+        name: p.name,
+        lat: p.lat,
+        lng: p.lng,
+      }));
+
       const id = await startSession(groupId, {
         timeWindow, 
         locationScope: formData.locationScope,
@@ -152,7 +170,8 @@ export function NewPlan() {
         budget: formData.budget,
         specificDate: formData.date,
         specificTime: `${formData.timeStart}-${formData.timeEnd}`,
-        inviteCode: draftInviteCode
+        inviteCode: draftInviteCode,
+        referenceVenues: referenceVenues.length > 0 ? referenceVenues : undefined,
       }, formData.name || undefined);
 
       // For ad-hoc plans, add selected friends as session participants
@@ -526,6 +545,22 @@ export function NewPlan() {
                   ))}
                 </div>
               </div>
+            </div>
+
+            {/* Reference Venues (Optional) */}
+            <div className="space-y-4 pt-4 border-t border-white/10">
+              <div>
+                <Label className="text-lg">Any places you love?</Label>
+                <p className="text-xs text-muted-foreground mt-1">Optional — helps us match your vibe</p>
+              </div>
+              
+              <PlacesAutocomplete
+                selectedPlaces={formData.referenceVenues}
+                onPlacesChange={(places) => setFormData({...formData, referenceVenues: places})}
+                maxPlaces={3}
+                city={formData.locationScope}
+                placeholder="Search for a favorite spot..."
+              />
             </div>
 
             <Button 

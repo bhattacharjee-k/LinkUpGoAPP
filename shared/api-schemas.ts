@@ -20,6 +20,13 @@ export const RegisterRequestSchema = z.object({
 });
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
 
+export const ReferenceVenueSchema = z.object({
+  placeId: z.string(),
+  name: z.string(),
+  lat: z.number(),
+  lng: z.number(),
+});
+
 export const SuggestRequestSchema = z.object({
   city: z.string().min(1),
   neighborhood: z.string().optional(),
@@ -31,6 +38,7 @@ export const SuggestRequestSchema = z.object({
   timeWindow: z.string().optional(),
   specificDate: z.string().optional(),
   specificTime: z.string().optional(),
+  referenceVenues: z.array(ReferenceVenueSchema).optional(),
 });
 export type SuggestRequest = z.infer<typeof SuggestRequestSchema>;
 
@@ -57,6 +65,7 @@ export const CreateSessionRequestSchema = z.object({
     minTurnout: z.string().optional(),
   }).optional().default({ priority: 'turnout', minTurnout: 'balanced' }),
   neighborhood: z.string().optional().nullable(),
+  referenceVenues: z.array(ReferenceVenueSchema).optional().nullable(),
 });
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
 

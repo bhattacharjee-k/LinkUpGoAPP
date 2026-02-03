@@ -1,0 +1,176 @@
+Perfect — this is a clean moment to implement it correctly, without overfitting or making the app feel heavy.
+
+Below is a copy-paste Replit Agent prompt that adds Reference Venues as style anchors, integrates them into your multi-bucket generation, and wires them into ranking + ℹ️ explanations — while keeping everything optional and robust.
+
+⸻
+
+✅ PASTE THIS INTO REPLIT AGENT
+
+Task: Add optional “Reference Venues” to the New Plan questionnaire and use them as style anchors (not filters) to improve suggestion quality and diversity.
+
+⸻
+
+1) Questionnaire / UX changes (New Plan)
+
+Add a new optional step:
+
+Title: “Any places you love?”
+Subtext: “Optional — helps us match your vibe”
+
+Input behavior:
+	•	Google Places Autocomplete search field
+	•	Allow 1–3 venues max
+	•	Show selected venues as removable chips
+	•	Always show Skip CTA
+	•	Do NOT block plan creation if empty
+
+Store selected venues on the plan as:
+
+referenceVenues: {
+  placeId
+  name
+  lat
+  lng
+}[]
+
+
+⸻
+
+2) Reference venue processing (backend logic)
+
+When generating suggestions, if referenceVenues.length > 0:
+
+For each reference venue:
+
+Fetch details from Google Places (New):
+	•	priceLevel
+	•	rating
+	•	primaryType
+	•	location (lat/lng)
+	•	openingHours (late vs early proxy)
+
+Aggregate into a Reference Profile
+
+Derive soft signals:
+	•	preferredPriceRange (avg ± tolerance)
+	•	preferredVenueTypes (weighted by frequency)
+	•	qualityFloor (rating bias, not filter)
+	•	neighborhoodTolerance (distance users are willing to travel)
+	•	energyBias (late-night vs daytime)
+
+⚠️ Important:
+	•	These are biases, not hard constraints
+	•	Never discard candidates solely because they differ from references
+
+⸻
+
+3) Apply references to generation (critical)
+
+Integrate Reference Profile into your existing 3-bucket generation:
+
+Bucket A — SAFE
+	•	Closest vibe match to references
+	•	Similar price + energy
+	•	Similar venue types
+	•	Still respect group filters + availability
+
+Bucket B — EXPLORE
+	•	Adjacent categories / vibes
+	•	Slightly cheaper OR slightly more casual than references
+	•	Slightly expanded radius if reference venues imply willingness to travel
+
+Bucket C — WILDCARD
+	•	One unexpected option
+	•	Can diverge in category or energy
+	•	Must still pass hard constraints (city, time window)
+
+Do NOT generate “places similar to X” directly.
+Always generate via attributes, not cloning.
+
+⸻
+
+4) Ranking integration (soft influence only)
+
+Modify FitScore weighting when reference venues exist:
+	•	Slightly increase weight on:
+	•	price fit
+	•	energy fit
+	•	quality proxy
+	•	Do NOT override vote/downvote logic
+	•	Downvote reasons still apply normally
+
+If references conflict (e.g., dive bar + fine dining):
+	•	Widen EXPLORE bucket
+	•	Reduce SAFE bucket strictness
+
+⸻
+
+5) Learning from rejection (within same plan)
+
+If downvote reasons conflict with reference-derived bias:
+	•	Adjust future generation within the plan
+
+Examples:
+	•	References upscale, but many “Too expensive” downvotes →
+relax price bias
+	•	References nightlife, but many “Not my vibe” →
+lower energy weighting
+
+Do NOT permanently update user profile yet (per-plan only).
+
+⸻
+
+6) ℹ️ explanation panel updates
+
+If reference venues influenced ranking, show:
+
+Why this was suggested
+	•	“Matches the vibe of places you referenced”
+	•	“Similar price range to venues you like”
+	•	“Closer than your reference venues”
+
+If option diverges:
+	•	“Explores a more casual option than your references”
+	•	“Offers variety while still fitting the group’s energy”
+
+Never name-drop the reference venues directly unless user taps “Details”.
+
+⸻
+
+7) Edge cases (must handle)
+	•	No reference venues → current behavior unchanged
+	•	Weird reference (e.g., Starbucks) → minimal signal extraction
+	•	Conflicting references → widen explore bucket, reduce strictness
+	•	Reference venues outside current city → ignore location bias, keep vibe bias
+
+⸻
+
+8) Acceptance criteria
+	•	Reference venues are optional and skippable
+	•	Suggestions feel more personalized without repetition
+	•	SAFE / EXPLORE / WILDCARD still produce diverse results
+	•	ℹ️ explanations accurately reflect reference influence
+	•	No hard filtering or cloning behavior
+
+⸻
+
+9) Explicitly DO NOT
+	•	Do NOT require reference venues
+	•	Do NOT permanently store reference taste on user profile yet
+	•	Do NOT reduce diversity because of references
+
+⸻
+
+End of prompt
+
+⸻
+
+What this unlocks immediately
+	•	Results feel custom, not generic
+	•	Voting becomes more meaningful
+	•	Planner feels “aware” without being creepy
+	•	Sets you up perfectly for #3: Plan Patterns (dinner → walk → dessert)
+
+When you’re ready, next we’ll add Plan Archetypes as a third generation layer — that’s where this becomes truly hard to beat.
+
+Just say when.

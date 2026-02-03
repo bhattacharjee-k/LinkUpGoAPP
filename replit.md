@@ -85,6 +85,18 @@ Preferred communication style: Simple, everyday language.
 - **Quota Redistribution**: Fills from remaining candidates if buckets are empty
 - **Internal Tagging**: generationType field for debugging (not shown in UI)
 
+### Reference Venues (Style Anchoring)
+- **Optional Input**: Users can select 1-3 favorite places during plan creation
+- **Google Places Autocomplete**: Search for venues with city bias
+- **Reference Profile Extraction**: Fetches venue details (price, rating, types, hours) to derive:
+  - `preferredPriceTier`: Average price level ± tolerance
+  - `preferredTypes`: Weighted venue types from references
+  - `qualityFloor`: Rating bias for SAFE bucket
+  - `energyBias`: Day/night/mixed based on opening hours
+  - `hasConflicts`: Detects conflicting styles to widen EXPLORE bucket
+- **Soft Biases Only**: Never discards candidates, only influences ranking and bucket filtering
+- **Stored on Session**: `referenceVenues` field in sessions table
+
 ### Production Quality Infrastructure
 - **API Validation**: Zod schemas in `shared/api-schemas.ts` for all request/response types
 - **Permission Middleware**: `server/middleware/auth.ts` with requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant

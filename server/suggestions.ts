@@ -70,6 +70,17 @@ export interface DownvoteReasonAggregates {
   other: number;
 }
 
+// Reference Profile - derived signals from reference venues
+export interface ReferenceProfile {
+  preferredPriceTier: number; // 1-4 average
+  priceTolerance: number; // How much variance to allow
+  preferredTypes: string[]; // Weighted venue types
+  qualityFloor: number; // Rating bias (not filter)
+  neighborhoodTolerance: number; // Distance user travels
+  energyBias: 'day' | 'night' | 'mixed'; // Late-night vs daytime
+  hasConflicts: boolean; // Conflicting reference styles
+}
+
 // Bucket generation parameters
 interface BucketParams {
   minRating: number;
@@ -213,7 +224,7 @@ function getBudgetTier(priceLevel?: string): number {
 }
 
 // Check if option matches budget constraints with learning adjustments
-function matchesBudget(opt: SuggestionOption, reqBudget: string, downvoteReasons?: DownvoteReasonAggregates): boolean {
+function matchesBudget(opt: SuggestionOption, reqBudget: string, downvoteReasons?: DownvoteReasonAggregates, refProfile?: ReferenceProfile): boolean {
   const optTier = getBudgetTier(opt.priceLevel);
   const reqTier = getBudgetTier(reqBudget);
   
@@ -222,13 +233,145 @@ function matchesBudget(opt: SuggestionOption, reqBudget: string, downvoteReasons
     return optTier <= reqTier; // Must be at or below requested budget
   }
   
+  // If reference profile exists, use its price tolerance
+  if (refProfile) {
+    return Math.abs(optTier - refProfile.preferredPriceTier) <= refProfile.priceTolerance;
+  }
+  
   return Math.abs(optTier - reqTier) <= 1; // Within 1 tier
+}
+
+// Reference venue from session
+export interface ReferenceVenue {
+  placeId: string;
+  name: string;
+  lat: number;
+  lng: number;
+}
+
+// Venue details fetched from Google Places
+interface VenueDetails {
+  placeId: string;
+  priceLevel?: number;
+  rating?: number;
+  types?: string[];
+  openingHours?: { weekdayText?: string[] };
+}
+
+// Fetch venue details from Google Places for reference profile extraction
+async function fetchVenueDetails(placeIds: string[]): Promise<VenueDetails[]> {
+  const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+  if (!GOOGLE_PLACES_API_KEY || placeIds.length === 0) return [];
+
+  const details: VenueDetails[] = [];
+  
+  for (const placeId of placeIds) {
+    try {
+      const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+        method: 'GET',
+        headers: {
+          'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+          'X-Goog-FieldMask': 'id,priceLevel,rating,types,currentOpeningHours.weekdayDescriptions',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        details.push({
+          placeId: data.id,
+          priceLevel: data.priceLevel ? priceLevelToNumber(data.priceLevel) : undefined,
+          rating: data.rating,
+          types: data.types,
+          openingHours: data.currentOpeningHours,
+        });
+      }
+    } catch (error) {
+      devLog('suggestions', `Failed to fetch venue details for ${placeId}`, { error });
+    }
+  }
+  
+  return details;
+}
+
+function priceLevelToNumber(priceLevel: string): number {
+  const levels: Record<string, number> = {
+    'PRICE_LEVEL_FREE': 0,
+    'PRICE_LEVEL_INEXPENSIVE': 1,
+    'PRICE_LEVEL_MODERATE': 2,
+    'PRICE_LEVEL_EXPENSIVE': 3,
+    'PRICE_LEVEL_VERY_EXPENSIVE': 4,
+  };
+  return levels[priceLevel] ?? 2;
+}
+
+// Extract Reference Profile from venue details
+function extractReferenceProfile(venues: VenueDetails[]): ReferenceProfile | null {
+  if (venues.length === 0) return null;
+
+  // Calculate average price tier
+  const priceLevels = venues.map(v => v.priceLevel).filter((p): p is number => p !== undefined);
+  const avgPrice = priceLevels.length > 0 
+    ? priceLevels.reduce((a, b) => a + b, 0) / priceLevels.length 
+    : 2;
+  
+  // Calculate price tolerance - wider if venues differ
+  const priceSpread = priceLevels.length > 1 
+    ? Math.max(...priceLevels) - Math.min(...priceLevels) 
+    : 1;
+  const priceTolerance = Math.max(1, Math.ceil(priceSpread / 2));
+  
+  // Collect types with frequency weighting
+  const typeCounts: Record<string, number> = {};
+  for (const venue of venues) {
+    for (const type of venue.types || []) {
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+    }
+  }
+  const preferredTypes = Object.entries(typeCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([type]) => type);
+  
+  // Calculate quality floor from average rating
+  const ratings = venues.map(v => v.rating).filter((r): r is number => r !== undefined);
+  const qualityFloor = ratings.length > 0 
+    ? Math.max(3.5, (ratings.reduce((a, b) => a + b, 0) / ratings.length) - 0.5)
+    : 3.8;
+  
+  // Estimate energy bias from opening hours (late-night = high energy)
+  let lateNightCount = 0;
+  for (const venue of venues) {
+    const hours = venue.openingHours?.weekdayText || [];
+    const hasLateHours = hours.some(h => 
+      h.includes('12:00 AM') || h.includes('1:00 AM') || h.includes('2:00 AM') || 
+      h.includes('3:00 AM') || h.includes('4:00 AM')
+    );
+    if (hasLateHours) lateNightCount++;
+  }
+  const energyBias: 'day' | 'night' | 'mixed' = 
+    lateNightCount === venues.length ? 'night' :
+    lateNightCount === 0 ? 'day' : 'mixed';
+  
+  // Detect conflicts (very different styles)
+  const hasConflicts = priceSpread >= 2 || 
+    (venues.length > 1 && new Set(venues.flatMap(v => v.types || [])).size > 10);
+
+  return {
+    preferredPriceTier: Math.round(avgPrice),
+    priceTolerance,
+    preferredTypes,
+    qualityFloor,
+    neighborhoodTolerance: 5, // Default miles
+    energyBias,
+    hasConflicts,
+  };
 }
 
 export async function getSuggestions(
   req: SuggestRequest,
-  downvoteReasons?: DownvoteReasonAggregates
-): Promise<{ options: SuggestionOption[]; meta: SuggestMeta }> {
+  downvoteReasons?: DownvoteReasonAggregates,
+  referenceVenues?: ReferenceVenue[]
+): Promise<{ options: SuggestionOption[]; meta: SuggestMeta; referenceProfile?: ReferenceProfile }> {
   const cacheKey = getCacheKey(req);
   const cached = suggestionsCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -243,6 +386,23 @@ export async function getSuggestions(
         filteredCount: cached.options.length,
       },
     };
+  }
+
+  // Extract Reference Profile from reference venues if provided
+  let refProfile: ReferenceProfile | null = null;
+  if (referenceVenues && referenceVenues.length > 0) {
+    const venueDetails = await fetchVenueDetails(referenceVenues.map(v => v.placeId));
+    refProfile = extractReferenceProfile(venueDetails);
+    
+    if (refProfile) {
+      devLog('suggestions', 'Reference profile extracted', {
+        priceTier: refProfile.preferredPriceTier,
+        qualityFloor: refProfile.qualityFloor,
+        energyBias: refProfile.energyBias,
+        hasConflicts: refProfile.hasConflicts,
+        types: refProfile.preferredTypes.slice(0, 3),
+      });
+    }
   }
 
   const center = getSearchCenter(req.city, req.neighborhood, req.userLat, req.userLng);
@@ -317,21 +477,33 @@ export async function getSuggestions(
   const getUniqueId = (opt: SuggestionOption) => 
     opt.placeId || opt.eventId || opt.title.toLowerCase().trim();
 
-  // BUCKET A: SAFE - High confidence, expected picks
+  // BUCKET A: SAFE - High confidence, expected picks (closest vibe to references)
   const safeParams = getAdjustedBucketParams(BUCKET_PARAMS.safe, 'safe', downvoteReasons);
+  const safeMinRating = refProfile ? Math.max(safeParams.minRating, refProfile.qualityFloor) : safeParams.minRating;
   const safeCandidates = allCandidates
     .filter(opt => {
       const rating = parseFloat(opt.rating || '0');
       const reviewCount = opt.ratingCount || 0;
       const dist = parseFloat(opt.distance?.replace(' mi', '') || '0');
-      return rating >= safeParams.minRating && 
+      return rating >= safeMinRating && 
              reviewCount >= safeParams.minReviewCount &&
              dist <= (baseRadiusMeters / 1609.34) * safeParams.radiusMultiplier &&
-             matchesBudget(opt, req.budget || '$$', downvoteReasons);
+             matchesBudget(opt, req.budget || '$$', downvoteReasons, refProfile || undefined);
     })
     .sort((a, b) => {
-      const scoreA = (parseFloat(a.rating || '0') * 10) + Math.min(10, (a.ratingCount || 0) / 50);
-      const scoreB = (parseFloat(b.rating || '0') * 10) + Math.min(10, (b.ratingCount || 0) / 50);
+      let scoreA = (parseFloat(a.rating || '0') * 10) + Math.min(10, (a.ratingCount || 0) / 50);
+      let scoreB = (parseFloat(b.rating || '0') * 10) + Math.min(10, (b.ratingCount || 0) / 50);
+      
+      // Boost score if option matches reference profile's preferred types
+      if (refProfile && a.tags) {
+        const matchA = a.tags.some(t => refProfile.preferredTypes.includes(t.toLowerCase()));
+        if (matchA) scoreA += 5;
+      }
+      if (refProfile && b.tags) {
+        const matchB = b.tags.some(t => refProfile.preferredTypes.includes(t.toLowerCase()));
+        if (matchB) scoreB += 5;
+      }
+      
       return scoreB - scoreA;
     });
 
@@ -346,8 +518,12 @@ export async function getSuggestions(
     }
   }
 
-  // BUCKET B: EXPLORE - Novelty and variety
+  // BUCKET B: EXPLORE - Novelty and variety (adjacent categories, slightly different from refs)
   const exploreParams = getAdjustedBucketParams(BUCKET_PARAMS.explore, 'explore', downvoteReasons);
+  // Widen explore bucket if reference profile has conflicts
+  const exploreRadiusMult = refProfile?.hasConflicts 
+    ? exploreParams.radiusMultiplier * 1.1 
+    : exploreParams.radiusMultiplier;
   const exploreCandidates = allCandidates
     .filter(opt => {
       const rating = parseFloat(opt.rating || '0');
@@ -358,8 +534,8 @@ export async function getSuggestions(
       return !usedIds.has(id) &&
              rating >= exploreParams.minRating && 
              reviewCount < 200 && // Favor less-reviewed places
-             dist <= (baseRadiusMeters / 1609.34) * exploreParams.radiusMultiplier &&
-             matchesBudget(opt, req.budget || '$$', downvoteReasons);
+             dist <= (baseRadiusMeters / 1609.34) * exploreRadiusMult &&
+             matchesBudget(opt, req.budget || '$$', downvoteReasons, refProfile || undefined);
     })
     .sort((a, b) => {
       // Sort by rating but prefer fewer reviews (more novel)
@@ -444,6 +620,7 @@ export async function getSuggestions(
     dedupedBeforeSelection: dedupedCount,
     totalCandidates: allCandidates.length,
     downvoteReasons: downvoteReasons || 'none',
+    hasReferenceProfile: !!refProfile,
   });
 
   suggestionsCache.set(cacheKey, { options: rankedOptions, timestamp: Date.now() });
@@ -460,6 +637,7 @@ export async function getSuggestions(
       bucketCounts,
       dedupedCount: allCandidates.length - selectedOptions.length,
     },
+    referenceProfile: refProfile || undefined,
   };
 }
 

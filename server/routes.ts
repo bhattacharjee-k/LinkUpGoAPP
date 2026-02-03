@@ -168,9 +168,68 @@ export async function registerRoutes(
     }
   });
 
+  // Places autocomplete for reference venues
+  app.post("/api/places/autocomplete", requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const { query, city } = req.body;
+    
+    if (!query || query.length < 2) {
+      return res.json({ places: [] });
+    }
+
+    const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+    if (!GOOGLE_PLACES_API_KEY) {
+      return res.json({ places: [] });
+    }
+
+    const cityBias: Record<string, { lat: number; lng: number }> = {
+      'NYC': { lat: 40.7128, lng: -73.9352 },
+      'Chicago': { lat: 41.8781, lng: -87.6298 },
+    };
+    const center = cityBias[city] || cityBias['NYC'];
+
+    try {
+      const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location',
+        },
+        body: JSON.stringify({
+          textQuery: query,
+          locationBias: {
+            circle: {
+              center: { latitude: center.lat, longitude: center.lng },
+              radius: 50000,
+            },
+          },
+          maxResultCount: 5,
+        }),
+      });
+
+      if (!response.ok) {
+        return res.json({ places: [] });
+      }
+
+      const data = await response.json();
+      const places = (data.places || []).map((p: any) => ({
+        placeId: p.id,
+        name: p.displayName?.text || 'Unknown',
+        address: p.formattedAddress || '',
+        lat: p.location?.latitude || 0,
+        lng: p.location?.longitude || 0,
+      }));
+
+      res.json({ places });
+    } catch (error) {
+      console.error('Places autocomplete error:', error);
+      res.json({ places: [] });
+    }
+  }));
+
   app.post("/api/suggest", requireAuth, asyncHandler(async (req: Request, res: Response) => {
     const data = SuggestRequestSchema.parse(req.body);
-    const result = await getSuggestions(data);
+    const result = await getSuggestions(data, undefined, data.referenceVenues);
 
     const sourceMap: Record<string, string> = {
       'Google': 'Web',
@@ -492,14 +551,15 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      const { groupId, name, filters, guardrails } = req.body;
+      const { groupId, name, filters, guardrails, referenceVenues } = req.body;
       
       const session = await storage.createSession({
         groupId,
         name,
         status: 'draft',
         filters,
-        guardrails
+        guardrails,
+        referenceVenues: referenceVenues || null
       });
       
       // Add all group members as participants (including creator)
