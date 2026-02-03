@@ -76,6 +76,15 @@ Preferred communication style: Simple, everyday language.
 - **Caching**: LRU cache with stale-while-revalidate (10m suggestions, 15m Places, 5m events)
 - **City Filtering**: Haversine distance with 35mi (NYC) / 30mi (Chicago) radius boundaries
 
+### Multi-Bucket Suggestion Generation (Diversity-First)
+- **SAFE bucket**: 2 options with high rating (≥4.4), higher review count (≥50), preferred radius
+- **EXPLORE bucket**: 2 options with lower review count (<200), expanded radius (+25%), novelty-weighted
+- **WILDCARD bucket**: 1 option with relaxed constraints, random selection for surprise
+- **Deduplication**: By placeId/eventId/name before bucket selection
+- **Downvote Learning**: "Too far" tightens radius, "Too expensive" tightens budget filtering
+- **Quota Redistribution**: Fills from remaining candidates if buckets are empty
+- **Internal Tagging**: generationType field for debugging (not shown in UI)
+
 ### Production Quality Infrastructure
 - **API Validation**: Zod schemas in `shared/api-schemas.ts` for all request/response types
 - **Permission Middleware**: `server/middleware/auth.ts` with requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant

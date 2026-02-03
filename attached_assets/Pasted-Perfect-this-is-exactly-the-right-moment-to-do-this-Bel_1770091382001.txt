@@ -1,0 +1,194 @@
+Perfect — this is exactly the right moment to do this.
+
+Below is a clean, copy-paste Replit Agent prompt that implements a second, diversity-driven generation layer without blowing up complexity or adding risky APIs yet.
+
+This will directly address:
+	•	repetitive results
+	•	“voting feels pointless”
+	•	same places winning over and over
+
+⸻
+
+✅ PASTE THIS INTO REPLIT AGENT
+
+Task: Improve plan suggestion quality by adding multi-bucket candidate generation (diversity-first), reducing repetitive results, and making voting outcomes more meaningful.
+
+1) Problem to solve (context for agent)
+
+Current suggestions feel repetitive because we only generate “top” results and then re-rank them. We need diverse candidate generation before voting, not just better ranking.
+
+2) High-level change
+
+Replace single-pass suggestion generation with a 3-bucket generation strategy, then merge + rank.
+
+Instead of:
+
+one query → rank → vote
+
+Do:
+
+generate diverse candidates → merge → rank → vote
+
+⸻
+
+3) Multi-bucket generation (REQUIRED)
+
+For each plan, generate 3 buckets of options, all constrained by:
+	•	city (never change city)
+	•	time window
+	•	hard filters (availability, max radius)
+
+Bucket A: SAFE (baseline)
+
+Goal: high confidence, expected picks.
+
+Criteria
+	•	High rating (≥ 4.4)
+	•	Higher review count
+	•	Within preferred radius
+	•	Strong category + energy match
+
+Count
+	•	2 options
+
+⸻
+
+Bucket B: EXPLORE (long-tail)
+
+Goal: novelty and variety.
+
+Criteria
+	•	Lower or moderate review count
+	•	OR newer places/events
+	•	Slightly expanded radius (+20–30%)
+	•	Adjacent subcategories allowed
+	•	Still valid for budget + energy
+
+Count
+	•	2 options
+
+⸻
+
+Bucket C: WILDCARD
+
+Goal: surprise without chaos.
+
+Criteria
+	•	Unexpected but still valid
+	•	Can bend ONE constraint slightly:
+	•	different subcategory
+	•	slightly different energy
+	•	unusual venue/event
+	•	Must still be in the same city
+
+Count
+	•	1 option
+
+⸻
+
+Result
+
+Always return 3–5 total options, with representation from all buckets when possible.
+
+⸻
+
+4) Technical implementation details
+
+A) Generation
+	•	Use existing Google Places + Ticketmaster APIs
+	•	Run separate queries per bucket with different constraints
+	•	Deduplicate options by placeId / eventId
+	•	If a bucket returns no results, redistribute quota to other buckets
+
+B) Internal tagging (important)
+
+Tag each option internally (NOT shown in UI):
+
+option.generationType = "safe" | "explore" | "wildcard"
+
+This is used only for debugging + future tuning.
+
+⸻
+
+5) Ranking (unchanged, but applied AFTER merge)
+
+After merging buckets:
+	•	Apply existing FitScore + VoteScore + ReasonPenalty logic
+	•	Majority downvote rules still apply
+	•	Suggested badge still only applies to top-ranked, non-majority-downvoted option
+
+Do NOT bias ranking directly by generationType (no hardcoding “safe always wins”).
+
+⸻
+
+6) Learning from rejection (critical)
+
+Use downvote reasons to influence future generation within the same plan:
+
+Examples:
+	•	Multiple “Too far” → tighten radius for EXPLORE + WILDCARD buckets
+	•	Multiple “Not my vibe” → reduce that energy band
+	•	Multiple “Too expensive” → bias toward cheaper tiers
+
+This should affect generation, not just ranking.
+
+⸻
+
+7) Regeneration rules
+
+Do NOT auto-regenerate constantly.
+
+Only regenerate suggestions if:
+	•	Admin taps “Try a different angle”
+	•	OR all options receive majority downvotes
+	•	OR user edits plan filters/time
+
+Otherwise:
+	•	Re-rank existing options based on votes/reasons
+
+⸻
+
+8) Logging & observability (dev-only)
+
+Log per plan:
+	•	bucket counts returned
+	•	number of deduped options
+	•	downvote reason aggregates
+	•	how many times regeneration occurs
+
+This is for tuning later.
+
+⸻
+
+9) Acceptance criteria
+	•	Initial suggestions are visibly more diverse
+	•	Voting results differ more often between sessions
+	•	Downvote reasons reduce repetition
+	•	Suggested plans feel intentional, not stale
+	•	City/location correctness remains perfect (0 tolerance)
+
+⸻
+
+10) Do NOT do yet
+	•	Do NOT add scraping
+	•	Do NOT add TikTok or social APIs
+	•	Do NOT add more than 5 options at once
+
+⸻
+
+End of prompt
+
+⸻
+
+What will change immediately once this lands
+	•	Voting will feel meaningful again
+	•	Groups will disagree more early (good sign)
+	•	“Suggested” will feel earned
+	•	You’ll stop seeing the same winners week after week
+
+If you want, next we can:
+	•	design the “Try a different angle” UI
+	•	tune bucket ratios for 3 vs 12 people
+	•	or add a very lightweight “pattern plan” layer (dinner → walk → dessert)
+
+You’re building this the right way.

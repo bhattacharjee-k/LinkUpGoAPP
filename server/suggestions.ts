@@ -1,7 +1,11 @@
 import { getSearchCenter, haversineDistance, isWithinCity, LatLng } from './geo';
+import { devLog } from './logger';
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY;
+
+// Bucket types for diversity-first generation
+export type GenerationType = 'safe' | 'explore' | 'wildcard';
 
 export interface SuggestionOption {
   optionType: 'place' | 'event';
@@ -24,6 +28,9 @@ export interface SuggestionOption {
   venueName?: string;
   source: string;
   score?: number;
+  generationType?: GenerationType; // Internal tagging for debugging
+  placeId?: string; // For deduplication
+  eventId?: string; // For deduplication
 }
 
 export interface SuggestRequest {
@@ -46,6 +53,30 @@ interface SuggestMeta {
   placesCount: number;
   eventsCount: number;
   filteredCount: number;
+  bucketCounts?: {
+    safe: number;
+    explore: number;
+    wildcard: number;
+  };
+  dedupedCount?: number;
+}
+
+// Downvote reason learning - stored per session for influencing generation
+export interface DownvoteReasonAggregates {
+  tooFar: number;
+  notMyVibe: number;
+  tooExpensive: number;
+  tooCrowded: number;
+  other: number;
+}
+
+// Bucket generation parameters
+interface BucketParams {
+  minRating: number;
+  minReviewCount: number;
+  radiusMultiplier: number;
+  allowAdjacentCategories: boolean;
+  count: number;
 }
 
 const categoryToPlaceTypes: Record<string, string[]> = {
@@ -105,6 +136,41 @@ const priceLevelMap: Record<string, string> = {
 const suggestionsCache = new Map<string, { options: SuggestionOption[]; timestamp: number }>();
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
+// Bucket parameters for each generation type
+const BUCKET_PARAMS: Record<GenerationType, BucketParams> = {
+  safe: {
+    minRating: 4.4,
+    minReviewCount: 50,
+    radiusMultiplier: 1.0,
+    allowAdjacentCategories: false,
+    count: 2,
+  },
+  explore: {
+    minRating: 3.8,
+    minReviewCount: 0, // Allow newer places with fewer reviews
+    radiusMultiplier: 1.25, // 25% expanded radius
+    allowAdjacentCategories: true,
+    count: 2,
+  },
+  wildcard: {
+    minRating: 3.5,
+    minReviewCount: 0,
+    radiusMultiplier: 1.3, // 30% expanded radius
+    allowAdjacentCategories: true,
+    count: 1,
+  },
+};
+
+// Adjacent categories for explore/wildcard buckets
+const adjacentCategories: Record<string, string[]> = {
+  'Dinner': ['Brunch', 'Food', 'Date Night'],
+  'Brunch': ['Dinner', 'Coffee', 'Chill'],
+  'Cocktails': ['Wine Bar', 'Speakeasy', 'Rooftop'],
+  'Live Music': ['Club', 'Dancing', 'Comedy'],
+  'Chill': ['Coffee', 'Walk', 'Conversation'],
+  'Drinks': ['Cocktails', 'Brewery', 'Dive Bar'],
+};
+
 function getCacheKey(req: SuggestRequest): string {
   return JSON.stringify({
     city: req.city,
@@ -117,7 +183,52 @@ function getCacheKey(req: SuggestRequest): string {
   });
 }
 
-export async function getSuggestions(req: SuggestRequest): Promise<{ options: SuggestionOption[]; meta: SuggestMeta }> {
+// Get adjusted bucket params based on downvote reasons
+function getAdjustedBucketParams(
+  baseParams: BucketParams,
+  bucketType: GenerationType,
+  downvoteReasons?: DownvoteReasonAggregates
+): BucketParams {
+  if (!downvoteReasons) return baseParams;
+  
+  const adjusted = { ...baseParams };
+  
+  // "Too far" → tighten radius for EXPLORE + WILDCARD
+  if (downvoteReasons.tooFar >= 2 && bucketType !== 'safe') {
+    adjusted.radiusMultiplier = Math.max(1.0, adjusted.radiusMultiplier - 0.15);
+  }
+  
+  // "Too expensive" → favor cheaper options (raise min rating to be more selective)
+  if (downvoteReasons.tooExpensive >= 2) {
+    adjusted.minRating = Math.min(4.5, adjusted.minRating + 0.2);
+  }
+  
+  return adjusted;
+}
+
+// Get budget tier for filtering
+function getBudgetTier(priceLevel?: string): number {
+  const tiers: Record<string, number> = { '$': 1, '$$': 2, '$$$': 3, '$$$$': 4 };
+  return tiers[priceLevel || '$$'] || 2;
+}
+
+// Check if option matches budget constraints with learning adjustments
+function matchesBudget(opt: SuggestionOption, reqBudget: string, downvoteReasons?: DownvoteReasonAggregates): boolean {
+  const optTier = getBudgetTier(opt.priceLevel);
+  const reqTier = getBudgetTier(reqBudget);
+  
+  // If many "too expensive" downvotes, be stricter about budget
+  if (downvoteReasons && downvoteReasons.tooExpensive >= 2) {
+    return optTier <= reqTier; // Must be at or below requested budget
+  }
+  
+  return Math.abs(optTier - reqTier) <= 1; // Within 1 tier
+}
+
+export async function getSuggestions(
+  req: SuggestRequest,
+  downvoteReasons?: DownvoteReasonAggregates
+): Promise<{ options: SuggestionOption[]; meta: SuggestMeta }> {
   const cacheKey = getCacheKey(req);
   const cached = suggestionsCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -135,7 +246,7 @@ export async function getSuggestions(req: SuggestRequest): Promise<{ options: Su
   }
 
   const center = getSearchCenter(req.city, req.neighborhood, req.userLat, req.userLng);
-  const radiusMeters = 3000;
+  const baseRadiusMeters = 3000;
 
   const placeTypes = new Set<string>();
   for (const cat of req.categories) {
@@ -150,27 +261,20 @@ export async function getSuggestions(req: SuggestRequest): Promise<{ options: Su
     }
   }
 
+  // Fetch all candidates with expanded radius for diversity
+  const maxRadiusMeters = Math.round(baseRadiusMeters * 1.3);
+  
   const [placesResults, eventsResults] = await Promise.all([
-    fetchGooglePlaces(center, radiusMeters, Array.from(placeTypes), req.city),
+    fetchGooglePlaces(center, maxRadiusMeters, Array.from(placeTypes), req.city),
     ticketmasterClasses.size > 0 
       ? fetchTicketmasterEvents(center, Array.from(ticketmasterClasses), req.specificDate)
       : Promise.resolve([]),
   ]);
 
-  let allOptions = [...placesResults, ...eventsResults];
+  let allCandidates = [...placesResults, ...eventsResults];
 
-  // Deduplicate by name (case-insensitive)
-  const seenNames = new Set<string>();
-  allOptions = allOptions.filter(opt => {
-    const normalizedName = opt.title.toLowerCase().trim();
-    if (seenNames.has(normalizedName)) {
-      return false;
-    }
-    seenNames.add(normalizedName);
-    return true;
-  });
-
-  allOptions = allOptions.filter(opt => {
+  // Filter by city first
+  allCandidates = allCandidates.filter(opt => {
     if (opt.lat && opt.lng) {
       return isWithinCity(req.city, opt.lat, opt.lng);
     }
@@ -185,21 +289,176 @@ export async function getSuggestions(req: SuggestRequest): Promise<{ options: Su
     return addressLower.includes(cityLower) || optCityLower.includes(cityLower);
   });
 
-  allOptions = scoreAndRank(allOptions, req, center);
+  // Calculate distance for all candidates
+  for (const opt of allCandidates) {
+    if (opt.lat != null && opt.lng != null) {
+      const dist = haversineDistance(center.lat, center.lng, opt.lat, opt.lng);
+      opt.distance = `${dist.toFixed(1)} mi`;
+    }
+  }
 
-  const topOptions = allOptions.slice(0, 5);
+  // Deduplicate by placeId/eventId/name BEFORE bucket selection
+  const uniqueIds = new Set<string>();
+  const preDedupCount = allCandidates.length;
+  allCandidates = allCandidates.filter(opt => {
+    const id = opt.placeId || opt.eventId || opt.title.toLowerCase().trim();
+    if (uniqueIds.has(id)) return false;
+    uniqueIds.add(id);
+    return true;
+  });
+  const dedupedCount = preDedupCount - allCandidates.length;
 
-  suggestionsCache.set(cacheKey, { options: topOptions, timestamp: Date.now() });
+  // Generate buckets with diversity-first approach
+  const bucketCounts = { safe: 0, explore: 0, wildcard: 0 };
+  const selectedOptions: SuggestionOption[] = [];
+  const usedIds = new Set<string>();
+
+  // Helper to get unique ID for deduplication
+  const getUniqueId = (opt: SuggestionOption) => 
+    opt.placeId || opt.eventId || opt.title.toLowerCase().trim();
+
+  // BUCKET A: SAFE - High confidence, expected picks
+  const safeParams = getAdjustedBucketParams(BUCKET_PARAMS.safe, 'safe', downvoteReasons);
+  const safeCandidates = allCandidates
+    .filter(opt => {
+      const rating = parseFloat(opt.rating || '0');
+      const reviewCount = opt.ratingCount || 0;
+      const dist = parseFloat(opt.distance?.replace(' mi', '') || '0');
+      return rating >= safeParams.minRating && 
+             reviewCount >= safeParams.minReviewCount &&
+             dist <= (baseRadiusMeters / 1609.34) * safeParams.radiusMultiplier &&
+             matchesBudget(opt, req.budget || '$$', downvoteReasons);
+    })
+    .sort((a, b) => {
+      const scoreA = (parseFloat(a.rating || '0') * 10) + Math.min(10, (a.ratingCount || 0) / 50);
+      const scoreB = (parseFloat(b.rating || '0') * 10) + Math.min(10, (b.ratingCount || 0) / 50);
+      return scoreB - scoreA;
+    });
+
+  for (const opt of safeCandidates) {
+    if (bucketCounts.safe >= safeParams.count) break;
+    const id = getUniqueId(opt);
+    if (!usedIds.has(id)) {
+      opt.generationType = 'safe';
+      selectedOptions.push(opt);
+      usedIds.add(id);
+      bucketCounts.safe++;
+    }
+  }
+
+  // BUCKET B: EXPLORE - Novelty and variety
+  const exploreParams = getAdjustedBucketParams(BUCKET_PARAMS.explore, 'explore', downvoteReasons);
+  const exploreCandidates = allCandidates
+    .filter(opt => {
+      const rating = parseFloat(opt.rating || '0');
+      const reviewCount = opt.ratingCount || 0;
+      const dist = parseFloat(opt.distance?.replace(' mi', '') || '0');
+      const id = getUniqueId(opt);
+      // Prefer lower review count (newer/less discovered places)
+      return !usedIds.has(id) &&
+             rating >= exploreParams.minRating && 
+             reviewCount < 200 && // Favor less-reviewed places
+             dist <= (baseRadiusMeters / 1609.34) * exploreParams.radiusMultiplier &&
+             matchesBudget(opt, req.budget || '$$', downvoteReasons);
+    })
+    .sort((a, b) => {
+      // Sort by rating but prefer fewer reviews (more novel)
+      const noveltyA = 100 - Math.min(100, (a.ratingCount || 0) / 2);
+      const noveltyB = 100 - Math.min(100, (b.ratingCount || 0) / 2);
+      return noveltyB - noveltyA;
+    });
+
+  for (const opt of exploreCandidates) {
+    if (bucketCounts.explore >= exploreParams.count) break;
+    const id = getUniqueId(opt);
+    if (!usedIds.has(id)) {
+      opt.generationType = 'explore';
+      selectedOptions.push(opt);
+      usedIds.add(id);
+      bucketCounts.explore++;
+    }
+  }
+
+  // BUCKET C: WILDCARD - Surprise without chaos
+  const wildcardParams = getAdjustedBucketParams(BUCKET_PARAMS.wildcard, 'wildcard', downvoteReasons);
+  const wildcardCandidates = allCandidates
+    .filter(opt => {
+      const rating = parseFloat(opt.rating || '0');
+      const dist = parseFloat(opt.distance?.replace(' mi', '') || '0');
+      const id = getUniqueId(opt);
+      // Allow slightly further or different types - more relaxed budget check
+      return !usedIds.has(id) &&
+             rating >= wildcardParams.minRating && 
+             dist <= (baseRadiusMeters / 1609.34) * wildcardParams.radiusMultiplier;
+    })
+    // Shuffle for randomness
+    .sort(() => Math.random() - 0.5);
+
+  for (const opt of wildcardCandidates) {
+    if (bucketCounts.wildcard >= wildcardParams.count) break;
+    const id = getUniqueId(opt);
+    if (!usedIds.has(id)) {
+      opt.generationType = 'wildcard';
+      selectedOptions.push(opt);
+      usedIds.add(id);
+      bucketCounts.wildcard++;
+    }
+  }
+
+  // Redistribute quota if buckets are empty
+  const targetCounts = { safe: 2, explore: 2, wildcard: 1 };
+  const shortfall = (targetCounts.safe - bucketCounts.safe) + 
+                    (targetCounts.explore - bucketCounts.explore) + 
+                    (targetCounts.wildcard - bucketCounts.wildcard);
+  
+  if (shortfall > 0) {
+    // Fill from remaining candidates, prioritizing by rating
+    const remaining = allCandidates
+      .filter(opt => !usedIds.has(getUniqueId(opt)))
+      .sort((a, b) => parseFloat(b.rating || '0') - parseFloat(a.rating || '0'));
+    
+    for (const opt of remaining) {
+      if (selectedOptions.length >= 5) break;
+      // Assign to bucket with most shortfall
+      if (bucketCounts.safe < targetCounts.safe) {
+        opt.generationType = 'safe';
+        bucketCounts.safe++;
+      } else if (bucketCounts.explore < targetCounts.explore) {
+        opt.generationType = 'explore';
+        bucketCounts.explore++;
+      } else {
+        opt.generationType = 'wildcard';
+        bucketCounts.wildcard++;
+      }
+      selectedOptions.push(opt);
+      usedIds.add(getUniqueId(opt));
+    }
+  }
+
+  // Apply scoring and ranking to final selection
+  const rankedOptions = scoreAndRank(selectedOptions, req, center);
+
+  // Log bucket distribution and downvote aggregates for debugging
+  devLog('suggestions', `Generated ${rankedOptions.length} options`, {
+    buckets: bucketCounts,
+    dedupedBeforeSelection: dedupedCount,
+    totalCandidates: allCandidates.length,
+    downvoteReasons: downvoteReasons || 'none',
+  });
+
+  suggestionsCache.set(cacheKey, { options: rankedOptions, timestamp: Date.now() });
 
   return {
-    options: topOptions,
+    options: rankedOptions,
     meta: {
       city: req.city,
       centerLatLng: center,
-      radiusMeters,
+      radiusMeters: baseRadiusMeters,
       placesCount: placesResults.length,
       eventsCount: eventsResults.length,
-      filteredCount: topOptions.length,
+      filteredCount: rankedOptions.length,
+      bucketCounts,
+      dedupedCount: allCandidates.length - selectedOptions.length,
     },
   };
 }
@@ -264,6 +523,7 @@ async function fetchGooglePlaces(center: LatLng, radiusMeters: number, types: st
           ticketUrl: null,
           eventUrl: null,
           source: 'Google',
+          placeId: place.id, // For deduplication
         });
       }
     } catch (err) {
@@ -337,6 +597,7 @@ async function fetchTicketmasterEvents(center: LatLng, classifications: string[]
           reservationUrl: null,
           eventUrl: event.url,
           source: 'Ticketmaster',
+          eventId: event.id, // For deduplication
         });
       }
     } catch (err) {
