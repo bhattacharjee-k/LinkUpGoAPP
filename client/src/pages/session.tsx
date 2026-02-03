@@ -50,6 +50,7 @@ export function Session() {
   const [rankingInfoOpen, setRankingInfoOpen] = useState(false);
   const [infoSuggestion, setInfoSuggestion] = useState<any>(null);
   const [infoVoteData, setInfoVoteData] = useState<any[]>([]);
+  const [membersOpen, setMembersOpen] = useState(false);
   const [proposeTimeOpen, setProposeTimeOpen] = useState(false);
   const [proposedTimes, setProposedTimes] = useState<Array<{
     id: string;
@@ -982,8 +983,12 @@ export function Session() {
             </div>
             
             <div className="flex items-center justify-between">
-                <div className="flex items-center -space-x-2 overflow-hidden">
-                    {participants.map((pid, i) => {
+                <button 
+                    onClick={() => setMembersOpen(true)}
+                    className="flex items-center -space-x-2 overflow-hidden hover:opacity-80 transition-opacity"
+                    data-testid="button-view-members"
+                >
+                    {participants.slice(0, 4).map((pid, i) => {
                         const status = session.participantStatusByUserId?.[pid] || 'active';
                         const isCant = status === 'cant_make_it';
                         return (
@@ -1005,14 +1010,15 @@ export function Session() {
                             )}
                         </div>
                     )})}
-                    <button 
-                        onClick={() => setInviteOpen(true)}
-                        className="w-8 h-8 rounded-full bg-white/5 border-2 border-dashed border-white/20 flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors ml-2 disabled:opacity-50"
-                        disabled={isLocked}
-                    >
-                        <UserPlus size={12} />
-                    </button>
-                </div>
+                    {participants.length > 4 && (
+                        <div className="w-8 h-8 rounded-full bg-white/10 border-2 border-background flex items-center justify-center text-[10px] font-medium">
+                            +{participants.length - 4}
+                        </div>
+                    )}
+                    <div className="w-8 h-8 rounded-full bg-white/5 border-2 border-dashed border-white/20 flex items-center justify-center text-muted-foreground ml-2">
+                        <ChevronRight size={12} />
+                    </div>
+                </button>
                 
                 <Button size="sm" variant="secondary" className="h-8 text-xs bg-white/10 hover:bg-white/20 border-0" onClick={handleCopyLink}>
                     <LinkIcon size={12} className="mr-2" /> Send Link
@@ -1522,6 +1528,77 @@ export function Session() {
             })()}
           </DialogContent>
         </Dialog>
+
+        {/* Members Sheet */}
+        <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
+          <SheetContent side="bottom" className="bg-card border-white/10 rounded-t-3xl max-h-[70vh] overflow-y-auto">
+            <SheetHeader className="pb-4 sticky top-0 bg-card z-10 border-b border-white/10">
+              <SheetTitle className="flex items-center gap-2">
+                <Users size={18} /> Who's Going ({participants.length})
+              </SheetTitle>
+            </SheetHeader>
+            <div className="space-y-3 py-4">
+              {participants.map((pid) => {
+                const status = session.participantStatusByUserId?.[pid] || 'active';
+                const isCant = status === 'cant_make_it';
+                const isAdmin = group?.adminId === pid;
+                const details = memberDetailsMap.get(pid);
+                
+                return (
+                  <div 
+                    key={pid} 
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10",
+                      isCant && "opacity-60"
+                    )}
+                    data-testid={`member-${pid}`}
+                  >
+                    <Avatar className="w-12 h-12 border-2 border-background">
+                      <AvatarFallback className="text-sm bg-white/10">
+                        {getInitials(pid)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{getDisplayName(pid)}</span>
+                        {isAdmin && (
+                          <Badge variant="outline" className="text-[10px] border-primary/50 text-primary">
+                            <Shield size={8} className="mr-1" /> Admin
+                          </Badge>
+                        )}
+                        {pid === user?.id && (
+                          <Badge variant="outline" className="text-[10px] border-white/30">You</Badge>
+                        )}
+                      </div>
+                      {details?.username && (
+                        <span className="text-xs text-muted-foreground">@{details.username}</span>
+                      )}
+                    </div>
+                    {isCant ? (
+                      <Badge variant="outline" className="border-red-500/50 text-red-400 text-xs">
+                        <Ban size={10} className="mr-1" /> Can't make it
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-green-500/50 text-green-400 text-xs">
+                        <Check size={10} className="mr-1" /> Going
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })}
+              
+              {!isLocked && (
+                <Button 
+                  onClick={() => { setMembersOpen(false); setInviteOpen(true); }}
+                  className="w-full mt-4"
+                  variant="outline"
+                >
+                  <UserPlus size={16} className="mr-2" /> Invite More People
+                </Button>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </Layout>
   );
