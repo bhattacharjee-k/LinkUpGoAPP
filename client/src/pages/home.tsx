@@ -13,7 +13,6 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 import { NotificationBell } from '@/components/notification-bell';
-import logoImg from '@/assets/brand/linkupgo-logo.png';
 
 export function Home() {
   const { user, sessions, groups, updateGroup, isAdmin, isGroupLocked } = useApp();
@@ -55,12 +54,7 @@ export function Home() {
       <div className="px-6 py-8 space-y-8">
         
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <img 
-            src={logoImg} 
-            alt="LinkUpGo" 
-            className="h-6 w-auto object-contain"
-          />
+        <div className="flex justify-end items-center">
           <div className="flex items-center gap-2">
             <NotificationBell />
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-blue-500 border-2 border-white/20" />
