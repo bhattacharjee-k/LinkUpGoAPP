@@ -574,11 +574,11 @@ export function NewPlan() {
           <DialogHeader>
             <DialogTitle>Add People</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
+          <div className="space-y-4 pt-2 max-h-[60vh] overflow-y-auto">
             {allFriends.filter(id => !selectedFriendIds.includes(id)).length > 0 ? (
-              <div className="space-y-2 pt-2 border-t border-white/10">
+              <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">From your contacts</Label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                   {allFriends.filter(id => !selectedFriendIds.includes(id)).map(friendId => (
                     <Button
                       key={friendId}
