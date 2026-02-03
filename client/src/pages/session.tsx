@@ -1532,7 +1532,7 @@ export function Session() {
         {/* Members Sheet */}
         <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
           <SheetContent side="bottom" className="bg-card border-white/10 rounded-t-3xl max-h-[70vh] overflow-y-auto">
-            <SheetHeader className="pb-4 sticky top-0 bg-card z-10 border-b border-white/10">
+            <SheetHeader className="pb-4 border-b border-white/10 pr-8">
               <SheetTitle className="flex items-center gap-2">
                 <Users size={18} /> Who's Going ({participants.length})
               </SheetTitle>
