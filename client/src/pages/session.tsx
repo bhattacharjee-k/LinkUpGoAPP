@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Send, ThumbsUp, ThumbsDown, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield, Lock, Ban, ArrowLeft, Pencil, RefreshCw, Calendar, Clock, Zap, MoreVertical, LogOut, Trash2, Info } from 'lucide-react';
 import { DownvoteModal } from '@/components/downvote-modal';
+import { MeetingCostCalculator } from '@/components/meeting-cost-calculator';
 import { calculateScore, getVoteSummary, REASON_PENALTIES } from '@shared/ranking';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -497,11 +498,11 @@ export function Session() {
                       <Pencil size={12} className="mr-1" /> Edit Plan
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="bottom" className="bg-card border-white/10 rounded-t-3xl max-h-[85vh] overflow-y-auto">
-                    <SheetHeader className="pb-4">
+                  <SheetContent side="bottom" className="bg-card border-white/10 rounded-t-3xl max-h-[65vh] overflow-y-auto">
+                    <SheetHeader className="pb-2 sticky top-0 bg-card z-10">
                       <SheetTitle>Edit Plan</SheetTitle>
                     </SheetHeader>
-                    <div className="space-y-6 pb-8">
+                    <div className="space-y-4 pb-6">
                       {/* Date & Time */}
                       <div className="space-y-3">
                         <Label className="text-sm font-medium">When?</Label>
@@ -896,9 +897,11 @@ export function Session() {
           <div className="flex flex-col gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
             <div className="flex justify-between items-center">
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Who's Going</span>
-                <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                <div className="flex items-center gap-1">
+                  <MeetingCostCalculator participantCount={participants.length} />
+                  <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
                     <DialogTrigger asChild>
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px] text-primary hover:text-primary hover:bg-primary/10 -mr-2" disabled={isLocked}>
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px] text-primary hover:text-primary hover:bg-primary/10" disabled={isLocked}>
                             Invite / Manage
                         </Button>
                     </DialogTrigger>
@@ -955,7 +958,8 @@ export function Session() {
                             </div>
                         </div>
                     </DialogContent>
-                </Dialog>
+                  </Dialog>
+                </div>
             </div>
             
             <div className="flex items-center justify-between">
