@@ -95,17 +95,13 @@ export function NewPlan() {
   };
 
   const handleAdHocContinue = async () => {
-    if (selectedFriendIds.length === 0) {
-      toast({ title: "Select at least yourself", variant: "destructive" });
-      return;
-    }
-
-    // Check if ad-hoc matches existing group
+    // Check if selected people match an existing group to avoid duplicates
     const matchingGroup = findMatchingGroup(selectedFriendIds);
     if (matchingGroup) {
       setSelectedGroupId(matchingGroup.id);
       setSelectionMode('group');
     } else {
+      setSelectedGroupId(null);
       setSelectionMode('adhoc');
     }
     setStep(1);
@@ -284,110 +280,107 @@ export function NewPlan() {
             {step === 0 ? '← Cancel' : '← Back'}
           </Button>
           <h1 className="text-3xl font-display font-bold mt-2 text-white">
-            {step === 0 ? "Who's going?" : 'Plan Details'}
+            {step === 0 ? "Who's in?" : 'Plan Details'}
           </h1>
           <p className="text-muted-foreground">
-            {step === 0 ? 'Pick a group or select friends' : 'When and what\'s the vibe?'}
+            {step === 0 ? 'Add people to your plan' : 'When and what\'s the vibe?'}
           </p>
         </div>
 
         {step === 0 ? (
           <div className="space-y-6 flex-1">
-            {/* Option A: Select existing group */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-muted-foreground">Your Groups</Label>
-              {groups.length > 0 ? (
-                <div className="space-y-2">
-                  {groups.map(group => (
-                    <Card 
-                      key={group.id}
-                      onClick={() => handleSelectGroup(group.id)}
-                      className={cn(
-                        "p-4 cursor-pointer transition-all border",
-                        selectedGroupId === group.id 
-                          ? "bg-primary/10 border-primary" 
-                          : "bg-white/5 border-white/10 hover:border-white/20"
-                      )}
-                      data-testid={`select-group-${group.id}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-bold text-base">{group.name}</h4>
-                          <p className="text-xs text-muted-foreground">{group.members.length} member{group.members.length !== 1 ? 's' : ''}</p>
-                        </div>
-                        <ChevronRight size={18} className="text-muted-foreground" />
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 border border-dashed border-white/10 rounded-xl">
-                  <p className="text-muted-foreground text-sm">No groups yet</p>
-                </div>
-              )}
-            </div>
-
-            {/* Divider */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1 h-px bg-white/10" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <div className="flex-1 h-px bg-white/10" />
-            </div>
-
-            {/* Option B: Select friends ad-hoc */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-muted-foreground">Pick Friends</Label>
+            {/* Add people - messaging app style */}
+            <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                {/* Current user always selected */}
+                {/* Current user always included */}
                 <div className="h-10 px-4 rounded-full bg-primary/20 border border-primary flex items-center gap-2 text-sm font-medium">
                   <Check size={14} className="text-primary" /> You
                 </div>
                 
-                {allFriends.map(friendId => (
+                {/* Selected friends */}
+                {selectedFriendIds.filter(id => id !== user?.id).map(friendId => (
                   <button
                     key={friendId}
                     onClick={() => toggleFriend(friendId)}
-                    className={cn(
-                      "h-10 px-4 rounded-full border text-sm font-medium transition-all",
-                      selectedFriendIds.includes(friendId)
-                        ? "bg-primary/20 border-primary text-white"
-                        : "bg-white/5 border-white/10 text-muted-foreground hover:border-white/20"
-                    )}
-                    data-testid={`toggle-friend-${friendId}`}
+                    className="h-10 px-4 rounded-full bg-primary/20 border border-primary text-white text-sm font-medium transition-all flex items-center gap-1"
+                    data-testid={`selected-friend-${friendId}`}
                   >
-                    {selectedFriendIds.includes(friendId) && <Check size={14} className="inline mr-1" />}
                     {friendId.substring(0, 6)}...
+                    <X size={12} className="ml-1 opacity-60" />
                   </button>
                 ))}
-
-                {allFriends.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No friends in your groups yet. Share your invite link!</p>
-                )}
-              </div>
-
-              {selectedFriendIds.length > 1 && (
-                <Button 
-                  onClick={handleAdHocContinue}
-                  className="w-full bg-white/10 hover:bg-white/20 mt-4"
-                  data-testid="button-continue-adhoc"
+                
+                {/* Add button */}
+                <button
+                  onClick={() => setInviteOpen(true)}
+                  className="h-10 px-4 rounded-full bg-white/5 border border-dashed border-white/20 text-muted-foreground text-sm font-medium hover:border-primary hover:text-primary transition-all flex items-center gap-2"
+                  data-testid="button-add-people"
                 >
-                  Continue with {selectedFriendIds.length} people <ChevronRight size={16} className="ml-1" />
-                </Button>
+                  <UserPlus size={14} /> Add
+                </button>
+              </div>
+              
+              {/* Quick add from existing contacts */}
+              {allFriends.filter(id => !selectedFriendIds.includes(id)).length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Quick add</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {allFriends.filter(id => !selectedFriendIds.includes(id)).map(friendId => (
+                      <button
+                        key={friendId}
+                        onClick={() => toggleFriend(friendId)}
+                        className="h-8 px-3 rounded-full bg-white/5 border border-white/10 text-muted-foreground text-xs font-medium hover:border-white/20 transition-all"
+                        data-testid={`quick-add-${friendId}`}
+                      >
+                        + {friendId.substring(0, 6)}...
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
+
+            {/* Share invite link */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <LinkIcon size={14} className="text-muted-foreground" />
+                <span className="text-sm font-medium">Invite via link</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1 bg-black/20 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
+                  {window.location.origin}/join-plan/{draftInviteCode}
+                </div>
+                <Button size="sm" variant="outline" onClick={handleCopyLink} className="border-white/10 h-9" data-testid="button-copy-invite">
+                  {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Anyone with this link can join once the plan is created</p>
+            </div>
+
+            {/* Continue button */}
+            <Button 
+              onClick={handleAdHocContinue}
+              className="w-full h-12 bg-primary text-black font-bold text-base"
+              data-testid="button-continue"
+            >
+              Continue <ChevronRight size={18} className="ml-1" />
+            </Button>
           </div>
         ) : (
           <div className="space-y-8 flex-1">
-            {/* Selected group indicator */}
-            {selectedGroup && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
-                <Users size={16} className="text-muted-foreground" />
-                <span className="text-sm">{selectedGroup.name}</span>
-                <Badge variant="outline" className="ml-auto text-[10px] border-white/20">
-                  {selectedGroup.members.length} members
-                </Badge>
-              </div>
-            )}
+            {/* People going indicator */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg border border-white/10">
+              <Users size={16} className="text-muted-foreground" />
+              <span className="text-sm">{selectedFriendIds.length} {selectedFriendIds.length === 1 ? 'person' : 'people'}</span>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="ml-auto h-6 text-xs text-primary"
+                onClick={() => setStep(0)}
+              >
+                Edit
+              </Button>
+            </div>
 
             {/* Plan Name Section */}
             <div className="space-y-4">
@@ -574,6 +567,56 @@ export function NewPlan() {
           </div>
         )}
       </div>
+
+      {/* Add People Dialog */}
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Add People</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {allFriends.filter(id => !selectedFriendIds.includes(id)).length > 0 ? (
+              <div className="space-y-2 pt-2 border-t border-white/10">
+                <Label className="text-xs text-muted-foreground">From your contacts</Label>
+                <div className="flex flex-wrap gap-2">
+                  {allFriends.filter(id => !selectedFriendIds.includes(id)).map(friendId => (
+                    <Button
+                      key={friendId}
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs border-white/10"
+                      onClick={() => {
+                        toggleFriend(friendId);
+                      }}
+                      data-testid={`dialog-add-${friendId}`}
+                    >
+                      + {friendId.substring(0, 6)}...
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No more contacts to add. Share the invite link below!</p>
+            )}
+
+            <div className="pt-2 border-t border-white/10">
+              <Label className="text-xs text-muted-foreground mb-2 block">Or share invite link</Label>
+              <div className="flex gap-2">
+                <div className="flex-1 bg-black/20 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
+                  {window.location.origin}/join-plan/{draftInviteCode}
+                </div>
+                <Button size="sm" variant="outline" onClick={handleCopyLink} className="border-white/10" data-testid="dialog-copy-link">
+                  {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                </Button>
+              </div>
+            </div>
+
+            <Button onClick={() => setInviteOpen(false)} className="w-full" data-testid="button-done-adding">
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
