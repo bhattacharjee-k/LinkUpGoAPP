@@ -192,6 +192,29 @@ export function Session() {
     return status !== 'left';
   });
   const isUserAdmin = group ? isAdmin(group.id) : false;
+
+  // Build a map of user id to member details for name lookup
+  const memberDetailsMap = new Map<string, { id: string; name: string; username: string }>();
+  groups.forEach(g => {
+    g.memberDetails?.forEach(m => memberDetailsMap.set(m.id, m));
+  });
+
+  // Helper to get display name for a user id
+  const getDisplayName = (userId: string): string => {
+    if (userId === user?.id) return 'You';
+    const details = memberDetailsMap.get(userId);
+    return details?.name || details?.username || `User`;
+  };
+
+  // Helper to get initials for a user id
+  const getInitials = (userId: string): string => {
+    if (userId === user?.id) return 'ME';
+    const details = memberDetailsMap.get(userId);
+    if (details?.name) {
+      return details.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    return details?.username?.substring(0, 2).toUpperCase() || '??';
+  };
   const isLocked = session.status === 'locked';
 
   const handleSend = async () => {
@@ -647,7 +670,7 @@ export function Session() {
                             const isCant = status === 'cant_make_it';
                             return (
                               <div key={pid} className={cn("flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/10 text-xs", isCant && "opacity-50")}>
-                                <span>{pid === user?.id ? 'You' : `User ${i+1}`}</span>
+                                <span>{getDisplayName(pid)}</span>
                                 {isCant && <Ban size={10} className="text-red-500" />}
                               </div>
                             );
@@ -930,7 +953,7 @@ export function Session() {
                                     <div className="flex flex-wrap gap-2">
                                         {group.members.filter(m => !participants.includes(m)).map(m => (
                                             <Button key={m} variant="outline" size="sm" onClick={() => handleAddGroupMember(m)} className="text-xs h-7 border-white/10">
-                                                + {m.substr(0,4)}
+                                                + {getDisplayName(m)}
                                             </Button>
                                         ))}
                                         {group.members.every(m => participants.includes(m)) && (
@@ -967,7 +990,7 @@ export function Session() {
                         <div key={pid} className={cn("relative", isCant && "opacity-50 grayscale")}>
                             <Avatar className="w-8 h-8 border-2 border-background">
                                 <AvatarFallback className="text-[10px] bg-white/10 relative">
-                                    {pid === user?.id ? 'ME' : `U${i}`}
+                                    {getInitials(pid)}
                                     {group?.adminId === pid && (
                                         <div className="absolute -bottom-1 -right-1 bg-primary text-black rounded-full p-[2px] border border-black z-10">
                                             <Shield size={6} />

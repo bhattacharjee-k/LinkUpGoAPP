@@ -262,6 +262,29 @@ export function NewPlan() {
     );
   };
 
+  // Build a map of user id to member details for name lookup
+  const memberDetailsMap = new Map<string, { id: string; name: string; username: string }>();
+  groups.forEach(g => {
+    g.memberDetails?.forEach(m => memberDetailsMap.set(m.id, m));
+  });
+
+  // Helper to get display name for a user id
+  const getDisplayName = (userId: string): string => {
+    if (userId === user?.id) return 'You';
+    const details = memberDetailsMap.get(userId);
+    return details?.name || details?.username || userId.substring(0, 8);
+  };
+
+  // Helper to get initials for a user id
+  const getInitials = (userId: string): string => {
+    if (userId === user?.id) return user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const details = memberDetailsMap.get(userId);
+    if (details?.name) {
+      return details.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    return details?.username?.substring(0, 2).toUpperCase() || 'U?';
+  };
+
   // All unique friends from all groups (excluding current user)
   const allFriends = Array.from(new Set(groups.flatMap(g => g.members))).filter(id => id !== user?.id);
 
@@ -305,7 +328,7 @@ export function NewPlan() {
                     className="h-10 px-4 rounded-full bg-primary/20 border border-primary text-white text-sm font-medium transition-all flex items-center gap-1"
                     data-testid={`selected-friend-${friendId}`}
                   >
-                    {friendId.substring(0, 6)}...
+                    {getDisplayName(friendId)}
                     <X size={12} className="ml-1 opacity-60" />
                   </button>
                 ))}
@@ -332,7 +355,7 @@ export function NewPlan() {
                         className="h-8 px-3 rounded-full bg-white/5 border border-white/10 text-muted-foreground text-xs font-medium hover:border-white/20 transition-all"
                         data-testid={`quick-add-${friendId}`}
                       >
-                        + {friendId.substring(0, 6)}...
+                        + {getDisplayName(friendId)}
                       </button>
                     ))}
                   </div>
@@ -590,7 +613,7 @@ export function NewPlan() {
                       }}
                       data-testid={`dialog-add-${friendId}`}
                     >
-                      + {friendId.substring(0, 6)}...
+                      + {getDisplayName(friendId)}
                     </Button>
                   ))}
                 </div>

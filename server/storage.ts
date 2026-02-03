@@ -33,10 +33,11 @@ export interface IStorage {
   // Groups
   getGroup(id: string): Promise<Group | undefined>;
   getGroupByInviteCode(code: string): Promise<Group | undefined>;
-  getUserGroups(userId: string): Promise<Array<Group & { members: string[] }>>;
+  getUserGroups(userId: string): Promise<Array<Group & { members: string[], memberDetails: Array<{id: string, name: string, username: string}> }>>;
   createGroup(group: InsertGroup, inviteCode: string): Promise<Group>;
   addGroupMember(groupId: string, userId: string): Promise<void>;
   getGroupMembers(groupId: string): Promise<string[]>;
+  getGroupMemberDetails(groupId: string): Promise<Array<{id: string, name: string, username: string}>>;
   updateGroup(id: string, updates: Partial<InsertGroup>): Promise<Group | undefined>;
 
   // Sessions
@@ -140,7 +141,7 @@ export class DbStorage implements IStorage {
     return group;
   }
 
-  async getUserGroups(userId: string): Promise<Array<Group & { members: string[] }>> {
+  async getUserGroups(userId: string): Promise<Array<Group & { members: string[], memberDetails: Array<{id: string, name: string, username: string}> }>> {
     const groupMemberships = await db
       .select()
       .from(schema.groupMembers)
@@ -150,11 +151,12 @@ export class DbStorage implements IStorage {
       groupMemberships.map(async (membership) => {
         const [group] = await db.select().from(schema.groups).where(eq(schema.groups.id, membership.groupId));
         const members = await this.getGroupMembers(membership.groupId);
-        return { ...group, members };
+        const memberDetails = await this.getGroupMemberDetails(membership.groupId);
+        return { ...group, members, memberDetails };
       })
     );
 
-    return groups.filter(g => g.id) as Array<Group & { members: string[] }>;
+    return groups.filter(g => g.id) as Array<Group & { members: string[], memberDetails: Array<{id: string, name: string, username: string}> }>;
   }
 
   async createGroup(group: InsertGroup, inviteCode: string): Promise<Group> {
@@ -173,6 +175,17 @@ export class DbStorage implements IStorage {
     const members = await db.select().from(schema.groupMembers).where(eq(schema.groupMembers.groupId, groupId));
     // Deduplicate member IDs in case of duplicate entries
     return [...new Set(members.map(m => m.userId))];
+  }
+
+  async getGroupMemberDetails(groupId: string): Promise<Array<{id: string, name: string, username: string}>> {
+    const memberIds = await this.getGroupMembers(groupId);
+    const details = await Promise.all(
+      memberIds.map(async (id) => {
+        const user = await this.getUser(id);
+        return user ? { id: user.id, name: user.name, username: user.username } : null;
+      })
+    );
+    return details.filter((d): d is {id: string, name: string, username: string} => d !== null);
   }
 
   async updateGroup(id: string, updates: Partial<InsertGroup>): Promise<Group | undefined> {

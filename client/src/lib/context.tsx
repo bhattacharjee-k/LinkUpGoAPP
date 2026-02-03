@@ -80,10 +80,17 @@ export interface UserProfile {
   locationPermission?: 'granted' | 'denied' | 'pending';
 }
 
+export interface GroupMemberDetail {
+  id: string;
+  name: string;
+  username: string;
+}
+
 export interface Group {
   id: string;
   name: string;
   members: string[];
+  memberDetails?: GroupMemberDetail[];
   inviteCode: string;
   adminId: string;
   locked: boolean;
