@@ -229,7 +229,19 @@ export async function registerRoutes(
 
   app.post("/api/suggest", requireAuth, asyncHandler(async (req: Request, res: Response) => {
     const data = SuggestRequestSchema.parse(req.body);
-    const result = await getSuggestions(data, undefined, data.referenceVenues);
+    
+    // Merge user preferences from authenticated user if not provided in request
+    // @ts-ignore
+    const userId = req.session?.userId;
+    const user = userId ? await storage.getUser(userId) : null;
+    const enrichedData = {
+      ...data,
+      discoveryStyle: data.discoveryStyle || user?.discoveryStyle as 'hidden_gems' | 'popular' | 'mixed' | undefined,
+      crowdPreference: data.crowdPreference || user?.crowdPreference as 'quiet' | 'buzzing' | 'no_preference' | undefined,
+      favoriteNeighborhoods: data.favoriteNeighborhoods || user?.favoriteNeighborhoods || undefined,
+    };
+    
+    const result = await getSuggestions(enrichedData, undefined, data.referenceVenues);
 
     const sourceMap: Record<string, string> = {
       'Google': 'Web',

@@ -85,6 +85,18 @@ Preferred communication style: Simple, everyday language.
 - **Quota Redistribution**: Fills from remaining candidates if buckets are empty
 - **Internal Tagging**: generationType field for debugging (not shown in UI)
 
+### Discovery Preferences (Curated Suggestions)
+- **Discovery Style**: User preference collected in onboarding step 6
+  - `hidden_gems`: Favors EXPLORE bucket (3 explore, 1 safe, 1 wildcard), lower review thresholds
+  - `popular`: Favors SAFE bucket (3 safe, 1 explore, 1 wildcard), higher review thresholds
+  - `mixed`: Balanced approach (2 safe, 2 explore, 1 wildcard)
+- **Crowd Preference**: `quiet`, `buzzing`, or `no_preference`
+  - Estimates venue crowd level from review count and venue types
+  - Boosts matching venues (+5 points), slight penalty for mismatches (-2 points)
+- **Favorite Neighborhoods**: User-selected neighborhoods in their city
+  - Soft boost (+3 for safe, +20 for explore) for venues in preferred neighborhoods
+- **Integration**: Preferences are automatically merged from user profile in /api/suggest route
+
 ### Reference Venues (Style Anchoring)
 - **Optional Input**: Users can select 1-3 favorite places during plan creation
 - **Google Places Autocomplete**: Search for venues with city bias

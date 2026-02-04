@@ -200,13 +200,16 @@ async function executeToolCall(
       // Delete existing suggestions
       await storage.deleteSessionSuggestions(sessionId);
       
-      // Fetch new suggestions with updated filters
+      // Fetch new suggestions with updated filters including user preferences
       const result = await getSuggestions({
         city,
         categories: args.categories || filters.category || [],
         budget: args.budget,
         neighborhood: args.neighborhood || context.session.neighborhood || undefined,
         specificDate: filters.specificDate,
+        discoveryStyle: context.user.discoveryStyle as 'hidden_gems' | 'popular' | 'mixed' | undefined,
+        crowdPreference: context.user.crowdPreference as 'quiet' | 'buzzing' | 'no_preference' | undefined,
+        favoriteNeighborhoods: context.user.favoriteNeighborhoods || undefined,
       });
       
       // Save new suggestions

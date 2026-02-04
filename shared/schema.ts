@@ -15,6 +15,9 @@ export const users = pgTable("users", {
   energy: text("energy").notNull(), // 'Chill' | 'Vibey' | 'Going out' | 'Full send'
   categories: text("categories").array().notNull(), // Interests
   hardNos: text("hard_nos").array().notNull(),
+  discoveryStyle: text("discovery_style").default('mixed'), // 'hidden_gems' | 'popular' | 'mixed'
+  crowdPreference: text("crowd_preference").default('no_preference'), // 'quiet' | 'buzzing' | 'no_preference'
+  favoriteNeighborhoods: text("favorite_neighborhoods").array().default(sql`'{}'::text[]`), // User's preferred neighborhoods
   lastKnownLat: text("last_known_lat"),
   lastKnownLng: text("last_known_lng"),
   lastLocationTimestamp: timestamp("last_location_timestamp"),

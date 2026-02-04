@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ChevronRight, ChevronLeft, MapPin, Ban, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
-import { City, Budget, Energy, Category, HardNo } from '@/lib/store';
+import { City, Budget, Energy, Category, HardNo, DiscoveryStyle, CrowdPreference, NEIGHBORHOODS } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import logoImg from '@/assets/brand/linkupgo-logo.png';
@@ -47,6 +47,9 @@ export function Onboarding() {
     energy: 'Vibey' as Energy,
     categories: [] as Category[],
     hardNos: [] as string[],
+    discoveryStyle: 'mixed' as DiscoveryStyle,
+    crowdPreference: 'no_preference' as CrowdPreference,
+    favoriteNeighborhoods: [] as string[],
   });
 
   const handleLogin = async () => {
@@ -71,8 +74,17 @@ export function Onboarding() {
     }
   };
 
+  const toggleNeighborhood = (n: string) => {
+    setFormData(prev => ({
+      ...prev,
+      favoriteNeighborhoods: prev.favoriteNeighborhoods.includes(n)
+        ? prev.favoriteNeighborhoods.filter(x => x !== n)
+        : [...prev.favoriteNeighborhoods, n]
+    }));
+  };
+
   const handleNext = async () => {
-    if (step < 5) {
+    if (step < 6) {
       setStep(step + 1);
     } else {
       // Finish - Register user
@@ -88,6 +100,9 @@ export function Onboarding() {
           energy: formData.energy,
           categories: formData.categories,
           hardNos: formData.hardNos,
+          discoveryStyle: formData.discoveryStyle,
+          crowdPreference: formData.crowdPreference,
+          favoriteNeighborhoods: formData.favoriteNeighborhoods,
         });
         
         // Check for returnTo param
@@ -278,19 +293,21 @@ export function Onboarding() {
         </div>
 
         <div className="space-y-2">
-          {!isLoginMode && <div className="text-primary font-bold tracking-widest text-xs uppercase" data-testid="text-step-indicator">Step {step} of 5</div>}
+          {!isLoginMode && <div className="text-primary font-bold tracking-widest text-xs uppercase" data-testid="text-step-indicator">Step {step} of 6</div>}
           <h1 className="text-4xl font-display font-bold text-white leading-tight" data-testid="text-step-title">
             {step === 1 && (isLoginMode ? "Welcome back!" : "Welcome to LinkUpGo.")}
             {step === 2 && "Tell us about yourself"}
             {step === 3 && "What are you into?"}
             {step === 4 && "What's your usual vibe?"}
             {step === 5 && "Any hard no's?"}
+            {step === 6 && "How adventurous are you?"}
           </h1>
           <p className="text-muted-foreground text-lg">
              {step === 1 && (isLoginMode ? "Sign in to continue planning with friends." : "Create your account to start planning with friends.")}
              {step === 3 && "Pick anything you're usually open to — we'll learn your real preferences as you plan."}
              {step === 4 && "This sets your baseline, but you can change it for every plan."}
              {step === 5 && "We'll hide these types of places from your suggestions."}
+             {step === 6 && "This helps us find the perfect spots for you."}
           </p>
         </div>
 
@@ -477,6 +494,83 @@ export function Onboarding() {
           </div>
         )}
 
+        {step === 6 && (
+          <div className="space-y-6 max-h-[55vh] overflow-y-auto pr-2">
+            <div className="space-y-3">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Discovery Style</Label>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { value: 'hidden_gems', label: 'Hidden Gems', desc: 'Unique spots most people haven\'t tried' },
+                  { value: 'popular', label: 'Popular Favorites', desc: 'Well-known spots with proven track records' },
+                  { value: 'mixed', label: 'Mix It Up', desc: 'A balance of both new and popular' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    data-testid={`button-discovery-${option.value}`}
+                    onClick={() => setFormData({...formData, discoveryStyle: option.value as DiscoveryStyle})}
+                    className={cn(
+                      "h-auto py-3 px-4 rounded-xl border border-white/10 flex flex-col items-start text-left transition-all",
+                      formData.discoveryStyle === option.value 
+                        ? "bg-primary text-black border-primary" 
+                        : "bg-white/5 hover:bg-white/10"
+                    )}
+                  >
+                    <span className="font-bold">{option.label}</span>
+                    <span className={cn("text-xs", formData.discoveryStyle === option.value ? "text-black/70" : "text-muted-foreground")}>{option.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Crowd Preference</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'quiet', label: 'Quiet' },
+                  { value: 'buzzing', label: 'Buzzing' },
+                  { value: 'no_preference', label: 'Either' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    data-testid={`button-crowd-${option.value}`}
+                    onClick={() => setFormData({...formData, crowdPreference: option.value as CrowdPreference})}
+                    className={cn(
+                      "h-12 rounded-xl border border-white/10 font-medium transition-all text-sm",
+                      formData.crowdPreference === option.value 
+                        ? "bg-primary text-black border-primary font-bold" 
+                        : "bg-white/5 hover:bg-white/10 text-muted-foreground"
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Favorite Neighborhoods in {formData.city}</Label>
+              <div className="flex flex-wrap gap-2">
+                {NEIGHBORHOODS[formData.city].map((n) => (
+                  <button
+                    key={n}
+                    data-testid={`button-neighborhood-${n.replace(/\s+/g, '-')}`}
+                    onClick={() => toggleNeighborhood(n)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full border border-white/10 transition-all text-xs",
+                      formData.favoriteNeighborhoods.includes(n) 
+                        ? "bg-primary text-black border-primary font-bold" 
+                        : "bg-white/5 hover:bg-white/10 text-muted-foreground"
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Optional — select your go-to areas or skip to explore everywhere.</p>
+            </div>
+          </div>
+        )}
+
         <Button 
           onClick={isLoginMode ? handleLogin : handleNext} 
           data-testid="button-next"
@@ -485,7 +579,7 @@ export function Onboarding() {
         >
           {isLoading ? (isLoginMode ? 'Signing in...' : 'Creating account...') : 
            isLoginMode ? "Sign In" :
-           step === 5 ? "Complete Profile" : "Next"} 
+           step === 6 ? "Complete Profile" : "Next"} 
           {!isLoading && <ChevronRight className="ml-2" />}
         </Button>
       </motion.div>

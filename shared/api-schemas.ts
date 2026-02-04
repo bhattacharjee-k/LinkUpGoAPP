@@ -39,6 +39,10 @@ export const SuggestRequestSchema = z.object({
   specificDate: z.string().optional(),
   specificTime: z.string().optional(),
   referenceVenues: z.array(ReferenceVenueSchema).optional(),
+  // User preference fields for more curated suggestions
+  discoveryStyle: z.enum(['hidden_gems', 'popular', 'mixed']).optional(),
+  crowdPreference: z.enum(['quiet', 'buzzing', 'no_preference']).optional(),
+  favoriteNeighborhoods: z.array(z.string()).optional(),
 });
 export type SuggestRequest = z.infer<typeof SuggestRequestSchema>;
 

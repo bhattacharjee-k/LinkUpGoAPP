@@ -22,6 +22,24 @@ export type Category =
 
 export type HardNo = 'Clubs' | 'Loud places' | 'Ticketed events' | 'Late nights' | 'Expensive spots';
 
+export type DiscoveryStyle = 'hidden_gems' | 'popular' | 'mixed';
+export type CrowdPreference = 'quiet' | 'buzzing' | 'no_preference';
+
+export const NEIGHBORHOODS: Record<City, string[]> = {
+  'NYC': [
+    'East Village', 'West Village', 'SoHo', 'Tribeca', 'Chelsea', 'Lower East Side',
+    'Williamsburg', 'Greenpoint', 'DUMBO', 'Bushwick', 'Park Slope', 'Prospect Heights',
+    'Upper East Side', 'Upper West Side', 'Midtown', 'Harlem', 'Hell\'s Kitchen',
+    'Nolita', 'Chinatown', 'Financial District', 'Astoria', 'Long Island City'
+  ],
+  'Chicago': [
+    'Wicker Park', 'Logan Square', 'Lincoln Park', 'Lakeview', 'Bucktown',
+    'River North', 'West Loop', 'Fulton Market', 'Old Town', 'Gold Coast',
+    'Pilsen', 'Bridgeport', 'Hyde Park', 'Andersonville', 'Uptown',
+    'Lincoln Square', 'Ravenswood', 'Humboldt Park', 'Ukrainian Village', 'South Loop'
+  ]
+};
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -31,6 +49,9 @@ export interface UserProfile {
   energy: Energy;
   categories: Category[]; // Interests
   hardNos: string[]; // Using string array to be flexible, but could be HardNo[]
+  discoveryStyle?: DiscoveryStyle;
+  crowdPreference?: CrowdPreference;
+  favoriteNeighborhoods?: string[];
   lastKnownLat?: string | null;
   lastKnownLng?: string | null;
   lastLocationTimestamp?: string | null;

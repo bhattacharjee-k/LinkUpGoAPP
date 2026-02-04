@@ -44,6 +44,10 @@ export interface SuggestRequest {
   timeWindow?: string;
   specificDate?: string;
   specificTime?: string;
+  // User preference fields for more curated suggestions
+  discoveryStyle?: 'hidden_gems' | 'popular' | 'mixed';
+  crowdPreference?: 'quiet' | 'buzzing' | 'no_preference';
+  favoriteNeighborhoods?: string[];
 }
 
 interface SuggestMeta {
@@ -172,6 +176,72 @@ const BUCKET_PARAMS: Record<GenerationType, BucketParams> = {
   },
 };
 
+// Adjust bucket counts based on user's discovery style preference
+function getDiscoveryAdjustedCounts(discoveryStyle?: string): { safe: number; explore: number; wildcard: number } {
+  switch (discoveryStyle) {
+    case 'hidden_gems':
+      // Favor explore and wildcard buckets for unique finds
+      return { safe: 1, explore: 3, wildcard: 1 };
+    case 'popular':
+      // Favor safe bucket with proven favorites
+      return { safe: 3, explore: 1, wildcard: 1 };
+    case 'mixed':
+    default:
+      // Balanced approach
+      return { safe: 2, explore: 2, wildcard: 1 };
+  }
+}
+
+// Adjust min review count thresholds based on discovery style
+function getReviewCountThresholds(discoveryStyle?: string): { safeMin: number; exploreMax: number } {
+  switch (discoveryStyle) {
+    case 'hidden_gems':
+      // Lower minimum for safe (allow lesser-known), lower max for explore
+      return { safeMin: 20, exploreMax: 150 };
+    case 'popular':
+      // Higher minimum for safe (well-established), higher max for explore
+      return { safeMin: 100, exploreMax: 500 };
+    case 'mixed':
+    default:
+      return { safeMin: 50, exploreMax: 200 };
+  }
+}
+
+// Estimate crowd level based on review count and venue type
+// Higher review count typically correlates with busier/more popular venues
+function estimateCrowdLevel(opt: SuggestionOption): 'quiet' | 'buzzing' | 'unknown' {
+  const reviewCount = opt.ratingCount || 0;
+  const tags = opt.tags || [];
+  
+  // Quiet indicators
+  const quietTypes = ['cafe', 'museum', 'park', 'wine_bar'];
+  const isQuietType = tags.some(t => quietTypes.some(qt => t.toLowerCase().includes(qt)));
+  
+  // Buzzing indicators
+  const buzzingTypes = ['club', 'night_club', 'bar', 'rooftop', 'brewery'];
+  const isBuzzingType = tags.some(t => buzzingTypes.some(bt => t.toLowerCase().includes(bt)));
+  
+  // Review count thresholds
+  if (reviewCount > 500 || isBuzzingType) {
+    return 'buzzing';
+  }
+  if (reviewCount < 100 || isQuietType) {
+    return 'quiet';
+  }
+  return 'unknown';
+}
+
+// Check if option matches crowd preference
+function matchesCrowdPreference(opt: SuggestionOption, crowdPref?: string): number {
+  if (!crowdPref || crowdPref === 'no_preference') return 0;
+  
+  const crowdLevel = estimateCrowdLevel(opt);
+  if (crowdLevel === 'unknown') return 0;
+  
+  if (crowdLevel === crowdPref) return 5; // Boost matching preference
+  return -2; // Slight penalty for mismatch
+}
+
 // Adjacent categories for explore/wildcard buckets
 const adjacentCategories: Record<string, string[]> = {
   'Dinner': ['Brunch', 'Food', 'Date Night'],
@@ -191,6 +261,9 @@ function getCacheKey(req: SuggestRequest): string {
     energy: req.energy,
     timeWindow: req.timeWindow,
     specificDate: req.specificDate,
+    discoveryStyle: req.discoveryStyle,
+    crowdPreference: req.crowdPreference,
+    favoriteNeighborhoods: req.favoriteNeighborhoods?.sort(),
   });
 }
 
@@ -469,6 +542,9 @@ export async function getSuggestions(
   const dedupedCount = preDedupCount - allCandidates.length;
 
   // Generate buckets with diversity-first approach
+  // Adjust target counts based on user's discovery style preference
+  const targetCounts = getDiscoveryAdjustedCounts(req.discoveryStyle);
+  const reviewThresholds = getReviewCountThresholds(req.discoveryStyle);
   const bucketCounts = { safe: 0, explore: 0, wildcard: 0 };
   const selectedOptions: SuggestionOption[] = [];
   const usedIds = new Set<string>();
@@ -477,16 +553,24 @@ export async function getSuggestions(
   const getUniqueId = (opt: SuggestionOption) => 
     opt.placeId || opt.eventId || opt.title.toLowerCase().trim();
 
+  // Helper to check if option is in user's favorite neighborhoods (soft boost, not filter)
+  const isInFavoriteNeighborhood = (opt: SuggestionOption): boolean => {
+    if (!req.favoriteNeighborhoods || req.favoriteNeighborhoods.length === 0) return false;
+    const addressLower = (opt.address || '').toLowerCase();
+    return req.favoriteNeighborhoods.some(n => addressLower.includes(n.toLowerCase()));
+  };
+
   // BUCKET A: SAFE - High confidence, expected picks (closest vibe to references)
   const safeParams = getAdjustedBucketParams(BUCKET_PARAMS.safe, 'safe', downvoteReasons);
   const safeMinRating = refProfile ? Math.max(safeParams.minRating, refProfile.qualityFloor) : safeParams.minRating;
+  const safeMinReviews = reviewThresholds.safeMin;
   const safeCandidates = allCandidates
     .filter(opt => {
       const rating = parseFloat(opt.rating || '0');
       const reviewCount = opt.ratingCount || 0;
       const dist = parseFloat(opt.distance?.replace(' mi', '') || '0');
       return rating >= safeMinRating && 
-             reviewCount >= safeParams.minReviewCount &&
+             reviewCount >= safeMinReviews &&
              dist <= (baseRadiusMeters / 1609.34) * safeParams.radiusMultiplier &&
              matchesBudget(opt, req.budget || '$$', downvoteReasons, refProfile || undefined);
     })
@@ -504,11 +588,19 @@ export async function getSuggestions(
         if (matchB) scoreB += 5;
       }
       
+      // Boost score if option is in user's favorite neighborhoods
+      if (isInFavoriteNeighborhood(a)) scoreA += 3;
+      if (isInFavoriteNeighborhood(b)) scoreB += 3;
+      
+      // Apply crowd preference boost/penalty
+      scoreA += matchesCrowdPreference(a, req.crowdPreference);
+      scoreB += matchesCrowdPreference(b, req.crowdPreference);
+      
       return scoreB - scoreA;
     });
 
   for (const opt of safeCandidates) {
-    if (bucketCounts.safe >= safeParams.count) break;
+    if (bucketCounts.safe >= targetCounts.safe) break;
     const id = getUniqueId(opt);
     if (!usedIds.has(id)) {
       opt.generationType = 'safe';
@@ -524,28 +616,38 @@ export async function getSuggestions(
   const exploreRadiusMult = refProfile?.hasConflicts 
     ? exploreParams.radiusMultiplier * 1.1 
     : exploreParams.radiusMultiplier;
+  const exploreMaxReviews = reviewThresholds.exploreMax;
   const exploreCandidates = allCandidates
     .filter(opt => {
       const rating = parseFloat(opt.rating || '0');
       const reviewCount = opt.ratingCount || 0;
       const dist = parseFloat(opt.distance?.replace(' mi', '') || '0');
       const id = getUniqueId(opt);
-      // Prefer lower review count (newer/less discovered places)
+      // Prefer lower review count (newer/less discovered places) - threshold adjusted by discoveryStyle
       return !usedIds.has(id) &&
              rating >= exploreParams.minRating && 
-             reviewCount < 200 && // Favor less-reviewed places
+             reviewCount < exploreMaxReviews &&
              dist <= (baseRadiusMeters / 1609.34) * exploreRadiusMult &&
              matchesBudget(opt, req.budget || '$$', downvoteReasons, refProfile || undefined);
     })
     .sort((a, b) => {
       // Sort by rating but prefer fewer reviews (more novel)
-      const noveltyA = 100 - Math.min(100, (a.ratingCount || 0) / 2);
-      const noveltyB = 100 - Math.min(100, (b.ratingCount || 0) / 2);
+      let noveltyA = 100 - Math.min(100, (a.ratingCount || 0) / 2);
+      let noveltyB = 100 - Math.min(100, (b.ratingCount || 0) / 2);
+      
+      // Boost score if option is in user's favorite neighborhoods
+      if (isInFavoriteNeighborhood(a)) noveltyA += 20;
+      if (isInFavoriteNeighborhood(b)) noveltyB += 20;
+      
+      // Apply crowd preference boost/penalty
+      noveltyA += matchesCrowdPreference(a, req.crowdPreference);
+      noveltyB += matchesCrowdPreference(b, req.crowdPreference);
+      
       return noveltyB - noveltyA;
     });
 
   for (const opt of exploreCandidates) {
-    if (bucketCounts.explore >= exploreParams.count) break;
+    if (bucketCounts.explore >= targetCounts.explore) break;
     const id = getUniqueId(opt);
     if (!usedIds.has(id)) {
       opt.generationType = 'explore';
@@ -571,7 +673,7 @@ export async function getSuggestions(
     .sort(() => Math.random() - 0.5);
 
   for (const opt of wildcardCandidates) {
-    if (bucketCounts.wildcard >= wildcardParams.count) break;
+    if (bucketCounts.wildcard >= targetCounts.wildcard) break;
     const id = getUniqueId(opt);
     if (!usedIds.has(id)) {
       opt.generationType = 'wildcard';
@@ -582,7 +684,6 @@ export async function getSuggestions(
   }
 
   // Redistribute quota if buckets are empty
-  const targetCounts = { safe: 2, explore: 2, wildcard: 1 };
   const shortfall = (targetCounts.safe - bucketCounts.safe) + 
                     (targetCounts.explore - bucketCounts.explore) + 
                     (targetCounts.wildcard - bucketCounts.wildcard);
