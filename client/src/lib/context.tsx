@@ -454,7 +454,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await api.sessions.update(sessionId, {
       status: 'locked',
       lockedByUserId: user?.id,
-      lockedAt: new Date(),
+      lockedAt: new Date().toISOString(),
       winningOptionId: suggestionId
     });
     await refreshSession(sessionId);
