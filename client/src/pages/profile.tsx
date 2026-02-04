@@ -8,14 +8,24 @@ import { Card } from '@/components/ui/card';
 import { ArrowLeft, LogOut, Check, MapPin, DollarSign, Zap, X, Mail } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
-import { City, Budget, Energy, Category } from '@/lib/store';
+import { City, Budget, Energy, Category, DiscoveryStyle, CrowdPreference, NEIGHBORHOODS } from '@/lib/store';
 import { useToast } from '@/hooks/use-toast';
 
 const CITIES: City[] = ['NYC', 'Chicago'];
 const BUDGETS: Budget[] = ['$', '$$', '$$$', '$$$$'];
 const ENERGIES: Energy[] = ['Chill', 'Vibey', 'Going out', 'Full send'];
 const CATEGORIES: Category[] = ['Dinner', 'Brunch', 'Cocktails', 'Rooftop', 'Club', 'Live Music', 'Bowling', 'Comedy', 'Walk', 'Arcade', 'Big Group', 'Date Night'];
-const HARD_NOS = ['Loud Music', 'Crowded Places', 'Dive Bar', 'Long Wait', 'Far Distance', 'Expensive'];
+const HARD_NOS = ['Clubs', 'Loud places', 'Ticketed events', 'Late nights', 'Expensive spots'];
+const DISCOVERY_OPTIONS: { value: DiscoveryStyle; label: string; desc: string }[] = [
+  { value: 'hidden_gems', label: 'Hidden Gems', desc: 'Unique spots most people haven\'t tried' },
+  { value: 'popular', label: 'Popular Favorites', desc: 'Well-known spots with proven track records' },
+  { value: 'mixed', label: 'Mix It Up', desc: 'A balance of both new and popular' },
+];
+const CROWD_OPTIONS: { value: CrowdPreference; label: string }[] = [
+  { value: 'quiet', label: 'Quiet' },
+  { value: 'buzzing', label: 'Buzzing' },
+  { value: 'no_preference', label: 'Either' },
+];
 
 export function Profile() {
   const { user, updateUserProfile, logout } = useApp();
@@ -26,12 +36,24 @@ export function Profile() {
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    city: user?.city || 'NYC',
+    city: (user?.city || 'NYC') as City,
     budget: user?.budget || ['$$'],
     energy: user?.energy || 'Vibey',
     categories: user?.categories || [],
     hardNos: user?.hardNos || [],
+    discoveryStyle: (user?.discoveryStyle || 'mixed') as DiscoveryStyle,
+    crowdPreference: (user?.crowdPreference || 'no_preference') as CrowdPreference,
+    favoriteNeighborhoods: user?.favoriteNeighborhoods || [],
   });
+
+  const toggleNeighborhood = (n: string) => {
+    setFormData(prev => ({
+      ...prev,
+      favoriteNeighborhoods: prev.favoriteNeighborhoods.includes(n)
+        ? prev.favoriteNeighborhoods.filter((x: string) => x !== n)
+        : [...prev.favoriteNeighborhoods, n]
+    }));
+  };
 
   if (!user) {
     setLocation('/');
@@ -133,7 +155,11 @@ export function Profile() {
               {CITIES.map(city => (
                 <button
                   key={city}
-                  onClick={() => setFormData(prev => ({ ...prev, city }))}
+                  onClick={() => setFormData(prev => ({ 
+                    ...prev, 
+                    city,
+                    favoriteNeighborhoods: prev.city !== city ? [] : prev.favoriteNeighborhoods
+                  }))}
                   className={cn(
                     "flex-1 py-3 rounded-xl border text-sm font-medium transition-all flex items-center justify-center gap-2",
                     formData.city === city 
@@ -233,6 +259,86 @@ export function Profile() {
             onClick={handleSave} 
             disabled={isSaving}
             className="w-full bg-primary text-black font-bold"
+            data-testid="button-save-prefs"
+          >
+            {isSaving ? 'Saving...' : 'Save All Preferences'}
+          </Button>
+        </Card>
+
+        <Card className="p-6 bg-white/5 border-white/10 space-y-6">
+          <h3 className="text-lg font-bold">Discovery Preferences</h3>
+          <p className="text-sm text-muted-foreground -mt-4">How adventurous are you when finding new spots?</p>
+
+          <div className="space-y-3">
+            <Label>Discovery Style</Label>
+            <div className="grid grid-cols-1 gap-2">
+              {DISCOVERY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  data-testid={`button-discovery-${option.value}`}
+                  onClick={() => setFormData(prev => ({ ...prev, discoveryStyle: option.value }))}
+                  className={cn(
+                    "h-auto py-3 px-4 rounded-xl border border-white/10 flex flex-col items-start text-left transition-all",
+                    formData.discoveryStyle === option.value 
+                      ? "bg-primary text-black border-primary" 
+                      : "bg-white/5 hover:bg-white/10"
+                  )}
+                >
+                  <span className="font-bold">{option.label}</span>
+                  <span className={cn("text-xs", formData.discoveryStyle === option.value ? "text-black/70" : "text-muted-foreground")}>{option.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Label>Crowd Preference</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {CROWD_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  data-testid={`button-crowd-${option.value}`}
+                  onClick={() => setFormData(prev => ({ ...prev, crowdPreference: option.value }))}
+                  className={cn(
+                    "h-12 rounded-xl border border-white/10 font-medium transition-all text-sm",
+                    formData.crowdPreference === option.value 
+                      ? "bg-primary text-black border-primary font-bold" 
+                      : "bg-white/5 hover:bg-white/10 text-muted-foreground"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Label>Favorite Neighborhoods in {formData.city}</Label>
+            <p className="text-xs text-muted-foreground">We'll prioritize spots in your go-to areas</p>
+            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+              {NEIGHBORHOODS[formData.city].map((n) => (
+                <button
+                  key={n}
+                  data-testid={`button-neighborhood-${n.replace(/\s+/g, '-')}`}
+                  onClick={() => toggleNeighborhood(n)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full border border-white/10 transition-all text-xs",
+                    formData.favoriteNeighborhoods.includes(n) 
+                      ? "bg-primary text-black border-primary font-bold" 
+                      : "bg-white/5 hover:bg-white/10 text-muted-foreground"
+                  )}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Button 
+            onClick={handleSave} 
+            disabled={isSaving}
+            className="w-full bg-primary text-black font-bold"
+            data-testid="button-save-discovery"
           >
             {isSaving ? 'Saving...' : 'Save Changes'}
           </Button>

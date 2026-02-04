@@ -78,6 +78,9 @@ export interface UserProfile {
   lastKnownLng?: string | null;
   lastLocationTimestamp?: string | null;
   locationPermission?: 'granted' | 'denied' | 'pending';
+  discoveryStyle?: 'hidden_gems' | 'popular' | 'mixed';
+  crowdPreference?: 'quiet' | 'buzzing' | 'no_preference';
+  favoriteNeighborhoods?: string[];
 }
 
 export interface GroupMemberDetail {
