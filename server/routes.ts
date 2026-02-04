@@ -663,18 +663,40 @@ export async function registerRoutes(
       
       const updated = await storage.updateSession(req.params.id, req.body);
       
-      // If session was just locked, notify all participants
+      // If session was just locked, notify all participants with calendar invite
       if (req.body.status === 'locked' && session.status !== 'locked') {
         const participants = await storage.getSessionParticipants(req.params.id);
         const participantIds = participants.filter(p => p.status !== 'left').map(p => p.userId);
         const suggestions = await storage.getSessionSuggestions(req.params.id);
-        const winningOption = suggestions.find(s => s.isLocked)?.name || suggestions[0]?.name || 'the plan';
+        const winningOptionId = updated?.winningOptionId || req.body.winningOptionId;
+        const winningSuggestion = winningOptionId 
+          ? suggestions.find(s => s.id === winningOptionId)
+          : suggestions[0];
+        const winningOption = winningSuggestion?.name || 'the plan';
+        
+        // Build event details for calendar invite
+        let eventDetails: { location: string; startDate: Date; description?: string } | undefined;
+        
+        // Get the confirmed date from the session or use a proposed time
+        const confirmedDate = updated?.confirmedDate || req.body.confirmedDate;
+        if (confirmedDate && winningSuggestion) {
+          const parsedDate = new Date(confirmedDate);
+          // Only include event details if the date is valid
+          if (!isNaN(parsedDate.getTime())) {
+            eventDetails = {
+              location: winningSuggestion.address || winningSuggestion.neighborhood || 'See venue details',
+              startDate: parsedDate,
+              description: winningSuggestion.description || undefined,
+            };
+          }
+        }
         
         notifyPlanLocked({
           sessionId: req.params.id,
           sessionName: session.name || 'Your plan',
           winningOption,
           participantIds,
+          eventDetails,
         }).catch(err => console.error('[Notify] Error sending lock notification:', err));
       }
       
@@ -1181,6 +1203,69 @@ export async function registerRoutes(
       
       await storage.deleteProposedTime(req.params.id);
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Event Feedback routes
+  app.get("/api/sessions/:sessionId/feedback", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const feedback = await storage.getSessionFeedback(req.params.sessionId);
+      const hasSubmitted = await storage.hasUserSubmittedFeedback(req.params.sessionId, userId);
+      res.json({ feedback, hasSubmitted });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/sessions/:sessionId/feedback", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const { rating, review, tags, wouldRecommend, suggestionId } = req.body;
+      
+      // Validate rating
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+      
+      // Check if already submitted
+      const hasSubmitted = await storage.hasUserSubmittedFeedback(req.params.sessionId, userId);
+      if (hasSubmitted) {
+        return res.status(400).json({ message: "You have already submitted feedback for this event" });
+      }
+      
+      const feedback = await storage.createFeedback({
+        sessionId: req.params.sessionId,
+        userId,
+        suggestionId: suggestionId || null,
+        rating,
+        review: review || null,
+        tags: tags || [],
+        wouldRecommend: wouldRecommend ?? null,
+      });
+      
+      res.json(feedback);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/feedback/venue/:name", async (req, res) => {
+    try {
+      const averageRating = await storage.getVenueAverageRating(req.params.name);
+      res.json(averageRating || { avgRating: 0, count: 0 });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

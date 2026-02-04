@@ -52,6 +52,15 @@ export function Session() {
   const [infoVoteData, setInfoVoteData] = useState<any[]>([]);
   const [membersOpen, setMembersOpen] = useState(false);
   const [proposeTimeOpen, setProposeTimeOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackForm, setFeedbackForm] = useState({
+    rating: 0,
+    review: '',
+    tags: [] as string[],
+    wouldRecommend: null as boolean | null,
+  });
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [proposedTimes, setProposedTimes] = useState<Array<{
     id: string;
     sessionId: string;
@@ -135,6 +144,51 @@ export function Session() {
       api.proposedTimes.list(session.id).then(setProposedTimes).catch(console.error);
     }
   }, [session?.id]);
+
+  // Check if feedback already submitted for locked sessions
+  useEffect(() => {
+    if (session?.id && session.status === 'locked') {
+      api.feedback.get(session.id).then(data => {
+        setFeedbackSubmitted(data.hasSubmitted);
+      }).catch(console.error);
+    }
+  }, [session?.id, session?.status]);
+
+  const handleSubmitFeedback = async () => {
+    if (!session?.id || feedbackForm.rating === 0) return;
+    
+    setIsSubmittingFeedback(true);
+    try {
+      const winningSuggestion = session.winningOptionId 
+        ? session.suggestions?.find(s => s.id === session.winningOptionId)
+        : session.suggestions?.[0];
+      await api.feedback.submit(session.id, {
+        rating: feedbackForm.rating,
+        review: feedbackForm.review || undefined,
+        tags: feedbackForm.tags.length > 0 ? feedbackForm.tags : undefined,
+        wouldRecommend: feedbackForm.wouldRecommend,
+        suggestionId: winningSuggestion?.id,
+      });
+      setFeedbackSubmitted(true);
+      setFeedbackOpen(false);
+      toast({ title: "Thanks for your feedback!", description: "Your rating helps us improve recommendations." });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  };
+
+  const feedbackTags = [
+    { value: 'great_vibes', label: 'Great vibes' },
+    { value: 'good_food', label: 'Good food' },
+    { value: 'affordable', label: 'Affordable' },
+    { value: 'crowded', label: 'Too crowded' },
+    { value: 'expensive', label: 'Expensive' },
+    { value: 'hard_to_find', label: 'Hard to find' },
+    { value: 'fun_activities', label: 'Fun activities' },
+    { value: 'great_service', label: 'Great service' },
+  ];
 
   const handleProposeTime = async () => {
     if (!session?.id) return;
@@ -894,6 +948,159 @@ export function Session() {
                   <Lock size={12} className="mr-2" /> Plan locked — editing disabled.
               </div>
           )}
+
+          {/* Feedback CTA for locked plans */}
+          {isLocked && !feedbackSubmitted && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-primary/10 border border-primary/30 rounded-lg p-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Star size={16} className="text-primary" />
+                  <span className="text-sm font-medium">How was the event?</span>
+                </div>
+                <Button 
+                  size="sm" 
+                  className="h-7 text-xs bg-primary text-black font-bold"
+                  onClick={() => setFeedbackOpen(true)}
+                  data-testid="button-leave-feedback"
+                >
+                  Leave Feedback
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Feedback submitted confirmation */}
+          {isLocked && feedbackSubmitted && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2 flex items-center justify-center text-xs text-green-400 font-medium">
+              <Check size={12} className="mr-2" /> Thanks for your feedback!
+            </div>
+          )}
+
+          {/* Feedback Dialog */}
+          <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+            <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
+              <DialogHeader>
+                <DialogTitle>Rate this event</DialogTitle>
+                <DialogDescription>Your feedback helps improve recommendations.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                {/* Star Rating */}
+                <div className="flex flex-col items-center gap-2">
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setFeedbackForm(prev => ({ ...prev, rating: star }))}
+                        className="p-1 transition-transform hover:scale-110"
+                        data-testid={`button-star-${star}`}
+                      >
+                        <Star
+                          size={32}
+                          className={cn(
+                            "transition-colors",
+                            star <= feedbackForm.rating
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-white/20"
+                          )}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {feedbackForm.rating === 0 ? 'Tap to rate' :
+                     feedbackForm.rating === 1 ? 'Poor' :
+                     feedbackForm.rating === 2 ? 'Fair' :
+                     feedbackForm.rating === 3 ? 'Good' :
+                     feedbackForm.rating === 4 ? 'Great' : 'Amazing!'}
+                  </span>
+                </div>
+
+                {/* Tags */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">What stood out? (optional)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {feedbackTags.map(tag => (
+                      <button
+                        key={tag.value}
+                        onClick={() => setFeedbackForm(prev => ({
+                          ...prev,
+                          tags: prev.tags.includes(tag.value)
+                            ? prev.tags.filter(t => t !== tag.value)
+                            : [...prev.tags, tag.value]
+                        }))}
+                        className={cn(
+                          "px-2.5 py-1 text-xs rounded-full border transition-colors",
+                          feedbackForm.tags.includes(tag.value)
+                            ? "bg-primary text-black border-primary"
+                            : "bg-white/5 border-white/10 hover:border-white/20"
+                        )}
+                        data-testid={`button-tag-${tag.value}`}
+                      >
+                        {tag.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Would Recommend */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Would you recommend this place?</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={feedbackForm.wouldRecommend === true ? "default" : "outline"}
+                      className={cn(
+                        "flex-1",
+                        feedbackForm.wouldRecommend === true && "bg-green-500 hover:bg-green-600"
+                      )}
+                      onClick={() => setFeedbackForm(prev => ({ ...prev, wouldRecommend: true }))}
+                      data-testid="button-recommend-yes"
+                    >
+                      <ThumbsUp size={14} className="mr-1" /> Yes
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={feedbackForm.wouldRecommend === false ? "default" : "outline"}
+                      className={cn(
+                        "flex-1",
+                        feedbackForm.wouldRecommend === false && "bg-red-500 hover:bg-red-600"
+                      )}
+                      onClick={() => setFeedbackForm(prev => ({ ...prev, wouldRecommend: false }))}
+                      data-testid="button-recommend-no"
+                    >
+                      <ThumbsDown size={14} className="mr-1" /> No
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Review Text */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Additional notes (optional)</Label>
+                  <Input
+                    placeholder="Share your experience..."
+                    value={feedbackForm.review}
+                    onChange={e => setFeedbackForm(prev => ({ ...prev, review: e.target.value }))}
+                    className="bg-white/5 border-white/10"
+                    data-testid="input-review"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={handleSubmitFeedback}
+                  disabled={feedbackForm.rating === 0 || isSubmittingFeedback}
+                  className="w-full bg-primary text-black font-bold"
+                  data-testid="button-submit-feedback"
+                >
+                  {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Regenerate Options CTA */}
           {!isLocked && showRegenerateCta && session.suggestions.length > 0 && (

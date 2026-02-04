@@ -165,4 +165,11 @@ export const api = {
     vote: (id: string) => fetchAPI(`/proposed-times/${id}/vote`, { method: 'POST' }),
     delete: (id: string) => fetchAPI(`/proposed-times/${id}`, { method: 'DELETE' }),
   },
+
+  feedback: {
+    get: (sessionId: string) => fetchAPI(`/sessions/${sessionId}/feedback`),
+    submit: (sessionId: string, data: { rating: number; review?: string; tags?: string[]; wouldRecommend?: boolean | null; suggestionId?: string }) =>
+      fetchAPI(`/sessions/${sessionId}/feedback`, { method: 'POST', body: JSON.stringify(data) }),
+    venueRating: (name: string) => fetchAPI(`/feedback/venue/${encodeURIComponent(name)}`),
+  },
 };

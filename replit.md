@@ -40,6 +40,7 @@ Preferred communication style: Simple, everyday language.
   - `notifications`: In-app notifications with type, title, body, url, isRead
   - `notification_prefs`: Per-user email notification preferences
   - `proposedTimes`: Alternative time proposals for sessions with voting support
+  - `eventFeedback`: Post-event ratings (1-5 stars), reviews, tags, and recommendations
 
 ### Authentication Flow
 - Registration collects user preferences during onboarding (multi-step form)
@@ -54,6 +55,15 @@ Preferred communication style: Simple, everyday language.
 - **Triggers**: Join session, lock plan, voting open, availability nudge (with 12-hour cooldown)
 - **Preferences**: Per-user email toggle stored in notification_prefs table
 - **Helper Module**: `server/notifications.ts` handles creation and email sending
+- **Calendar Invites**: When a plan is locked with a confirmed date, .ics calendar files are generated and attached to emails
+
+### Post-Event Feedback System
+- **Feedback Collection**: Users can rate events 1-5 stars after plans are locked
+- **Feedback Data**: Rating, optional review text, tags (great_vibes, good_food, crowded, etc.), recommendation boolean
+- **Single Submission**: Users can only submit feedback once per session
+- **Venue Learning**: `getVenueAverageRating` aggregates feedback by venue name for algorithm learning
+- **API Endpoints**: GET/POST `/api/sessions/:sessionId/feedback`, GET `/api/feedback/venue/:name`
+- **UI Location**: Feedback CTA banner appears on locked session pages
 
 ### Key Design Patterns
 - **Shared Types**: Schema definitions in `shared/` directory used by both client and server

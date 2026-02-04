@@ -1,6 +1,55 @@
 import { storage } from './storage';
 import type { InsertNotification, Notification, NotificationType } from '@shared/schema';
 
+interface CalendarEventParams {
+  title: string;
+  description: string;
+  location: string;
+  startDate: Date;
+  durationMinutes?: number;
+  url?: string;
+}
+
+export function generateICSFile(params: CalendarEventParams): string {
+  const { title, description, location, startDate, durationMinutes = 120, url } = params;
+  
+  const formatDate = (date: Date): string => {
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
+  
+  const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+  const uid = `vibecheck-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@vibecheck.app`;
+  
+  const escapeText = (text: string): string => {
+    return text
+      .replace(/\\/g, '\\\\')
+      .replace(/;/g, '\\;')
+      .replace(/,/g, '\\,')
+      .replace(/\n/g, '\\n');
+  };
+  
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//VibeCheck//Event Planner//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${formatDate(new Date())}`,
+    `DTSTART:${formatDate(startDate)}`,
+    `DTEND:${formatDate(endDate)}`,
+    `SUMMARY:${escapeText(title)}`,
+    `DESCRIPTION:${escapeText(description)}${url ? `\\n\\nMore details: ${url}` : ''}`,
+    `LOCATION:${escapeText(location)}`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ];
+  
+  return lines.join('\r\n');
+}
+
 interface CreateNotificationParams {
   userId: string;
   type: NotificationType;
@@ -174,8 +223,13 @@ export async function notifyPlanLocked(params: {
   winningOption: string;
   participantIds: string[];
   detailUrl?: string;
+  eventDetails?: {
+    location: string;
+    startDate: Date;
+    description?: string;
+  };
 }): Promise<void> {
-  const { sessionId, sessionName, winningOption, participantIds, detailUrl } = params;
+  const { sessionId, sessionName, winningOption, participantIds, detailUrl, eventDetails } = params;
   const url = `/session/${sessionId}`;
   const planName = sessionName || 'Your plan';
 
@@ -187,6 +241,125 @@ export async function notifyPlanLocked(params: {
       body: `It's happening: ${winningOption}${detailUrl ? ' • Tap to see details' : ''}`,
       url,
     });
+  }
+
+  if (eventDetails) {
+    await sendCalendarInviteEmails({
+      sessionId,
+      sessionName: planName,
+      winningOption,
+      participantIds,
+      eventDetails,
+      url,
+    });
+  }
+}
+
+async function sendCalendarInviteEmails(params: {
+  sessionId: string;
+  sessionName: string;
+  winningOption: string;
+  participantIds: string[];
+  eventDetails: {
+    location: string;
+    startDate: Date;
+    description?: string;
+  };
+  url: string;
+}): Promise<void> {
+  const { sessionId, sessionName, winningOption, participantIds, eventDetails, url } = params;
+  
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.FROM_EMAIL;
+  const appBaseUrl = process.env.APP_BASE_URL || (process.env.REPL_SLUG 
+    ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+    : '');
+
+  if (!resendApiKey || !fromEmail || !appBaseUrl) {
+    console.log('[Calendar Email] Skipping - missing env vars');
+    return;
+  }
+
+  const icsContent = generateICSFile({
+    title: `${sessionName}: ${winningOption}`,
+    description: eventDetails.description || `Event planned with VibeCheck!\n\nVenue: ${winningOption}`,
+    location: eventDetails.location,
+    startDate: eventDetails.startDate,
+    url: `${appBaseUrl}${url}`,
+  });
+
+  const icsBase64 = Buffer.from(icsContent).toString('base64');
+
+  for (const userId of participantIds) {
+    try {
+      const user = await storage.getUser(userId);
+      if (!user?.email) continue;
+
+      const prefs = await storage.getNotificationPrefs(userId);
+      if (prefs && !prefs.emailEnabled) continue;
+
+      const deepLink = `${appBaseUrl}${url}`;
+      const eventDate = eventDetails.startDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+
+      const htmlContent = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #84cc16 0%, #22c55e 100%); padding: 2px; border-radius: 16px;">
+            <div style="background: #0a0a0a; border-radius: 14px; padding: 32px;">
+              <h1 style="color: #ffffff; margin: 0 0 8px 0; font-size: 24px;">It's locked in! 🎉</h1>
+              <h2 style="color: #84cc16; margin: 0 0 24px 0; font-size: 20px;">${winningOption}</h2>
+              <div style="background: #171717; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                <p style="color: #a3a3a3; margin: 0 0 8px 0; font-size: 14px;">📅 ${eventDate}</p>
+                <p style="color: #a3a3a3; margin: 0; font-size: 14px;">📍 ${eventDetails.location}</p>
+              </div>
+              <p style="color: #a3a3a3; margin: 0 0 24px 0; font-size: 14px;">
+                A calendar invite is attached to this email. Add it to your calendar so you don't miss out!
+              </p>
+              <a href="${deepLink}" 
+                 style="display: inline-block; background: #84cc16; color: #000000; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">
+                View Plan Details
+              </a>
+            </div>
+          </div>
+          <p style="color: #525252; text-align: center; margin: 16px 0 0 0; font-size: 12px;">
+            Sent by VibeCheck • <a href="${appBaseUrl}/profile" style="color: #84cc16;">Manage notifications</a>
+          </p>
+        </div>
+      `;
+
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: user.email,
+          subject: `${sessionName} is happening: ${winningOption}`,
+          html: htmlContent,
+          attachments: [
+            {
+              filename: 'event.ics',
+              content: icsBase64,
+            },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('[Calendar Email] Failed:', await response.text());
+      } else {
+        console.log('[Calendar Email] Sent to:', user.email);
+      }
+    } catch (error) {
+      console.error('[Calendar Email] Error:', error);
+    }
   }
 }
 

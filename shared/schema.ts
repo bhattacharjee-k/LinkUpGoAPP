@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, jsonb, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, jsonb, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -219,3 +219,37 @@ export const proposedTimes = pgTable("proposed_times", {
 export const insertProposedTimeSchema = createInsertSchema(proposedTimes).omit({ id: true, createdAt: true, votes: true });
 export type InsertProposedTime = z.infer<typeof insertProposedTimeSchema>;
 export type ProposedTime = typeof proposedTimes.$inferSelect;
+
+// Event feedback - post-event ratings and reviews
+export const eventFeedback = pgTable("event_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  suggestionId: varchar("suggestion_id").references(() => suggestions.id, { onDelete: 'set null' }), // The venue/event that was chosen
+  rating: integer("rating").notNull(), // 1-5 star rating
+  review: text("review"), // Optional text explanation
+  tags: text("tags").array().default(sql`'{}'::text[]`), // Quick feedback tags like 'great_vibe', 'too_crowded', 'perfect_price', etc.
+  wouldRecommend: boolean("would_recommend"), // Would recommend to friends
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertEventFeedbackSchema = createInsertSchema(eventFeedback).omit({ id: true, createdAt: true });
+export type InsertEventFeedback = z.infer<typeof insertEventFeedbackSchema>;
+export type EventFeedback = typeof eventFeedback.$inferSelect;
+
+// Feedback tags for quick selection
+export const FeedbackTags = {
+  GREAT_VIBE: 'great_vibe',
+  TOO_CROWDED: 'too_crowded',
+  PERFECT_PRICE: 'perfect_price',
+  TOO_EXPENSIVE: 'too_expensive',
+  GOOD_SERVICE: 'good_service',
+  POOR_SERVICE: 'poor_service',
+  GREAT_FOOD: 'great_food',
+  DISAPPOINTING_FOOD: 'disappointing_food',
+  EASY_TO_FIND: 'easy_to_find',
+  HARD_TO_FIND: 'hard_to_find',
+  WOULD_RETURN: 'would_return',
+  WOULD_NOT_RETURN: 'would_not_return',
+} as const;
+export type FeedbackTag = typeof FeedbackTags[keyof typeof FeedbackTags];

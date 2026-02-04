@@ -13,7 +13,8 @@ import type {
   Message, InsertMessage,
   Notification, InsertNotification,
   NotificationPrefs, InsertNotificationPrefs,
-  ProposedTime, InsertProposedTime
+  ProposedTime, InsertProposedTime,
+  EventFeedback, InsertEventFeedback
 } from '@shared/schema';
 
 const pool = new pg.Pool({
@@ -93,6 +94,13 @@ export interface IStorage {
   createProposedTime(data: InsertProposedTime): Promise<ProposedTime>;
   voteForProposedTime(proposedTimeId: string, userId: string): Promise<ProposedTime | undefined>;
   deleteProposedTime(id: string): Promise<void>;
+
+  // Event Feedback
+  getSessionFeedback(sessionId: string): Promise<EventFeedback[]>;
+  getUserFeedback(userId: string): Promise<EventFeedback[]>;
+  createFeedback(data: InsertEventFeedback): Promise<EventFeedback>;
+  hasUserSubmittedFeedback(sessionId: string, userId: string): Promise<boolean>;
+  getVenueAverageRating(suggestionName: string): Promise<{ avgRating: number; count: number } | null>;
 }
 
 export class DbStorage implements IStorage {
@@ -525,6 +533,49 @@ export class DbStorage implements IStorage {
 
   async deleteProposedTime(id: string): Promise<void> {
     await db.delete(schema.proposedTimes).where(eq(schema.proposedTimes.id, id));
+  }
+
+  // Event Feedback
+  async getSessionFeedback(sessionId: string): Promise<EventFeedback[]> {
+    const feedback = await db.select().from(schema.eventFeedback)
+      .where(eq(schema.eventFeedback.sessionId, sessionId))
+      .orderBy(schema.eventFeedback.createdAt);
+    return feedback;
+  }
+
+  async getUserFeedback(userId: string): Promise<EventFeedback[]> {
+    const feedback = await db.select().from(schema.eventFeedback)
+      .where(eq(schema.eventFeedback.userId, userId))
+      .orderBy(schema.eventFeedback.createdAt);
+    return feedback;
+  }
+
+  async createFeedback(data: InsertEventFeedback): Promise<EventFeedback> {
+    const [created] = await db.insert(schema.eventFeedback).values(data).returning();
+    return created;
+  }
+
+  async hasUserSubmittedFeedback(sessionId: string, userId: string): Promise<boolean> {
+    const [existing] = await db.select().from(schema.eventFeedback)
+      .where(and(
+        eq(schema.eventFeedback.sessionId, sessionId),
+        eq(schema.eventFeedback.userId, userId)
+      ));
+    return !!existing;
+  }
+
+  async getVenueAverageRating(suggestionName: string): Promise<{ avgRating: number; count: number } | null> {
+    // Get all feedback for suggestions with matching names (via join)
+    const results = await db.select({
+      rating: schema.eventFeedback.rating,
+    }).from(schema.eventFeedback)
+      .innerJoin(schema.suggestions, eq(schema.eventFeedback.suggestionId, schema.suggestions.id))
+      .where(eq(schema.suggestions.name, suggestionName));
+    
+    if (results.length === 0) return null;
+    
+    const sum = results.reduce((acc, r) => acc + r.rating, 0);
+    return { avgRating: sum / results.length, count: results.length };
   }
 }
 
