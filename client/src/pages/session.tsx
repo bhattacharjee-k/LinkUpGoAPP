@@ -54,6 +54,8 @@ export function Session() {
   const [membersOpen, setMembersOpen] = useState(false);
   const [proposeTimeOpen, setProposeTimeOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [confirmLockOpen, setConfirmLockOpen] = useState(false);
+  const [pendingLockSuggestionId, setPendingLockSuggestionId] = useState<string | null>(null);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackForm, setFeedbackForm] = useState({
     rating: 0,
@@ -453,6 +455,8 @@ export function Session() {
   const handleLockIn = async (suggestionId: string) => {
       await confirmPlan(session.id, suggestionId);
       toast({ title: "Plan Locked!", description: "The group is going!" });
+      setConfirmLockOpen(false);
+      setPendingLockSuggestionId(null);
       // Navigate to the complete page
       setLocation(`/session/${session.id}/complete`);
   };
@@ -466,9 +470,21 @@ export function Session() {
           setTieOptions(winners.map(w => w.id));
           setTieBreakerOpen(true);
       } else if (winners.length === 1) {
-          handleLockIn(winners[0].id);
+          setPendingLockSuggestionId(winners[0].id);
+          setConfirmLockOpen(true);
       } else {
-          handleLockIn(session.suggestions[0].id);
+          setPendingLockSuggestionId(session.suggestions[0].id);
+          setConfirmLockOpen(true);
+      }
+  };
+
+  const handleUnlock = async () => {
+      try {
+        await api.sessions.update(session.id, { status: 'voting', winningOptionId: null });
+        await refreshSession(session.id);
+        toast({ title: "Plan Unlocked", description: "Voting is open again." });
+      } catch (error: any) {
+        toast({ title: "Error", description: error.message || "Failed to unlock plan", variant: "destructive" });
       }
   };
 
@@ -964,8 +980,21 @@ export function Session() {
 
           {/* Locked Banner */}
           {isLocked && (
-              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2 flex items-center justify-center text-xs text-green-400 font-medium">
-                  <Lock size={12} className="mr-2" /> Plan locked — editing disabled.
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center justify-between text-xs text-green-400 font-medium">
+                  <div className="flex items-center">
+                    <Lock size={12} className="mr-2" /> Plan locked — voting complete.
+                  </div>
+                  {isUserAdmin && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-xs text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
+                      onClick={handleUnlock}
+                      data-testid="button-unlock"
+                    >
+                      <RefreshCw size={12} className="mr-1" /> Unlock
+                    </Button>
+                  )}
               </div>
           )}
 
@@ -1612,13 +1641,52 @@ export function Session() {
                         const opt = session.suggestions.find(s => s.id === optId);
                         if (!opt) return null;
                         return (
-                            <Button key={optId} onClick={() => { handleLockIn(optId); setTieBreakerOpen(false); }} className="w-full justify-between" variant="outline">
+                            <Button key={optId} onClick={() => { setPendingLockSuggestionId(optId); setTieBreakerOpen(false); setConfirmLockOpen(true); }} className="w-full justify-between" variant="outline">
                                 <span>{opt.name}</span>
                                 <Badge>{getScore(opt)} pts</Badge>
                             </Button>
                         )
                     })}
                 </div>
+            </DialogContent>
+        </Dialog>
+
+        {/* Confirm Lock Modal */}
+        <Dialog open={confirmLockOpen} onOpenChange={setConfirmLockOpen}>
+            <DialogContent className="bg-card border-white/10 w-[95%] max-w-sm rounded-2xl">
+                <DialogHeader>
+                    <DialogTitle>Confirm Plan?</DialogTitle>
+                    <DialogDescription className="text-muted-foreground">
+                      Once you lock in the plan, voting will be closed. You can unlock it later if needed.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    {pendingLockSuggestionId && (() => {
+                        const winner = session.suggestions.find(s => s.id === pendingLockSuggestionId);
+                        if (!winner) return null;
+                        return (
+                          <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-bold text-lg">{winner.name}</span>
+                              <Badge className="bg-primary text-black">{getScore(winner)} pts</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{winner.description?.slice(0, 80)}...</p>
+                          </div>
+                        );
+                    })()}
+                </div>
+                <DialogFooter className="gap-2">
+                    <Button variant="outline" onClick={() => setConfirmLockOpen(false)} data-testid="button-cancel-lock">
+                        Cancel
+                    </Button>
+                    <Button 
+                      className="bg-primary text-black font-bold" 
+                      onClick={() => pendingLockSuggestionId && handleLockIn(pendingLockSuggestionId)}
+                      data-testid="button-confirm-lock"
+                    >
+                        <Check size={16} className="mr-2" /> Lock In Plan
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
 
