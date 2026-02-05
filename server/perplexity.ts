@@ -5,7 +5,10 @@ const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
 const PERPLEXITY_API_URL = 'https://api.perplexity.ai/chat/completions';
 
 // Cache for Perplexity results (5 minute TTL)
-const perplexityCache = new LRUCache<string, PerplexitySearchResult>(50, 5 * 60 * 1000);
+const perplexityCache = new LRUCache<PerplexitySearchResult>({
+  ttlMs: 5 * 60 * 1000,
+  maxSize: 50,
+});
 
 export interface PerplexitySearchResult {
   answer: string;
@@ -46,7 +49,7 @@ export async function searchPerplexity(query: string): Promise<PerplexitySearchR
   const cached = perplexityCache.get(cacheKey);
   if (cached) {
     devLog('info', '[Perplexity] Cache hit for query');
-    return cached;
+    return cached.data;
   }
 
   try {

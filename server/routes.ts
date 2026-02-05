@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { insertUserSchema, insertGroupSchema, insertSessionSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { getSuggestions, SuggestionOption } from "./suggestions";
+import { getSuggestions, SuggestionOption, generateWhyExplanation, GroupPreferenceSummary } from "./suggestions";
 import { notifyPlanJoined, notifyPlanLocked } from "./notifications";
 import { requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant, requireSessionNotLocked } from "./middleware/auth";
 import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from "./middleware/error-handler";
@@ -248,7 +248,20 @@ export async function registerRoutes(
       'Ticketmaster': 'Web',
     };
 
+    // Build group preference summary for "why" explanation generation
+    const groupPrefs: GroupPreferenceSummary = {
+      memberCount: 1, // Single user context for /api/suggest
+      categories: enrichedData.categories || [],
+      commonCategories: enrichedData.categories || [],
+      budget: enrichedData.budget || '$$',
+      energy: enrichedData.energy || 'Vibey',
+      crowdPreference: enrichedData.crowdPreference,
+      discoveryStyle: enrichedData.discoveryStyle,
+      favoriteNeighborhoods: enrichedData.favoriteNeighborhoods,
+    };
+
     const suggestions = result.options.map(opt => {
+      const whyExplanation = generateWhyExplanation(opt, groupPrefs);
       const suggestion: Record<string, any> = {
         name: opt.title,
         city: data.city,
@@ -260,6 +273,7 @@ export async function registerRoutes(
         budget: opt.priceLevel || '$$',
         description: opt.description || `A great spot in ${data.city}`,
         tags: opt.tags || [],
+        whyExplanation,
       };
       if (opt.detailUrl) suggestion.detailUrl = opt.detailUrl;
       if (opt.reservationUrl) suggestion.reservationUrl = opt.reservationUrl;

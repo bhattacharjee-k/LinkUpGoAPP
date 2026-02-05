@@ -1322,6 +1322,15 @@ export function Session() {
                      {suggestion.description}
                    </p>
                    
+                   {/* Why we picked this */}
+                   {suggestion.whyExplanation && (
+                     <div className="px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+                       <p className="text-xs text-primary font-medium">
+                         {suggestion.whyExplanation}
+                       </p>
+                     </div>
+                   )}
+                   
                    <div className="flex flex-wrap gap-2 text-xs">
                      <span className="px-2 py-1 rounded-md bg-white/5 border border-white/5 flex items-center gap-1">
                        <Users size={12} /> {suggestion.turnout}

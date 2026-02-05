@@ -74,7 +74,20 @@ export interface IStorage {
   // Planner context
   getSessionWithContext(sessionId: string): Promise<{
     session: Session;
-    participants: Array<{ id: string; name: string; preferences: { budget: string[]; energy: string; categories: string[] } }>;
+    participants: Array<{ 
+      id: string; 
+      userId: string;
+      name: string; 
+      preferences: { 
+        budget: string[]; 
+        energy: string; 
+        categories: string[];
+        hardNos?: string[];
+        discoveryStyle?: string | null;
+        crowdPreference?: string | null;
+        favoriteNeighborhoods?: string[] | null;
+      } 
+    }>;
     suggestions: Suggestion[];
     recentMessages: Message[];
   } | undefined>;
@@ -382,7 +395,20 @@ export class DbStorage implements IStorage {
 
   async getSessionWithContext(sessionId: string): Promise<{
     session: Session;
-    participants: Array<{ id: string; name: string; preferences: { budget: string[]; energy: string; categories: string[] } }>;
+    participants: Array<{ 
+      id: string; 
+      userId: string;
+      name: string; 
+      preferences: { 
+        budget: string[]; 
+        energy: string; 
+        categories: string[];
+        hardNos?: string[];
+        discoveryStyle?: string | null;
+        crowdPreference?: string | null;
+        favoriteNeighborhoods?: string[] | null;
+      } 
+    }>;
     suggestions: Suggestion[];
     recentMessages: Message[];
   } | undefined> {
@@ -399,11 +425,16 @@ export class DbStorage implements IStorage {
         if (!user) return null;
         return {
           id: user.id,
+          userId: user.id,
           name: user.name,
           preferences: {
             budget: user.budget,
             energy: user.energy,
-            categories: user.categories
+            categories: user.categories,
+            hardNos: user.hardNos || [],
+            discoveryStyle: user.discoveryStyle,
+            crowdPreference: user.crowdPreference,
+            favoriteNeighborhoods: user.favoriteNeighborhoods,
           }
         };
       })

@@ -83,8 +83,24 @@ Preferred communication style: Simple, everyday language.
 ### API Integrations
 - **Google Places API (New)**: Real venue suggestions with location data, ratings, price levels
 - **Ticketmaster Discovery API**: Live event/concert information with ticket URLs
-- **Caching**: LRU cache with stale-while-revalidate (10m suggestions, 15m Places, 5m events)
+- **Perplexity API**: Web search for venue validation and current intel (trending spots, recent reviews)
+- **OpenAI (Replit AI Integrations)**: Orchestrates the planner, generates personalized explanations
+- **Caching**: LRU cache with stale-while-revalidate (10m suggestions, 15m Places, 5m events, 5m Perplexity)
 - **City Filtering**: Haversine distance with 35mi (NYC) / 30mi (Chicago) radius boundaries
+
+### Personalized "Why" Explanations
+- **Generation**: Each suggestion includes a `whyExplanation` field explaining why it was picked
+- **Factors Considered**:
+  - Bucket type (safe = "Highly rated", explore = "Hidden gem", wildcard = "Wild card")
+  - Category match with group preferences
+  - Budget alignment
+  - Crowd preference match (quiet vs buzzing)
+  - Neighborhood match with favorites
+  - Distance/convenience
+  - Group size suitability
+- **Group Preference Aggregation**: `server/group-preferences.ts` combines user preferences
+- **Perplexity Validation**: `server/perplexity.ts` can validate venues and discover trending spots
+- **UI Display**: Suggestion cards show the "why" explanation in a highlighted box
 
 ### Multi-Bucket Suggestion Generation (Diversity-First)
 - **SAFE bucket**: 2 options with high rating (≥4.4), higher review count (≥50), preferred radius

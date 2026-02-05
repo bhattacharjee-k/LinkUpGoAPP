@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { Session, Message, User, Suggestion, InsertSuggestion } from "@shared/schema";
-import { getSuggestions } from "./suggestions";
+import { getSuggestions, generateWhyExplanation, GroupPreferenceSummary } from "./suggestions";
+import { aggregateGroupPreferences } from "./group-preferences";
 import { storage } from "./storage";
 
 const openai = new OpenAI({
@@ -92,7 +93,20 @@ const plannerTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 interface PlannerContext {
   session: Session;
   user: User;
-  participants: { id: string; name: string; preferences: { budget: string[]; energy: string; categories: string[] } }[];
+  participants: { 
+    id: string; 
+    userId: string;
+    name: string; 
+    preferences: { 
+      budget: string[]; 
+      energy: string; 
+      categories: string[];
+      hardNos?: string[];
+      discoveryStyle?: string | null;
+      crowdPreference?: string | null;
+      favoriteNeighborhoods?: string[] | null;
+    } 
+  }[];
   suggestions: Suggestion[];
   recentMessages: Message[];
   liveEvents?: { name: string; venue: string; date: string; ticketUrl: string }[];
@@ -102,9 +116,50 @@ function buildSystemPrompt(context: PlannerContext): string {
   const { session, participants, suggestions, liveEvents } = context;
   const filters = session.filters as any;
   
-  const participantSummary = participants.map(p => 
-    `- ${p.name}: budget ${p.preferences.budget.join('/')}, energy "${p.preferences.energy}", interests: ${p.preferences.categories.slice(0, 3).join(', ')}`
-  ).join('\n');
+  // Build detailed participant summary including discovery preferences
+  const participantSummary = participants.map(p => {
+    const parts = [`- ${p.name}: budget ${p.preferences.budget.join('/')}, energy "${p.preferences.energy}"`];
+    if (p.preferences.categories.length > 0) {
+      parts.push(`interests: ${p.preferences.categories.slice(0, 3).join(', ')}`);
+    }
+    if (p.preferences.discoveryStyle) {
+      parts.push(`discovery: ${p.preferences.discoveryStyle}`);
+    }
+    if (p.preferences.crowdPreference && p.preferences.crowdPreference !== 'no_preference') {
+      parts.push(`crowd: ${p.preferences.crowdPreference}`);
+    }
+    if (p.preferences.favoriteNeighborhoods && p.preferences.favoriteNeighborhoods.length > 0) {
+      parts.push(`neighborhoods: ${p.preferences.favoriteNeighborhoods.slice(0, 2).join(', ')}`);
+    }
+    return parts.join(', ');
+  }).join('\n');
+  
+  // Use proper group preference aggregation for true consensus
+  const userPrefsForAggregation = participants.map(p => ({
+    id: p.userId,
+    name: p.name,
+    city: filters?.locationScope || 'New York',
+    budget: p.preferences.budget || ['$$'],
+    energy: p.preferences.energy || 'Vibey',
+    categories: p.preferences.categories || [],
+    hardNos: p.preferences.hardNos || [],
+    discoveryStyle: p.preferences.discoveryStyle,
+    crowdPreference: p.preferences.crowdPreference,
+    favoriteNeighborhoods: p.preferences.favoriteNeighborhoods,
+  }));
+  
+  let discoveryConsensus = 'mixed';
+  let crowdConsensus = 'no_preference';
+  let favoriteNeighborhoods: string[] = [];
+  let hardNos: string[] = [];
+  
+  if (userPrefsForAggregation.length > 0) {
+    const aggregated = aggregateGroupPreferences(userPrefsForAggregation, session);
+    discoveryConsensus = aggregated.discoveryStyle;
+    crowdConsensus = aggregated.crowdPreference;
+    favoriteNeighborhoods = aggregated.favoriteNeighborhoods;
+    hardNos = aggregated.hardNos;
+  }
   
   const suggestionSummary = suggestions.length > 0 
     ? suggestions.map((s, i) => `${i + 1}. ${s.name} (${s.budget}, ${s.rating}★) - ${s.description.slice(0, 50)}...`).join('\n')
@@ -123,6 +178,10 @@ CURRENT PLAN CONTEXT:
 - Vibe: ${filters.energy || 'any'}
 - Categories: ${(filters.category || []).join(', ') || 'any'}
 ${session.neighborhood ? `- Neighborhood: ${session.neighborhood}` : ''}
+- Discovery Style: ${discoveryConsensus} (${discoveryConsensus === 'hidden_gems' ? 'prefer lesser-known spots' : discoveryConsensus === 'popular' ? 'prefer popular spots' : 'balanced mix'})
+- Crowd Preference: ${crowdConsensus}
+${favoriteNeighborhoods.length > 0 ? `- Favorite Neighborhoods: ${favoriteNeighborhoods.slice(0, 4).join(', ')}` : ''}
+${hardNos.length > 0 ? `- Avoid (hard nos): ${hardNos.slice(0, 5).join(', ')}` : ''}
 
 GROUP PREFERENCES:
 ${participantSummary || 'No participants yet.'}
@@ -216,7 +275,35 @@ async function executeToolCall(
       const sourceMap: Record<string, string> = { 'Google': 'Web', 'Ticketmaster': 'Web' };
       const newSuggestions: Suggestion[] = [];
       
+      // Build group preferences using proper aggregation from all participants
+      const userPrefsForAggregation = context.participants.map(p => ({
+        id: p.userId,
+        name: p.name,
+        city: (context.session.filters as any)?.city || 'New York',
+        budget: p.preferences.budget || ['$$'],
+        energy: p.preferences.energy || 'Vibey',
+        categories: p.preferences.categories || [],
+        hardNos: p.preferences.hardNos || [],
+        discoveryStyle: p.preferences.discoveryStyle,
+        crowdPreference: p.preferences.crowdPreference,
+        favoriteNeighborhoods: p.preferences.favoriteNeighborhoods,
+      }));
+      
+      const aggregated = aggregateGroupPreferences(userPrefsForAggregation, context.session);
+      
+      const groupPrefs: GroupPreferenceSummary = {
+        memberCount: aggregated.memberCount,
+        categories: args.categories || aggregated.categories,
+        commonCategories: aggregated.commonCategories,
+        budget: args.budget || aggregated.preferredBudget,
+        energy: aggregated.energyLevel,
+        crowdPreference: aggregated.crowdPreference,
+        discoveryStyle: aggregated.discoveryStyle,
+        favoriteNeighborhoods: aggregated.favoriteNeighborhoods.length > 0 ? aggregated.favoriteNeighborhoods : undefined,
+      };
+      
       for (const opt of result.options.slice(0, 8)) {
+        const whyExplanation = generateWhyExplanation(opt, groupPrefs);
         const suggestion = await storage.createSuggestion({
           sessionId,
           name: opt.title,
@@ -235,6 +322,7 @@ async function executeToolCall(
           eventUrl: opt.eventUrl || null,
           venueName: opt.venueName || null,
           startTime: opt.startTime || null,
+          whyExplanation,
         });
         newSuggestions.push(suggestion);
       }
@@ -256,6 +344,54 @@ async function executeToolCall(
   
   if (toolName === 'add_suggestion') {
     try {
+      // Build group preferences for personalized explanation
+      const userPrefsForAggregation = context.participants.map(p => ({
+        id: p.userId,
+        name: p.name,
+        city: (context.session.filters as any)?.locationScope || 'New York',
+        budget: p.preferences.budget || ['$$'],
+        energy: p.preferences.energy || 'Vibey',
+        categories: p.preferences.categories || [],
+        hardNos: p.preferences.hardNos || [],
+        discoveryStyle: p.preferences.discoveryStyle,
+        crowdPreference: p.preferences.crowdPreference,
+        favoriteNeighborhoods: p.preferences.favoriteNeighborhoods,
+      }));
+      
+      let groupPrefs: GroupPreferenceSummary = {
+        memberCount: context.participants.length || 1,
+        categories: args.tags || [],
+        commonCategories: args.tags || [],
+        budget: args.budget || '$$',
+        energy: 'Vibey',
+      };
+      
+      if (userPrefsForAggregation.length > 0) {
+        const aggregated = aggregateGroupPreferences(userPrefsForAggregation, context.session);
+        groupPrefs = {
+          memberCount: aggregated.memberCount,
+          categories: aggregated.categories,
+          commonCategories: aggregated.commonCategories,
+          budget: args.budget || aggregated.preferredBudget,
+          energy: aggregated.energyLevel,
+          crowdPreference: aggregated.crowdPreference,
+          discoveryStyle: aggregated.discoveryStyle,
+          favoriteNeighborhoods: aggregated.favoriteNeighborhoods.length > 0 ? aggregated.favoriteNeighborhoods : undefined,
+        };
+      }
+      
+      // Create option object for whyExplanation generation
+      const addedOption = {
+        title: args.name,
+        description: args.description || '',
+        priceLevel: args.budget || '$$',
+        tags: args.tags || [],
+        optionType: args.kind || 'venue',
+        generationType: 'safe' as const,
+      };
+      
+      const whyExplanation = generateWhyExplanation(addedOption, groupPrefs);
+      
       const suggestion = await storage.createSuggestion({
         sessionId,
         name: args.name,
@@ -274,6 +410,7 @@ async function executeToolCall(
         eventUrl: null,
         venueName: null,
         startTime: null,
+        whyExplanation,
       });
       
       // Update context for subsequent calls
@@ -340,8 +477,10 @@ export async function* streamPlannerResponse(
       let newSuggestions: Suggestion[] | undefined;
       
       for (const toolCall of toolCalls) {
-        const args = JSON.parse(toolCall.function.arguments);
-        const result = await executeToolCall(toolCall.function.name, args, context);
+        if (toolCall.type !== 'function' || !('function' in toolCall)) continue;
+        const fn = toolCall.function as { name: string; arguments: string };
+        const args = JSON.parse(fn.arguments);
+        const result = await executeToolCall(fn.name, args, context);
         toolResults.push(result);
         if (result.newSuggestions) {
           newSuggestions = result.newSuggestions;
@@ -412,8 +551,10 @@ export async function getPlannerResponse(
       let newSuggestions: Suggestion[] | undefined;
       
       for (const toolCall of toolCalls) {
-        const args = JSON.parse(toolCall.function.arguments);
-        const result = await executeToolCall(toolCall.function.name, args, context);
+        if (toolCall.type !== 'function' || !('function' in toolCall)) continue;
+        const fn = toolCall.function as { name: string; arguments: string };
+        const args = JSON.parse(fn.arguments);
+        const result = await executeToolCall(fn.name, args, context);
         toolResults.push(result);
         if (result.newSuggestions) {
           newSuggestions = result.newSuggestions;

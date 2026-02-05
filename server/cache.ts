@@ -15,7 +15,7 @@ interface CacheOptions {
 const DEFAULT_TTL = 10 * 60 * 1000;
 const DEFAULT_MAX_SIZE = 500;
 
-class LRUCache<T> {
+export class LRUCache<T> {
   private cache: Map<string, CacheEntry<T>> = new Map();
   private maxSize: number;
   private ttlMs: number;

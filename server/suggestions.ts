@@ -31,6 +31,7 @@ export interface SuggestionOption {
   generationType?: GenerationType; // Internal tagging for debugging
   placeId?: string; // For deduplication
   eventId?: string; // For deduplication
+  whyExplanation?: string; // AI-generated personalized reason
 }
 
 export interface SuggestRequest {
@@ -922,4 +923,117 @@ function scoreAndRank(options: SuggestionOption[], req: SuggestRequest, center: 
   }
 
   return options.sort((a, b) => (b.score || 0) - (a.score || 0));
+}
+
+export interface GroupPreferenceSummary {
+  memberCount: number;
+  categories: string[];
+  commonCategories: string[];
+  budget: string;
+  energy: string;
+  crowdPreference?: string;
+  discoveryStyle?: string;
+  favoriteNeighborhoods?: string[];
+}
+
+export function generateWhyExplanation(
+  option: SuggestionOption,
+  groupPrefs: GroupPreferenceSummary
+): string {
+  const reasons: string[] = [];
+  
+  // Bucket-based explanation (primary reason)
+  if (option.generationType === 'safe') {
+    if (option.rating && parseFloat(option.rating) >= 4.5) {
+      reasons.push(`Highly rated at ${option.rating}★`);
+    } else if (option.ratingCount && option.ratingCount > 100) {
+      reasons.push('Crowd favorite with strong reviews');
+    } else {
+      reasons.push('Reliable choice with consistent quality');
+    }
+  } else if (option.generationType === 'explore') {
+    if (option.ratingCount && option.ratingCount < 50) {
+      reasons.push('Hidden gem waiting to be discovered');
+    } else {
+      reasons.push('Something new to try');
+    }
+  } else if (option.generationType === 'wildcard') {
+    reasons.push('Wild card for variety');
+  }
+
+  // Category match
+  const matchingCategories = option.tags.filter(tag => 
+    groupPrefs.categories.some(cat => 
+      tag.toLowerCase().includes(cat.toLowerCase()) || 
+      cat.toLowerCase().includes(tag.toLowerCase())
+    )
+  );
+  if (matchingCategories.length > 0) {
+    reasons.push(`Matches your ${matchingCategories[0]} vibe`);
+  }
+
+  // Budget match
+  if (option.priceLevel && groupPrefs.budget) {
+    const budgetOrder = ['$', '$$', '$$$', '$$$$'];
+    const optLevel = budgetOrder.indexOf(option.priceLevel);
+    const prefLevel = budgetOrder.indexOf(groupPrefs.budget);
+    if (Math.abs(optLevel - prefLevel) <= 1) {
+      reasons.push(`Fits your ${groupPrefs.budget} budget`);
+    }
+  }
+
+  // Crowd preference match
+  if (groupPrefs.crowdPreference && groupPrefs.crowdPreference !== 'no_preference') {
+    const estimatedCrowd = option.ratingCount && option.ratingCount > 300 ? 'buzzing' : 'quiet';
+    if (estimatedCrowd === groupPrefs.crowdPreference) {
+      reasons.push(groupPrefs.crowdPreference === 'quiet' 
+        ? 'More intimate setting' 
+        : 'Lively atmosphere');
+    }
+  }
+
+  // Neighborhood match
+  if (groupPrefs.favoriteNeighborhoods && groupPrefs.favoriteNeighborhoods.length > 0) {
+    const addressLower = (option.address || '').toLowerCase();
+    const matchedNeighborhood = groupPrefs.favoriteNeighborhoods.find(n => 
+      addressLower.includes(n.toLowerCase())
+    );
+    if (matchedNeighborhood) {
+      reasons.push(`In ${matchedNeighborhood}`);
+    }
+  }
+
+  // Distance
+  if (option.distance) {
+    const dist = parseFloat(option.distance.replace(' mi', ''));
+    if (dist <= 0.5) {
+      reasons.push('Super close by');
+    } else if (dist <= 1) {
+      reasons.push('Easy walk');
+    }
+  }
+
+  // Group size consideration
+  if (groupPrefs.memberCount >= 5) {
+    const goodForGroups = option.tags.some(t => 
+      ['restaurant', 'bar', 'big group'].some(k => t.toLowerCase().includes(k))
+    );
+    if (goodForGroups) {
+      reasons.push('Works for your group');
+    }
+  }
+
+  // Combine reasons (max 2-3 for concise explanation)
+  const topReasons = reasons.slice(0, 3);
+  return topReasons.join(' · ') || 'Great option for your group';
+}
+
+export async function enrichSuggestionsWithExplanations(
+  options: SuggestionOption[],
+  groupPrefs: GroupPreferenceSummary
+): Promise<SuggestionOption[]> {
+  return options.map(option => ({
+    ...option,
+    whyExplanation: generateWhyExplanation(option, groupPrefs),
+  }));
 }

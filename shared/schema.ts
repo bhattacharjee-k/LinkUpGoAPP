@@ -116,6 +116,7 @@ export const suggestions = pgTable("suggestions", {
   eventUrl: text("event_url"), // Optional event page link
   venueName: text("venue_name"), // For events - the venue hosting
   startTime: text("start_time"), // For events - start time
+  whyExplanation: text("why_explanation"), // AI-generated personalized reason for this suggestion
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
