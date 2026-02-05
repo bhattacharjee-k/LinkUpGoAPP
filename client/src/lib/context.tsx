@@ -453,8 +453,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const confirmPlan = async (sessionId: string, suggestionId: string) => {
     await api.sessions.update(sessionId, {
       status: 'locked',
-      lockedByUserId: user?.id,
-      lockedAt: new Date().toISOString(),
       winningOptionId: suggestionId
     });
     await refreshSession(sessionId);

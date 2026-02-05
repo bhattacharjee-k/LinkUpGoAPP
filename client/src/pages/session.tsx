@@ -39,6 +39,7 @@ export function Session() {
   const [tieOptions, setTieOptions] = useState<string[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [replacingSuggestionId, setReplacingSuggestionId] = useState<string | null>(null);
   const [showRegenerateCta, setShowRegenerateCta] = useState(false);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -347,6 +348,23 @@ export function Session() {
   const handleAddGroupMember = (memberId: string) => {
       addParticipantToSession(session.id, memberId);
       toast({ title: "Added", description: "Group member added to plan." });
+  };
+
+  const handleReplaceSuggestion = async (suggestionId: string) => {
+    setReplacingSuggestionId(suggestionId);
+    try {
+      const response = await api.suggestions.replace(session.id, suggestionId);
+      if (response.newSuggestion) {
+        toast({ title: "New suggestion added!", description: `Found: ${response.newSuggestion.name}` });
+        refreshSession(session.id);
+      } else {
+        toast({ title: "No alternatives found", description: "Try adjusting your filters.", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to find new suggestion", variant: "destructive" });
+    } finally {
+      setReplacingSuggestionId(null);
+    }
   };
 
   const toggleCategory = (c: Category) => {
@@ -1433,15 +1451,32 @@ export function Session() {
                      );
                    })()}
 
+                   {/* Suggest New Button - Admin only */}
                    {isUserAdmin && !isLocked && (
-                        <Button 
-                            variant="secondary" 
-                            className="w-full bg-white/5 hover:bg-primary hover:text-black transition-all text-xs h-8 font-bold mt-2 border border-white/5"
-                            onClick={() => confirmPlan(session.id, suggestion.id)}
-                        >
-                            <Shield size={12} className="mr-2" /> Lock In
-                        </Button>
+                     <div className="pt-3 border-t border-white/5">
+                       <Button 
+                         variant="outline" 
+                         size="sm"
+                         className="w-full h-9 text-xs border-white/10 hover:bg-white/5"
+                         onClick={() => handleReplaceSuggestion(suggestion.id)}
+                         disabled={replacingSuggestionId === suggestion.id}
+                         data-testid={`button-suggest-new-${suggestion.id}`}
+                       >
+                         {replacingSuggestionId === suggestion.id ? (
+                           <>
+                             <RefreshCw size={12} className="mr-2 animate-spin" />
+                             Finding...
+                           </>
+                         ) : (
+                           <>
+                             <RefreshCw size={12} className="mr-2" />
+                             Suggest New
+                           </>
+                         )}
+                       </Button>
+                     </div>
                    )}
+
                  </div>
                </motion.div>
              );
@@ -1449,8 +1484,8 @@ export function Session() {
              })()
              )}
              
-             {/* All Votes In Button - active when at least 1 vote exists */}
-             {!isLocked && session.suggestions.length > 0 && (() => {
+             {/* All Votes In Button - admin only, active when at least 1 vote exists */}
+             {isUserAdmin && !isLocked && session.suggestions.length > 0 && (() => {
                const totalVotes = session.suggestions.reduce((acc, s) => {
                  const voteData = getSuggestionVoteData(s);
                  const summary = getVoteSummary(voteData);

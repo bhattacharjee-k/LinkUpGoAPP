@@ -797,6 +797,83 @@ export async function registerRoutes(
     }
   });
 
+  // Replace a single suggestion with a new one (admin only)
+  app.post("/api/sessions/:id/suggestions/:suggestionId/replace", async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const session = await storage.getSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      // Check if user is admin
+      const group = await storage.getGroup(session.groupId);
+      if (!group || group.adminId !== userId) {
+        return res.status(403).json({ message: "Only the group admin can replace suggestions" });
+      }
+      
+      // Delete the old suggestion
+      await storage.deleteSuggestion(req.params.suggestionId);
+      
+      // Get current suggestions to avoid duplicates
+      const currentSuggestions = await storage.getSessionSuggestions(session.id);
+      const existingNames = new Set(currentSuggestions.map(s => s.name.toLowerCase()));
+      
+      // Import the suggestion generator
+      const { getSuggestions } = await import('./suggestions');
+      
+      // Generate new suggestions
+      const filters = session.filters as any;
+      const { options } = await getSuggestions({
+        city: filters?.locationScope || 'NYC',
+        categories: filters?.category || ['Drinks'],
+        budget: filters?.budget || '$$',
+        specificDate: filters?.specificDate || undefined,
+        neighborhood: session.neighborhood || undefined,
+      });
+      
+      // Filter out duplicates and pick one
+      const newCandidates = options.filter((s) => !existingNames.has(s.title.toLowerCase()));
+      
+      if (newCandidates.length === 0) {
+        return res.json({ newSuggestion: null, message: "No new alternatives found" });
+      }
+      
+      // Pick the first non-duplicate suggestion
+      const newOption = newCandidates[0];
+      
+      // Save the new suggestion
+      const created = await storage.createSuggestion({
+        sessionId: session.id,
+        name: newOption.title,
+        city: filters?.locationScope || 'NYC',
+        source: newOption.source || 'Google Places',
+        kind: newOption.optionType === 'event' ? 'event' : 'venue',
+        budget: newOption.priceLevel || '$$',
+        rating: newOption.rating || '4.0',
+        turnout: 'Medium',
+        distance: newOption.distance || 'Nearby',
+        description: newOption.description || '',
+        tags: newOption.tags || [],
+        reservationUrl: newOption.reservationUrl || null,
+        ticketUrl: newOption.ticketUrl || null,
+        eventUrl: newOption.eventUrl || null,
+        detailUrl: newOption.detailUrl || null,
+        whyExplanation: newOption.whyExplanation || null,
+      });
+      
+      res.json({ newSuggestion: created });
+    } catch (error: any) {
+      console.error('[Replace Suggestion Error]', error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.post("/api/sessions/:id/leave", async (req, res) => {
     try {
       // @ts-ignore

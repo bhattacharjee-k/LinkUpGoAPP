@@ -70,6 +70,7 @@ export const api = {
   suggestions: {
     create: (data: any) => fetchAPI('/suggestions', { method: 'POST', body: JSON.stringify(data) }),
     deleteForSession: (sessionId: string) => fetchAPI(`/sessions/${sessionId}/suggestions`, { method: 'DELETE' }),
+    replace: (sessionId: string, suggestionId: string) => fetchAPI(`/sessions/${sessionId}/suggestions/${suggestionId}/replace`, { method: 'POST' }),
     fetch: (data: {
       city: string;
       neighborhood?: string;
