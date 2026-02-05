@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Onboarding } from "@/pages/onboarding";
 import { Home } from "@/pages/home";
 import { Session } from "@/pages/session";
+import { SessionComplete } from "@/pages/session-complete";
 import { NewPlan } from "@/pages/new-plan";
 import { GroupDetails } from "@/pages/group-details";
 import { Groups } from "@/pages/groups";
@@ -166,6 +167,7 @@ function Router() {
         <PrivateRoute component={NewPlan} />
       </Route>
 
+      <Route path="/session/:id/complete" component={SessionComplete} />
       <Route path="/session/:id" component={Session} />
       
       <Route path="/" component={user ? Home : Onboarding} />

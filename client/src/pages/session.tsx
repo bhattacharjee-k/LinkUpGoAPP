@@ -432,9 +432,11 @@ export function Session() {
     }
   };
 
-  const handleLockIn = (suggestionId: string) => {
-      confirmPlan(session.id, suggestionId);
+  const handleLockIn = async (suggestionId: string) => {
+      await confirmPlan(session.id, suggestionId);
       toast({ title: "Plan Locked!", description: "The group is going!" });
+      // Navigate to the complete page
+      setLocation(`/session/${session.id}/complete`);
   };
   
   const handleAdminLock = () => {
@@ -1447,14 +1449,39 @@ export function Session() {
              })()
              )}
              
-             {/* Admin Confirm All / Tie Breaker Button */}
-             {isUserAdmin && !isLocked && session.suggestions.length > 0 && (
+             {/* All Votes In Button - active when at least 1 vote exists */}
+             {!isLocked && session.suggestions.length > 0 && (() => {
+               const totalVotes = session.suggestions.reduce((acc, s) => {
+                 const voteData = getSuggestionVoteData(s);
+                 const summary = getVoteSummary(voteData);
+                 return acc + summary.upvotes + summary.downvotes;
+               }, 0);
+               const hasAnyVotes = totalVotes >= 1;
+               
+               return (
                  <div className="sticky bottom-0 pt-4 pb-2 bg-gradient-to-t from-background via-background to-transparent z-10">
-                    <Button onClick={handleAdminLock} className="w-full bg-primary text-black font-bold h-12 shadow-lg shadow-primary/20">
-                        Confirm Winning Plan
+                    <Button 
+                      onClick={handleAdminLock} 
+                      disabled={!hasAnyVotes}
+                      className={cn(
+                        "w-full font-bold h-12 shadow-lg",
+                        hasAnyVotes 
+                          ? "bg-primary text-black shadow-primary/20" 
+                          : "bg-muted text-muted-foreground cursor-not-allowed"
+                      )}
+                      data-testid="button-all-votes-in"
+                    >
+                        <Check size={18} className="mr-2" />
+                        All Votes In
                     </Button>
+                    {!hasAnyVotes && (
+                      <p className="text-center text-muted-foreground text-xs mt-2">
+                        Vote on at least one option to continue
+                      </p>
+                    )}
                  </div>
-             )}
+               );
+             })()}
           </TabsContent>
 
           {/* Chat Tab */}

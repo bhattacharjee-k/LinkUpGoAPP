@@ -110,10 +110,17 @@ interface PlannerContext {
   suggestions: Suggestion[];
   recentMessages: Message[];
   liveEvents?: { name: string; venue: string; date: string; ticketUrl: string }[];
+  userFeedback?: Array<{
+    rating: number;
+    review: string | null;
+    tags: string[] | null;
+    venueName: string;
+    createdAt: Date;
+  }>;
 }
 
 function buildSystemPrompt(context: PlannerContext): string {
-  const { session, participants, suggestions, liveEvents } = context;
+  const { session, participants, suggestions, liveEvents, userFeedback } = context;
   const filters = session.filters as any;
   
   // Build detailed participant summary including discovery preferences
@@ -169,6 +176,15 @@ function buildSystemPrompt(context: PlannerContext): string {
     ? liveEvents.map((e, i) => `${i + 1}. ${e.name} at ${e.venue} (${e.date}) - Tickets: ${e.ticketUrl}`).join('\n')
     : 'No upcoming events found for this area.';
   
+  // Build user feedback history for AI memory
+  const feedbackHistory = userFeedback && userFeedback.length > 0
+    ? userFeedback.map(f => {
+        const tagsList = f.tags && f.tags.length > 0 ? ` [${f.tags.join(', ')}]` : '';
+        const reviewText = f.review ? ` - "${f.review}"` : '';
+        return `- ${f.venueName}: ${f.rating}★${tagsList}${reviewText}`;
+      }).join('\n')
+    : '';
+  
   return `You are the Planner, an AI assistant helping a group of friends plan a social outing in ${filters.locationScope || 'NYC'}. You're friendly, concise, and helpful.
 
 CURRENT PLAN CONTEXT:
@@ -191,7 +207,16 @@ ${suggestionSummary}
 
 LIVE CONCERTS & EVENTS (from Ticketmaster):
 ${eventsSummary}
+${feedbackHistory ? `
+USER'S PAST OUTING FEEDBACK (use this to personalize suggestions):
+${feedbackHistory}
 
+MEMORY INSIGHTS:
+- Venues with 4-5★ ratings were great experiences - suggest similar places
+- Venues with 1-2★ ratings should be avoided
+- Pay attention to tags like "too_crowded", "too_expensive", "great_vibe" to learn preferences
+- Comments reveal specific likes/dislikes - use these to tailor recommendations
+` : ''}
 YOUR ROLE:
 1. Help the group refine their plan based on preferences
 2. Suggest adjustments to filters if options seem limited

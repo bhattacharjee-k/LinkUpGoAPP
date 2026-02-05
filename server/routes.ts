@@ -998,11 +998,14 @@ export async function registerRoutes(
         filters?.specificDate
       );
       
+      // Fetch user's historical feedback for AI memory
+      const userFeedback = await storage.getUserFeedbackWithVenues(userId);
+      
       let fullResponse = '';
       let plannerResult: any = null;
       
       try {
-        const generator = streamPlannerResponse({ ...context, user, liveEvents }, userMessage);
+        const generator = streamPlannerResponse({ ...context, user, liveEvents, userFeedback }, userMessage);
         
         while (true) {
           const { value, done } = await generator.next();

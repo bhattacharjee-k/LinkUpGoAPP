@@ -111,6 +111,13 @@ export interface IStorage {
   // Event Feedback
   getSessionFeedback(sessionId: string): Promise<EventFeedback[]>;
   getUserFeedback(userId: string): Promise<EventFeedback[]>;
+  getUserFeedbackWithVenues(userId: string): Promise<Array<{
+    rating: number;
+    review: string | null;
+    tags: string[] | null;
+    venueName: string;
+    createdAt: Date;
+  }>>;
   createFeedback(data: InsertEventFeedback): Promise<EventFeedback>;
   hasUserSubmittedFeedback(sessionId: string, userId: string): Promise<boolean>;
   getVenueAverageRating(suggestionName: string): Promise<{ avgRating: number; count: number } | null>;
@@ -579,6 +586,28 @@ export class DbStorage implements IStorage {
       .where(eq(schema.eventFeedback.userId, userId))
       .orderBy(schema.eventFeedback.createdAt);
     return feedback;
+  }
+
+  async getUserFeedbackWithVenues(userId: string): Promise<Array<{
+    rating: number;
+    review: string | null;
+    tags: string[] | null;
+    venueName: string;
+    createdAt: Date;
+  }>> {
+    const results = await db.select({
+      rating: schema.eventFeedback.rating,
+      review: schema.eventFeedback.review,
+      tags: schema.eventFeedback.tags,
+      venueName: schema.suggestions.name,
+      createdAt: schema.eventFeedback.createdAt,
+    }).from(schema.eventFeedback)
+      .innerJoin(schema.suggestions, eq(schema.eventFeedback.suggestionId, schema.suggestions.id))
+      .where(eq(schema.eventFeedback.userId, userId))
+      .orderBy(schema.eventFeedback.createdAt)
+      .limit(20); // Last 20 reviews for context
+    
+    return results;
   }
 
   async createFeedback(data: InsertEventFeedback): Promise<EventFeedback> {
