@@ -80,6 +80,12 @@ export function Session() {
   const session = getSession(params?.id || '');
 
   useEffect(() => {
+    if (params?.id) {
+      refreshSession(params.id);
+    }
+  }, [params?.id]);
+
+  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
@@ -610,19 +616,28 @@ export function Session() {
   }
 
   return (
-    <Layout>
-      <div className="flex flex-col h-screen max-h-screen">
+    <Layout hideNav>
+      <div className="flex flex-col h-[100dvh]">
         {/* Header */}
         <div className="px-6 py-4 border-b border-white/10 bg-background/80 backdrop-blur-md z-20 space-y-3">
           <div className="flex justify-between items-center">
-            <div>
-              <h2 className="font-bold text-lg leading-tight">{session.name || 'LinkUpGo Session'}</h2>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setLocation('/')}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                data-testid="button-back"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h2 className="font-bold text-lg leading-tight">{session.name || 'LinkUpGo Session'}</h2>
               <p className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
                 <span className={cn("w-2 h-2 rounded-full animate-pulse", !isLocked ? "bg-primary" : "bg-green-500")}/> 
                 <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-bold uppercase", !isLocked ? "bg-primary/20 text-primary" : "bg-green-500/20 text-green-400")}>
                     {!isLocked ? 'Voting Open' : 'Locked'}
                 </span>
               </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {!isLocked && (
@@ -1186,7 +1201,7 @@ export function Session() {
           </div>
 
           {/* Suggestions Tab */}
-          <TabsContent value="suggestions" className="flex-1 overflow-y-auto p-6 space-y-6 data-[state=inactive]:hidden">
+          <TabsContent value="suggestions" className="flex-1 overflow-y-auto p-6 pb-8 space-y-6 data-[state=inactive]:hidden">
              {sortedSuggestions.length === 0 ? (
                <div className="flex flex-col items-center justify-center py-16 px-6 text-center space-y-6">
                  <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
@@ -1540,7 +1555,7 @@ export function Session() {
                 )}
               </div>
             </ScrollArea>
-            <div ref={chatInputRef} className="p-4 bg-background border-t border-white/10 flex gap-2">
+            <div ref={chatInputRef} className="p-4 bg-background/95 backdrop-blur-md border-t border-white/10 flex gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <div className="relative flex-1">
                 <Input 
                   placeholder="Discuss or ask @Planner..." 
@@ -1552,11 +1567,11 @@ export function Session() {
                       chatInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
                     }, 300);
                   }}
-                  className="pr-10 bg-white/5 border-white/10 focus-visible:ring-primary text-white placeholder:text-muted-foreground"
+                  className="h-11 bg-white/10 border-white/20 focus-visible:ring-primary text-white placeholder:text-white/40 text-sm"
                   data-testid="input-chat-message"
                 />
               </div>
-              <Button size="icon" onClick={handleSend} className="bg-primary hover:bg-primary/90 text-black" data-testid="button-send-chat">
+              <Button size="icon" onClick={handleSend} className="h-11 w-11 bg-primary hover:bg-primary/90 text-black shrink-0" data-testid="button-send-chat">
                 <Send size={16} />
               </Button>
             </div>
