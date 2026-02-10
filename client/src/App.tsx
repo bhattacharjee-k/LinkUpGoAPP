@@ -13,6 +13,7 @@ import { History } from "@/pages/history";
 import { UpdatesPage } from "@/pages/updates";
 import { useEffect, useState } from "react";
 import { api } from "./lib/api";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 function PrivateRoute({ component: Component }: { component: React.ComponentType }) {
   const { user } = useApp();
@@ -34,6 +35,7 @@ function JoinRoute() {
     const [_, setLocation] = useLocation();
     const [joining, setJoining] = useState(false);
     const [joinedGroupId, setJoinedGroupId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
     
     useEffect(() => {
         const joinGroup = async () => {
@@ -44,9 +46,9 @@ function JoinRoute() {
                     await refreshGroups();
                     await refreshSessions();
                     setJoinedGroupId(group.id);
-                } catch (error) {
-                    console.error("Failed to join group:", error);
-                    setLocation('/');
+                } catch (err: any) {
+                    console.error("Failed to join group:", err);
+                    setError(err.message || "Failed to join group. The invite code may be invalid or expired.");
                 }
             } else if (!user && !isLoading) {
                 const returnPath = encodeURIComponent(window.location.pathname);
@@ -66,6 +68,24 @@ function JoinRoute() {
             }
         }
     }, [joinedGroupId, sessions, setLocation]);
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen bg-background text-foreground gap-4">
+                <div className="text-center">
+                    <h2 className="text-xl font-bold text-red-500">Unable to Join</h2>
+                    <p className="text-muted-foreground mt-2">{error}</p>
+                    <button 
+                        onClick={() => setLocation('/')}
+                        className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+                        data-testid="button-go-home-join"
+                    >
+                        Go Home
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col items-center justify-center h-screen bg-background text-foreground gap-4">
@@ -179,10 +199,12 @@ function Router() {
 
 function App() {
   return (
-    <AppProvider>
-      <Toaster />
-      <Router />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <Toaster />
+        <Router />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 
