@@ -158,15 +158,6 @@ export const api = {
     updatePrefs: (emailEnabled: boolean) => fetchAPI('/notification-prefs', { method: 'POST', body: JSON.stringify({ emailEnabled }) }),
   },
 
-  // Proposed times
-  proposedTimes: {
-    list: (sessionId: string) => fetchAPI(`/sessions/${sessionId}/proposed-times`),
-    create: (sessionId: string, data: { proposedDate: string; timeStart: string; timeEnd: string; note?: string }) =>
-      fetchAPI(`/sessions/${sessionId}/proposed-times`, { method: 'POST', body: JSON.stringify(data) }),
-    vote: (id: string) => fetchAPI(`/proposed-times/${id}/vote`, { method: 'POST' }),
-    delete: (id: string) => fetchAPI(`/proposed-times/${id}`, { method: 'DELETE' }),
-  },
-
   feedback: {
     get: (sessionId: string) => fetchAPI(`/sessions/${sessionId}/feedback`),
     submit: (sessionId: string, data: { rating: number; review?: string; tags?: string[]; wouldRecommend?: boolean | null; suggestionId?: string }) =>
