@@ -1563,9 +1563,9 @@ export function Session() {
                return (
                  <div className="sticky bottom-0 pt-4 pb-2 bg-gradient-to-t from-background via-background to-transparent z-10">
                     {hasAnyVotes && (
-                      <div className="flex items-center justify-center gap-2 mb-2" data-testid="text-vote-progress">
-                        <Users size={14} className="text-muted-foreground" />
-                        <span className={cn("text-xs font-medium", voterCount >= activeCount ? "text-primary" : "text-muted-foreground")}>
+                      <div className="flex items-center justify-center gap-2 mb-2 py-1.5 px-3 rounded-full bg-white/10 border border-white/10 w-fit mx-auto backdrop-blur-sm" data-testid="text-vote-progress">
+                        <Users size={14} className="text-white/70" />
+                        <span className={cn("text-xs font-medium", voterCount >= activeCount ? "text-primary" : "text-white/70")}>
                           {voterCount} of {activeCount} voted
                         </span>
                         {voterCount >= activeCount && <Check size={14} className="text-primary" />}
