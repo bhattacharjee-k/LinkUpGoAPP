@@ -933,6 +933,9 @@ export async function registerRoutes(
         categories: filters?.category || ['Drinks'],
         budget: filters?.budget || '$$',
         specificDate: filters?.specificDate || undefined,
+        specificTime: filters?.specificTime || undefined,
+        timeWindow: filters?.timeWindow || undefined,
+        energy: filters?.energy || undefined,
         neighborhood: session.neighborhood || undefined,
       });
       

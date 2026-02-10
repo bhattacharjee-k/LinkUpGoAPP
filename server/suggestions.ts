@@ -1,8 +1,10 @@
 import { getSearchCenter, haversineDistance, isWithinCity, LatLng } from './geo';
 import { devLog } from './logger';
+import { discoverTrendingVenues } from './perplexity';
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY;
+const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
 
 // Bucket types for diversity-first generation
 export type GenerationType = 'safe' | 'explore' | 'wildcard';
@@ -152,6 +154,111 @@ const priceLevelMap: Record<string, string> = {
 const suggestionsCache = new Map<string, { options: SuggestionOption[]; timestamp: number }>();
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
+function isLateNight(specificTime?: string, timeWindow?: string): boolean {
+  if (specificTime) {
+    const startHour = parseInt(specificTime.split('-')[0]?.split(':')[0] || '19', 10);
+    return startHour >= 21 || startHour <= 4;
+  }
+  if (timeWindow) {
+    return timeWindow.toLowerCase().includes('night');
+  }
+  return false;
+}
+
+function isHighEnergy(energy?: string): boolean {
+  return energy === 'Going out' || energy === 'Full send';
+}
+
+const nightlifeTypes = ['night_club', 'bar'];
+const nightlifeCategories = ['Club', 'Dancing', 'Live Music', 'Lounge', 'Speakeasy', 'Cocktails', 'Drinks', 'Karaoke', 'Dive Bar'];
+const restaurantTypes = ['restaurant', 'cafe'];
+
+function getTimeAwareTypes(categories: string[], specificTime?: string, timeWindow?: string, energy?: string): string[] {
+  const placeTypes = new Set<string>();
+  for (const cat of categories) {
+    const types = categoryToPlaceTypes[cat] || categoryToPlaceTypes['Drinks'];
+    types.forEach(t => placeTypes.add(t));
+  }
+
+  const lateNight = isLateNight(specificTime, timeWindow);
+  const highEnergy = isHighEnergy(energy);
+
+  if (lateNight || highEnergy) {
+    placeTypes.add('night_club');
+    placeTypes.add('bar');
+
+    if (lateNight) {
+      placeTypes.delete('cafe');
+      placeTypes.delete('museum');
+      placeTypes.delete('park');
+    }
+  }
+
+  console.log(`[Suggestions] Time-aware types: lateNight=${lateNight}, highEnergy=${highEnergy}, types=[${Array.from(placeTypes).join(', ')}]`);
+  return Array.from(placeTypes);
+}
+
+function getTimeAwareTicketmasterClasses(categories: string[], specificTime?: string, timeWindow?: string, energy?: string): string[] {
+  const classes = new Set<string>();
+  for (const cat of categories) {
+    if (categoryToTicketmaster[cat]) {
+      classes.add(categoryToTicketmaster[cat]);
+    }
+  }
+
+  if (isLateNight(specificTime, timeWindow) || isHighEnergy(energy)) {
+    classes.add('music');
+  }
+
+  return Array.from(classes);
+}
+
+const restaurantSignals = [
+  'restaurant', 'cafe', 'eatery', 'dining', 'brunch', 'bistro', 'trattoria',
+  'steakhouse', 'grill', 'kitchen', 'diner', 'pizzeria', 'sushi', 'ramen',
+  'coffee', 'bakery', 'ice cream', 'dessert', 'tea house', 'juice',
+];
+
+function looksLikeRestaurant(opt: SuggestionOption): boolean {
+  const tags = opt.tags.map(t => t.toLowerCase());
+  const titleLower = opt.title.toLowerCase();
+  const descLower = (opt.description || '').toLowerCase();
+  
+  if (tags.some(t => restaurantSignals.some(r => t.includes(r)))) return true;
+  if (restaurantSignals.some(r => titleLower.includes(r))) return true;
+  if (descLower.includes('restaurant') || descLower.includes('dining') || descLower.includes('cuisine')) return true;
+  
+  const knownRestaurants = ['dearborn', 'aba ', 'girl & the goat', 'alinea', 'au cheval', 'bavette', 'momotaro'];
+  if (knownRestaurants.some(r => titleLower.includes(r))) return true;
+  
+  return false;
+}
+
+function scoreTimeAppropriateness(opt: SuggestionOption, specificTime?: string, timeWindow?: string, energy?: string): number {
+  const lateNight = isLateNight(specificTime, timeWindow);
+  const highEnergy = isHighEnergy(energy);
+  const tags = opt.tags.map(t => t.toLowerCase());
+
+  if (!lateNight && !highEnergy) return 0;
+
+  const isNightclub = tags.some(t => t.includes('night_club') || t.includes('night club'));
+  const isBar = tags.some(t => t.includes('bar'));
+  const isEvent = opt.optionType === 'event';
+  const isRestaurantLike = looksLikeRestaurant(opt);
+  const isTrending = tags.some(t => t.includes('perplexity'));
+
+  let score = 0;
+  if (isNightclub) score += 20;
+  if (isBar && !isRestaurantLike) score += 12;
+  if (isEvent) score += 15;
+  if (isTrending) score += 10;
+  
+  if (isRestaurantLike && lateNight) score -= 25;
+  if (isBar && isRestaurantLike && lateNight) score -= 10;
+
+  return score;
+}
+
 // Bucket parameters for each generation type
 const BUCKET_PARAMS: Record<GenerationType, BucketParams> = {
   safe: {
@@ -262,6 +369,7 @@ function getCacheKey(req: SuggestRequest): string {
     energy: req.energy,
     timeWindow: req.timeWindow,
     specificDate: req.specificDate,
+    specificTime: req.specificTime,
     discoveryStyle: req.discoveryStyle,
     crowdPreference: req.crowdPreference,
     favoriteNeighborhoods: req.favoriteNeighborhoods?.sort(),
@@ -482,28 +590,35 @@ export async function getSuggestions(
   const center = getSearchCenter(req.city, req.neighborhood, req.userLat, req.userLng);
   const baseRadiusMeters = 3000;
 
-  const placeTypes = new Set<string>();
-  for (const cat of req.categories) {
-    const types = categoryToPlaceTypes[cat] || categoryToPlaceTypes['Drinks'];
-    types.forEach(t => placeTypes.add(t));
-  }
+  const timeAwarePlaceTypes = getTimeAwareTypes(req.categories, req.specificTime, req.timeWindow, req.energy);
+  const timeAwareTicketClasses = getTimeAwareTicketmasterClasses(req.categories, req.specificTime, req.timeWindow, req.energy);
 
-  const ticketmasterClasses = new Set<string>();
-  for (const cat of req.categories) {
-    if (categoryToTicketmaster[cat]) {
-      ticketmasterClasses.add(categoryToTicketmaster[cat]);
-    }
-  }
-
-  // Fetch all candidates with expanded radius for diversity
   const maxRadiusMeters = Math.round(baseRadiusMeters * 1.3);
   
-  const [placesResults, eventsResults] = await Promise.all([
-    fetchGooglePlaces(center, maxRadiusMeters, Array.from(placeTypes), req.city),
-    ticketmasterClasses.size > 0 
-      ? fetchTicketmasterEvents(center, Array.from(ticketmasterClasses), req.specificDate)
+  console.log(`[Suggestions] Request: city=${req.city}, categories=[${req.categories.join(',')}], energy=${req.energy}, time=${req.specificTime || req.timeWindow || 'none'}, placeTypes=[${timeAwarePlaceTypes.join(',')}], ticketClasses=[${timeAwareTicketClasses.join(',')}]`);
+
+  const perplexityCategories = req.categories.length > 0 ? req.categories : ['Drinks'];
+  const shouldSearchPerplexity = PERPLEXITY_API_KEY && (isLateNight(req.specificTime, req.timeWindow) || isHighEnergy(req.energy));
+
+  const [placesResults, eventsResults, trendingVenueNames] = await Promise.all([
+    fetchGooglePlaces(center, maxRadiusMeters, timeAwarePlaceTypes, req.city),
+    timeAwareTicketClasses.length > 0 
+      ? fetchTicketmasterEvents(center, timeAwareTicketClasses, req.specificDate)
       : Promise.resolve([]),
+    shouldSearchPerplexity
+      ? discoverTrendingVenues(req.city, perplexityCategories, {
+          crowdPreference: req.crowdPreference,
+          discoveryStyle: req.discoveryStyle,
+        }).catch(err => { console.error('[Suggestions] Perplexity error:', err); return [] as string[]; })
+      : Promise.resolve([] as string[]),
   ]);
+
+  if (trendingVenueNames.length > 0) {
+    console.log(`[Suggestions] Perplexity trending venues: [${trendingVenueNames.join(', ')}]`);
+    const trendingPlaceResults = await fetchGooglePlacesByName(center, maxRadiusMeters, trendingVenueNames, req.city);
+    console.log(`[Suggestions] Resolved ${trendingPlaceResults.length} trending venues via Google Places`);
+    placesResults.push(...trendingPlaceResults);
+  }
 
   let allCandidates = [...placesResults, ...eventsResults];
 
@@ -542,6 +657,17 @@ export async function getSuggestions(
   });
   const dedupedCount = preDedupCount - allCandidates.length;
 
+  // Hard filter: remove restaurant-primary venues for late-night plans
+  const lateNightFilter = isLateNight(req.specificTime, req.timeWindow) || isHighEnergy(req.energy);
+  if (lateNightFilter) {
+    const beforeFilter = allCandidates.length;
+    allCandidates = allCandidates.filter(opt => !looksLikeRestaurant(opt));
+    const removed = beforeFilter - allCandidates.length;
+    if (removed > 0) {
+      console.log(`[Suggestions] Late-night filter: removed ${removed} restaurant-like venues`);
+    }
+  }
+
   // Generate buckets with diversity-first approach
   // Adjust target counts based on user's discovery style preference
   const targetCounts = getDiscoveryAdjustedCounts(req.discoveryStyle);
@@ -579,7 +705,6 @@ export async function getSuggestions(
       let scoreA = (parseFloat(a.rating || '0') * 10) + Math.min(10, (a.ratingCount || 0) / 50);
       let scoreB = (parseFloat(b.rating || '0') * 10) + Math.min(10, (b.ratingCount || 0) / 50);
       
-      // Boost score if option matches reference profile's preferred types
       if (refProfile && a.tags) {
         const matchA = a.tags.some(t => refProfile.preferredTypes.includes(t.toLowerCase()));
         if (matchA) scoreA += 5;
@@ -589,13 +714,14 @@ export async function getSuggestions(
         if (matchB) scoreB += 5;
       }
       
-      // Boost score if option is in user's favorite neighborhoods
       if (isInFavoriteNeighborhood(a)) scoreA += 3;
       if (isInFavoriteNeighborhood(b)) scoreB += 3;
       
-      // Apply crowd preference boost/penalty
       scoreA += matchesCrowdPreference(a, req.crowdPreference);
       scoreB += matchesCrowdPreference(b, req.crowdPreference);
+      
+      scoreA += scoreTimeAppropriateness(a, req.specificTime, req.timeWindow, req.energy);
+      scoreB += scoreTimeAppropriateness(b, req.specificTime, req.timeWindow, req.energy);
       
       return scoreB - scoreA;
     });
@@ -632,17 +758,17 @@ export async function getSuggestions(
              matchesBudget(opt, req.budget || '$$', downvoteReasons, refProfile || undefined);
     })
     .sort((a, b) => {
-      // Sort by rating but prefer fewer reviews (more novel)
       let noveltyA = 100 - Math.min(100, (a.ratingCount || 0) / 2);
       let noveltyB = 100 - Math.min(100, (b.ratingCount || 0) / 2);
       
-      // Boost score if option is in user's favorite neighborhoods
       if (isInFavoriteNeighborhood(a)) noveltyA += 20;
       if (isInFavoriteNeighborhood(b)) noveltyB += 20;
       
-      // Apply crowd preference boost/penalty
       noveltyA += matchesCrowdPreference(a, req.crowdPreference);
       noveltyB += matchesCrowdPreference(b, req.crowdPreference);
+      
+      noveltyA += scoreTimeAppropriateness(a, req.specificTime, req.timeWindow, req.energy);
+      noveltyB += scoreTimeAppropriateness(b, req.specificTime, req.timeWindow, req.energy);
       
       return noveltyB - noveltyA;
     });
@@ -716,7 +842,10 @@ export async function getSuggestions(
   // Apply scoring and ranking to final selection
   const rankedOptions = scoreAndRank(selectedOptions, req, center);
 
-  // Log bucket distribution and downvote aggregates for debugging
+  console.log(`[Suggestions] Pipeline results: places=${placesResults.length}, events=${eventsResults.length}, trending=${trendingVenueNames.length}, afterCityFilter=${allCandidates.length}, selected=${selectedOptions.length}`);
+  console.log(`[Suggestions] Buckets: safe=${bucketCounts.safe}/${targetCounts.safe}, explore=${bucketCounts.explore}/${targetCounts.explore}, wildcard=${bucketCounts.wildcard}/${targetCounts.wildcard}`);
+  console.log(`[Suggestions] Selected: ${rankedOptions.map(o => `${o.title} (${o.tags.join(',')}, score=${o.score?.toFixed(0)})`).join(' | ')}`);
+  
   devLog('suggestions', `Generated ${rankedOptions.length} options`, {
     buckets: bucketCounts,
     dedupedBeforeSelection: dedupedCount,
@@ -751,7 +880,7 @@ async function fetchGooglePlaces(center: LatLng, radiusMeters: number, types: st
 
   const results: SuggestionOption[] = [];
 
-  for (const type of types.slice(0, 3)) {
+  for (const type of types.slice(0, 5)) {
     try {
       const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
         method: 'POST',
@@ -797,7 +926,10 @@ async function fetchGooglePlaces(center: LatLng, radiusMeters: number, types: st
           ratingCount: place.userRatingCount,
           priceLevel: priceLevelMap[place.priceLevel] || '$$',
           distance: distance ? `${distance.toFixed(1)} mi` : undefined,
-          tags: [type.replace('_', ' ')],
+          tags: [
+            type.replace('_', ' '),
+            ...(place.primaryType && place.primaryType !== type ? [place.primaryType.replace('_', ' ')] : []),
+          ],
           detailUrl: place.websiteUri || place.googleMapsUri,
           reservationUrl: null,
           ticketUrl: null,
@@ -919,10 +1051,83 @@ function scoreAndRank(options: SuggestionOption[], req: SuggestRequest, center: 
       score += Math.min(10, opt.ratingCount / 100);
     }
 
+    score += scoreTimeAppropriateness(opt, req.specificTime, req.timeWindow, req.energy);
+
     opt.score = score;
   }
 
   return options.sort((a, b) => (b.score || 0) - (a.score || 0));
+}
+
+async function fetchGooglePlacesByName(center: LatLng, radiusMeters: number, venueNames: string[], city: string): Promise<SuggestionOption[]> {
+  if (!GOOGLE_PLACES_API_KEY || venueNames.length === 0) return [];
+
+  const results: SuggestionOption[] = [];
+
+  for (const name of venueNames.slice(0, 5)) {
+    try {
+      const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.websiteUri,places.googleMapsUri,places.primaryType,places.editorialSummary',
+        },
+        body: JSON.stringify({
+          textQuery: `${name} ${city}`,
+          locationBias: {
+            circle: {
+              center: { latitude: center.lat, longitude: center.lng },
+              radius: radiusMeters,
+            },
+          },
+          maxResultCount: 1,
+        }),
+      });
+
+      if (!response.ok) continue;
+
+      const data = await response.json();
+      const place = data.places?.[0];
+      if (!place) continue;
+
+      const primaryType = (place.primaryType || '').toLowerCase();
+      const invalidTypes = ['apartment', 'hotel', 'motel', 'school', 'hospital', 'church', 'parking', 'gas_station', 'grocery', 'supermarket', 'shopping_mall', 'real_estate'];
+      if (invalidTypes.some(t => primaryType.includes(t))) {
+        console.log(`[Suggestions] Skipping Perplexity result "${place.displayName?.text}" (type: ${primaryType})`);
+        continue;
+      }
+
+      const lat = place.location?.latitude;
+      const lng = place.location?.longitude;
+      const distance = lat && lng ? haversineDistance(center.lat, center.lng, lat, lng) : null;
+
+      results.push({
+        optionType: 'place',
+        title: place.displayName?.text || name,
+        description: place.editorialSummary?.text || `Trending spot in ${city}`,
+        address: place.formattedAddress || '',
+        city,
+        lat,
+        lng,
+        rating: place.rating?.toString(),
+        ratingCount: place.userRatingCount,
+        priceLevel: priceLevelMap[place.priceLevel] || '$$',
+        distance: distance ? `${distance.toFixed(1)} mi` : undefined,
+        tags: [place.primaryType?.replace('_', ' ') || 'trending', 'Perplexity Pick'],
+        detailUrl: place.websiteUri || place.googleMapsUri,
+        reservationUrl: null,
+        ticketUrl: null,
+        eventUrl: null,
+        source: 'Google',
+        placeId: place.id,
+      });
+    } catch (err) {
+      console.error(`[Suggestions] Error resolving trending venue "${name}":`, err);
+    }
+  }
+
+  return results;
 }
 
 export interface GroupPreferenceSummary {
@@ -1021,6 +1226,19 @@ export function generateWhyExplanation(
     if (goodForGroups) {
       reasons.push('Works for your group');
     }
+  }
+
+  // Nightlife / late-night relevance
+  const isNightlifeVenue = option.tags.some(t => 
+    ['night club', 'night_club', 'club', 'lounge', 'bar'].some(k => t.toLowerCase().includes(k))
+  );
+  const isNightEnergy = groupPrefs.energy === 'Going out' || groupPrefs.energy === 'Full send';
+  if (isNightlifeVenue && isNightEnergy) {
+    reasons.push('Perfect for a night out');
+  }
+
+  if (option.tags.some(t => t.toLowerCase().includes('perplexity'))) {
+    reasons.push('Currently trending');
   }
 
   // Combine reasons (max 2-3 for concise explanation)

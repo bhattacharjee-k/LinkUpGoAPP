@@ -60,11 +60,11 @@ export async function searchPerplexity(query: string): Promise<PerplexitySearchR
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.1-sonar-small-128k-online',
+        model: 'sonar',
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that provides concise, factual information about venues, restaurants, bars, and events. Focus on recent reviews, current status, and quality indicators.'
+            content: 'You are a helpful assistant that provides concise, factual information about venues, restaurants, bars, clubs, and events. Focus on recent reviews, current status, and quality indicators.'
           },
           {
             role: 'user',
@@ -74,15 +74,13 @@ export async function searchPerplexity(query: string): Promise<PerplexitySearchR
         max_tokens: 500,
         temperature: 0.2,
         top_p: 0.9,
-        return_images: false,
-        return_related_questions: false,
-        search_recency_filter: 'month',
         stream: false,
       }),
     });
 
     if (!response.ok) {
-      devLog('error', `[Perplexity] API error: ${response.status}`);
+      const errBody = await response.text().catch(() => 'no body');
+      console.error(`[Perplexity] API error ${response.status}: ${errBody}`);
       return null;
     }
 
@@ -184,6 +182,9 @@ export async function discoverTrendingVenues(
   categories: string[],
   preferences?: { crowdPreference?: string; discoveryStyle?: string }
 ): Promise<string[]> {
+  const nightlifeCategories = ['Club', 'Dancing', 'Live Music', 'Lounge', 'Speakeasy', 'Cocktails', 'Drinks', 'Karaoke', 'Dive Bar'];
+  const hasNightlife = categories.some(c => nightlifeCategories.includes(c));
+  
   const categoryList = categories.slice(0, 3).join(', ');
   const vibeHint = preferences?.crowdPreference === 'quiet' 
     ? 'hidden gems and quieter spots' 
@@ -191,7 +192,12 @@ export async function discoverTrendingVenues(
     ? 'popular and buzzing venues'
     : 'interesting spots';
   
-  const query = `What are the best ${vibeHint} for ${categoryList} in ${city} right now? Focus on places that opened recently or are currently trending. List just the venue names.`;
+  let query: string;
+  if (hasNightlife) {
+    query = `What are the best nightclubs, bars, and nightlife spots in ${city} right now for a fun night out? Include clubs with DJs, dance floors, late-night bars, and lounges that are currently popular. List just the venue names, no descriptions.`;
+  } else {
+    query = `What are the best ${vibeHint} for ${categoryList} in ${city} right now? Focus on places that opened recently or are currently trending. List just the venue names.`;
+  }
   
   const result = await searchPerplexity(query);
   
@@ -199,11 +205,29 @@ export async function discoverTrendingVenues(
     return [];
   }
 
-  // Extract venue names from the response (rough parsing)
-  const venueMatches = result.answer.match(/[""]([^""]+)[""]/g) || [];
-  const venues = venueMatches.map(v => v.replace(/[""]|[""]/g, '').trim()).filter(v => v.length > 2);
+  const cleanAnswer = result.answer.replace(/\[\d+\]/g, '').replace(/\n-\s*/g, '\n');
   
-  return venues.slice(0, 5);
+  const venueMatches = cleanAnswer.match(/[""\*\*]([^""\*]+)[""\*\*]/g) || [];
+  let venues = venueMatches
+    .map(v => v.replace(/[""\*\*]/g, '').replace(/\(\s*[^)]*\)/g, '').trim())
+    .filter(v => v.length > 2 && v.length < 60);
+  
+  if (venues.length === 0) {
+    const lines = cleanAnswer.split('\n').filter(l => l.trim());
+    const numbered = lines.filter(l => /^\d+[\.\)]\s/.test(l.trim()));
+    venues = numbered
+      .map(l => l.replace(/^\d+[\.\)]\s*/, '').replace(/[-–:].+$/, '').replace(/\(\s*[^)]*\)/g, '').trim())
+      .filter(v => v.length > 2 && v.length < 60);
+  }
+  
+  const filtered = venues.filter(v => {
+    const lower = v.toLowerCase();
+    const badTypes = ['apartment', 'hotel', 'motel', 'hospital', 'school', 'church', 'park', 'mall'];
+    return !badTypes.some(t => lower.includes(t));
+  });
+  
+  console.log(`[Perplexity] Extracted venues: [${filtered.join(', ')}]`);
+  return filtered.slice(0, 5);
 }
 
 export async function generateWhyExplanation(

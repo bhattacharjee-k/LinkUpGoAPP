@@ -229,7 +229,9 @@ IMPORTANT RULES:
 - Only discuss venues in ${filters.locationScope || 'NYC'} - never suggest places outside this city
 - Be conversational and fun - use casual language appropriate for young professionals
 - When mentioning events, include the ticket URL so users can buy tickets
-- Don't make up specific venue details you don't know`;
+- Don't make up specific venue details you don't know
+- For late-night plans (after 9PM) or high-energy vibes ("Going out", "Full send"), prioritize nightclubs, bars, lounges, and events over restaurants
+- When regenerating suggestions for a night out, use categories like Club, Dancing, Live Music, Cocktails, Lounge - not just Dinner or Drinks`;
 }
 
 function buildConversationHistory(
@@ -291,6 +293,9 @@ async function executeToolCall(
         budget: args.budget,
         neighborhood: args.neighborhood || context.session.neighborhood || undefined,
         specificDate: filters.specificDate,
+        specificTime: filters.specificTime,
+        timeWindow: filters.timeWindow,
+        energy: filters.energy,
         discoveryStyle: context.user.discoveryStyle as 'hidden_gems' | 'popular' | 'mixed' | undefined,
         crowdPreference: context.user.crowdPreference as 'quiet' | 'buzzing' | 'no_preference' | undefined,
         favoriteNeighborhoods: context.user.favoriteNeighborhoods || undefined,
