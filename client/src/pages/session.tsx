@@ -610,7 +610,7 @@ export function Session() {
   }
 
   return (
-    <Layout hideNav>
+    <Layout>
       <div className="flex flex-col h-screen max-h-screen">
         {/* Header */}
         <div className="px-6 py-4 border-b border-white/10 bg-background/80 backdrop-blur-md z-20 space-y-3">
