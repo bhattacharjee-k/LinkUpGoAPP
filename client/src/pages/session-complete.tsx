@@ -80,6 +80,19 @@ export function SessionComplete() {
   const winningSuggestion = session.suggestions.find(s => s.id === session.winningOptionId);
   const sessionFilters = session.filters as any;
   
+  const formatTime12h = (time24: string) => {
+    const [h, m] = time24.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${hour12}:${m.toString().padStart(2, '0')} ${period}`;
+  };
+  const cityTimezone = (sessionFilters?.locationScope || winningSuggestion?.city || '').toLowerCase().includes('chicago') ? 'CST' : 'EST';
+  const formatTimeDisplay = (timeStr: string) => {
+    const parts = timeStr.split('-');
+    if (parts.length === 2) return `${formatTime12h(parts[0])}-${formatTime12h(parts[1])} ${cityTimezone}`;
+    return `${formatTime12h(timeStr)} ${cityTimezone}`;
+  };
+  
   const handleTagToggle = (tagId: string) => {
     setSelectedTags(prev => 
       prev.includes(tagId) 
@@ -212,7 +225,7 @@ END:VCALENDAR`;
                   {sessionFilters?.specificTime && (
                     <span className="flex items-center gap-1">
                       <Clock size={14} />
-                      {sessionFilters.specificTime}
+                      {formatTimeDisplay(sessionFilters.specificTime)}
                     </span>
                   )}
                   <span className="flex items-center gap-1">

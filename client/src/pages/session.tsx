@@ -398,6 +398,23 @@ export function Session() {
     toast({ title: "Plan updated!", description: "Your preferences have been saved." });
   };
 
+  const formatTime12h = (time24: string) => {
+    const [h, m] = time24.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${hour12}:${m.toString().padStart(2, '0')} ${period}`;
+  };
+
+  const cityTimezone = (session.filters?.locationScope || '').toLowerCase().includes('chicago') ? 'CST' : 'EST';
+
+  const formatTimeRange = (timeStr: string) => {
+    const parts = timeStr.split('-');
+    if (parts.length === 2) {
+      return `${formatTime12h(parts[0])}-${formatTime12h(parts[1])} ${cityTimezone}`;
+    }
+    return `${formatTime12h(timeStr)} ${cityTimezone}`;
+  };
+
   const handleRegenerate = async () => {
     setIsRegenerating(true);
     try {
@@ -852,7 +869,7 @@ export function Session() {
             )}
             {session.filters?.specificTime && (
               <Badge variant="secondary" className="bg-white/5 border-white/10 text-[10px] gap-1">
-                <Clock size={10} /> {session.filters.specificTime}
+                <Clock size={10} /> {formatTimeRange(session.filters.specificTime)}
               </Badge>
             )}
             {session.filters?.budget && (
@@ -962,7 +979,7 @@ export function Session() {
                             <Calendar size={10} className="mr-1" /> {format(new Date(pt.proposedDate), 'MMM d')}
                           </Badge>
                           <Badge variant="secondary" className="bg-white/10 text-[10px]">
-                            <Clock size={10} className="mr-1" /> {pt.timeStart}-{pt.timeEnd}
+                            <Clock size={10} className="mr-1" /> {formatTime12h(pt.timeStart)}-{formatTime12h(pt.timeEnd)} {cityTimezone}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-1">
