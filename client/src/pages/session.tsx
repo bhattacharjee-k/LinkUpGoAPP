@@ -278,7 +278,7 @@ export function Session() {
     }
   };
 
-  const sessionInviteCode = (session.filters as any)?.inviteCode || '';
+  const sessionInviteCode = (session as any)?.inviteCode || (session.filters as any)?.inviteCode || '';
   
   const handleCopyLink = () => {
     const link = `${window.location.origin}/join-plan/${sessionInviteCode}`;

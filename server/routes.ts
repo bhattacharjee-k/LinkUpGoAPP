@@ -486,12 +486,17 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Not authenticated" });
       }
       
+      console.log(`[Join] Looking up session with inviteCode=${req.params.inviteCode} for userId=${userId}`);
       const session = await storage.getSessionByInviteCode(req.params.inviteCode);
       if (!session) {
+        console.log(`[Join] No session found for inviteCode=${req.params.inviteCode}`);
         return res.status(404).json({ message: "Invalid session invite code" });
       }
       
+      console.log(`[Join] Found session id=${session.id} status=${session.status} inviteCode=${session.inviteCode}`);
+      
       if (session.deletedAt) {
+        console.log(`[Join] Session ${session.id} is deleted`);
         return res.status(404).json({ message: "This plan no longer exists" });
       }
       
@@ -606,14 +611,20 @@ export async function registerRoutes(
       
       const { groupId, name, filters, guardrails, referenceVenues } = req.body;
       
+      const inviteCode = filters?.inviteCode || Math.random().toString(36).substr(2, 6).toUpperCase();
+      console.log(`[Session] Creating session for group ${groupId} with inviteCode=${inviteCode}`);
+      
       const session = await storage.createSession({
         groupId,
         name,
         status: 'draft',
+        inviteCode,
         filters,
         guardrails,
         referenceVenues: referenceVenues || null
       });
+      
+      console.log(`[Session] Created session id=${session.id} inviteCode=${session.inviteCode}`);
       
       // Add all group members as participants (including creator)
       const groupMembers = await storage.getGroupMembers(groupId);

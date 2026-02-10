@@ -221,10 +221,9 @@ export class DbStorage implements IStorage {
   }
 
   async getSessionByInviteCode(inviteCode: string): Promise<Session | undefined> {
-    // Session invite code is stored in filters.inviteCode (JSONB column)
     const [session] = await db.select().from(schema.sessions).where(
       and(
-        sql`${schema.sessions.filters}->>'inviteCode' = ${inviteCode}`,
+        eq(schema.sessions.inviteCode, inviteCode),
         isNull(schema.sessions.deletedAt)
       )
     );

@@ -71,6 +71,7 @@ export const sessions = pgTable("sessions", {
   lockedByUserId: varchar("locked_by_user_id").references(() => users.id),
   lockedAt: timestamp("locked_at"),
   winningOptionId: varchar("winning_option_id"),
+  inviteCode: varchar("invite_code").unique(),
   filters: jsonb("filters").notNull(),
   guardrails: jsonb("guardrails").notNull(),
   neighborhood: text("neighborhood"),
