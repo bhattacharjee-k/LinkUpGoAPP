@@ -368,15 +368,24 @@ END:VCALENDAR`;
           </Card>
         </motion.div>
         
-        {/* Back to Session Button */}
-        <Button
-          variant="outline"
-          onClick={() => setLocation(`/session/${session.id}`)}
-          className="w-full"
-          data-testid="button-back-to-session"
-        >
-          Back to Session
-        </Button>
+        {/* Navigation Buttons */}
+        <div className="flex flex-col gap-2">
+          <Button
+            onClick={() => setLocation('/')}
+            className="w-full bg-primary text-black font-bold"
+            data-testid="button-back-to-home"
+          >
+            Back to Home
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setLocation(`/session/${session.id}`)}
+            className="w-full"
+            data-testid="button-back-to-session"
+          >
+            View Session Details
+          </Button>
+        </div>
       </div>
     </Layout>
   );
