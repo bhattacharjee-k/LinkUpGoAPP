@@ -3,7 +3,7 @@ import { useApp } from '@/lib/context';
 import { Layout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Plus, MapPin, Users, ArrowRight, Lock, Shield, Copy, Check, Unlock } from 'lucide-react';
+import { Plus, MapPin, ArrowRight, Lock, Shield, Copy, Check, Unlock, Clock } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,8 @@ export function Home() {
 
   const selectedSquad = groups.find(g => g.id === selectedSquadId);
 
+  const activeSessions = sessions.filter(s => s.status !== 'locked');
+  const pastSessions = sessions.filter(s => s.status === 'locked');
 
   const openSquadDrawer = (groupId: string) => {
     setSelectedSquadId(groupId);
@@ -47,6 +49,17 @@ export function Home() {
       title: checked ? "Group Locked" : "Group Unlocked", 
       description: checked ? "New members cannot join via invite link." : "Invite links are now active." 
     });
+  };
+
+  const getWinningSuggestion = (session: typeof sessions[0]) => {
+    if (!session.winningOptionId || !session.suggestions) return null;
+    return session.suggestions.find(s => s.id === session.winningOptionId) || null;
+  };
+
+  const formatLockedDate = (lockedAt?: number) => {
+    if (!lockedAt) return '';
+    const d = new Date(lockedAt);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   return (
@@ -74,43 +87,39 @@ export function Home() {
           <div className="bg-background/90 backdrop-blur-md rounded-xl p-6 space-y-4">
             <h2 className="text-xl font-bold">Ready to LinkUpGo?</h2>
             <p className="text-sm text-muted-foreground">Start a new planning session with your groups.</p>
-            <div className="flex gap-3">
-              <Button onClick={() => setLocation('/groups')} className="flex-1 bg-white/10 hover:bg-white/20 text-white border-0">
-                <Users size={16} className="mr-2" /> Groups
-              </Button>
-              <Button onClick={() => setLocation('/new-session')} className="flex-1 bg-primary text-black hover:bg-primary/90 font-bold">
-                <Plus size={16} className="mr-2" /> New Plan
-              </Button>
-            </div>
+            <Button onClick={() => setLocation('/new-session')} className="w-full bg-primary text-black hover:bg-primary/90 font-bold" data-testid="button-new-plan-hero">
+              <Plus size={16} className="mr-2" /> New Plan
+            </Button>
           </div>
         </div>
 
-        {/* Active Sessions */}
+        {/* Active Plans */}
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-bold">Active Plans</h3>
-            <Link href="/history" className="text-xs text-primary font-medium">History</Link>
+            {pastSessions.length > 0 && (
+              <Link href="/history" className="text-xs text-primary font-medium flex items-center gap-1" data-testid="link-history">
+                <Clock size={12} /> History ({pastSessions.length})
+              </Link>
+            )}
           </div>
           
-          {sessions.length === 0 ? (
+          {activeSessions.length === 0 ? (
             <div className="text-center py-10 border border-dashed border-white/10 rounded-xl">
               <p className="text-muted-foreground text-sm">No active plans yet.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {sessions.map(session => (
+              {activeSessions.map(session => (
                 <Link key={session.id} href={`/session/${session.id}`}>
-                  <Card className="p-4 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer group">
+                  <Card className="p-4 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer group" data-testid={`card-active-plan-${session.id}`}>
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                            session.status === 'locked' ? "bg-green-500/20 text-green-400" : "bg-primary/20 text-primary"
-                          )}>
-                            {session.status === 'locked' ? 'Confirmed' : 'Voting'}
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary">
+                            {session.status === 'voting' ? 'Voting' : 'Planning'}
                           </span>
-                          <span className="text-xs text-muted-foreground">Today</span>
+                          {session.name && <span className="text-xs text-muted-foreground">{session.name}</span>}
                         </div>
                         <h4 className="font-bold text-lg group-hover:text-primary transition-colors">
                           {groups.find(g => g.id === session.groupId)?.name || 'Unknown Group'}
@@ -188,62 +197,61 @@ export function Home() {
       {/* Group Details Drawer */}
       <Sheet open={isSquadDrawerOpen} onOpenChange={setIsSquadDrawerOpen}>
         <SheetContent side="bottom" className="bg-background border-t border-white/10 h-[85vh] rounded-t-2xl">
-          {selectedSquad && (
-            <div className="space-y-6">
-              <SheetHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <SheetTitle className="text-2xl">{selectedSquad.name}</SheetTitle>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge variant="outline" className="border-white/20 text-muted-foreground bg-white/5">
-                        {selectedSquad.members.length} member{selectedSquad.members.length !== 1 ? 's' : ''}
-                      </Badge>
-                      {isGroupLocked(selectedSquad.id) && (
-                        <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-500">
-                          <Lock size={10} className="mr-1" /> Locked
+          {selectedSquad && (() => {
+            const groupActiveSessions = sessions.filter(s => s.groupId === selectedSquad.id && s.status !== 'locked');
+            const groupPastSessions = sessions.filter(s => s.groupId === selectedSquad.id && s.status === 'locked');
+            
+            return (
+              <div className="space-y-6">
+                <SheetHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <SheetTitle className="text-2xl">{selectedSquad.name}</SheetTitle>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="outline" className="border-white/20 text-muted-foreground bg-white/5">
+                          {selectedSquad.members.length} member{selectedSquad.members.length !== 1 ? 's' : ''}
                         </Badge>
-                      )}
-                      {isAdmin(selectedSquad.id) && (
-                        <Badge variant="secondary" className="bg-primary/20 text-primary">
-                          <Shield size={10} className="mr-1" /> Admin
-                        </Badge>
-                      )}
+                        {isGroupLocked(selectedSquad.id) && (
+                          <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-500">
+                            <Lock size={10} className="mr-1" /> Locked
+                          </Badge>
+                        )}
+                        {isAdmin(selectedSquad.id) && (
+                          <Badge variant="secondary" className="bg-primary/20 text-primary">
+                            <Shield size={10} className="mr-1" /> Admin
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </SheetHeader>
+                </SheetHeader>
 
-              {/* Primary New Plan CTA */}
-              <Button 
-                className="w-full bg-primary hover:bg-primary/90 text-[#0a0a0a] font-bold h-12"
-                onClick={() => {
-                  setIsSquadDrawerOpen(false);
-                  setLocation(`/new-session?groupId=${selectedSquad.id}`);
-                }}
-                data-testid="button-new-plan-drawer"
-              >
-                <Plus size={18} className="mr-2" /> New Plan
-              </Button>
+                {/* Primary New Plan CTA */}
+                <Button 
+                  className="w-full bg-primary hover:bg-primary/90 text-[#0a0a0a] font-bold h-12"
+                  onClick={() => {
+                    setIsSquadDrawerOpen(false);
+                    setLocation(`/new-session?groupId=${selectedSquad.id}`);
+                  }}
+                  data-testid="button-new-plan-drawer"
+                >
+                  <Plus size={18} className="mr-2" /> New Plan
+                </Button>
 
-              <div className="space-y-6 overflow-y-auto max-h-[calc(85vh-12rem)] pb-4">
-                {/* Plans for this Group */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-muted-foreground">Plans</Label>
-                  {sessions.filter(s => s.groupId === selectedSquad.id).length > 0 ? (
-                    <div className="space-y-2">
-                      {sessions
-                        .filter(s => s.groupId === selectedSquad.id)
-                        .map(session => (
+                <div className="space-y-6 overflow-y-auto max-h-[calc(85vh-12rem)] pb-4">
+                  {/* Active Plans */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-muted-foreground">Active Plans</Label>
+                    {groupActiveSessions.length > 0 ? (
+                      <div className="space-y-2">
+                        {groupActiveSessions.map(session => (
                           <Link key={session.id} href={`/session/${session.id}`}>
-                            <Card className="p-3 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer group" data-testid={`plan-${session.id}`}>
+                            <Card className="p-3 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer group" data-testid={`plan-active-${session.id}`}>
                               <div className="flex justify-between items-center">
                                 <div>
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className={cn(
-                                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                                      session.status === 'locked' ? "bg-green-500/20 text-green-400" : "bg-primary/20 text-primary"
-                                    )}>
-                                      {session.status === 'locked' ? 'Confirmed' : 'Voting'}
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-primary/20 text-primary">
+                                      {session.status === 'voting' ? 'Voting' : 'Planning'}
                                     </span>
                                     {session.name && <span className="text-sm font-medium">{session.name}</span>}
                                   </div>
@@ -256,75 +264,113 @@ export function Home() {
                             </Card>
                           </Link>
                         ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 border border-dashed border-white/10 rounded-xl">
-                      <p className="text-muted-foreground text-sm">No plans yet</p>
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 border border-dashed border-white/10 rounded-xl">
+                        <p className="text-muted-foreground text-sm">No active plans</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Past Plans */}
+                  {groupPastSessions.length > 0 && (
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-muted-foreground">Past Plans</Label>
+                      <div className="space-y-2">
+                        {groupPastSessions.map(session => {
+                          const winner = getWinningSuggestion(session);
+                          return (
+                            <Link key={session.id} href={`/session/${session.id}`}>
+                              <Card className="p-3 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer group" data-testid={`plan-past-${session.id}`}>
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-green-500/20 text-green-400">
+                                        Confirmed
+                                      </span>
+                                      {session.lockedAt && (
+                                        <span className="text-xs text-muted-foreground">{formatLockedDate(session.lockedAt)}</span>
+                                      )}
+                                    </div>
+                                    <p className="text-sm font-medium">
+                                      {winner?.name || session.name || 'Confirmed Plan'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground line-clamp-1">
+                                      {session.filters.category.join(', ')}
+                                    </p>
+                                  </div>
+                                  <ArrowRight size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                                </div>
+                              </Card>
+                            </Link>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
-                </div>
 
-                {/* Invite Link */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-muted-foreground">Invite Link</Label>
-                  <div className="flex gap-2">
-                    <div className="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
-                      {window.location.origin}/join/{selectedSquad.inviteCode}
-                    </div>
-                    <Button size="icon" variant="outline" onClick={() => handleCopyLink(selectedSquad.inviteCode)} className="border-white/10" data-testid="button-copy-link">
-                      {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Admin Lock Toggle */}
-                {isAdmin(selectedSquad.id) && (
-                  <Card className="p-4 bg-white/5 border-white/10">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <Label className="text-sm font-medium flex items-center gap-2">
-                          {isGroupLocked(selectedSquad.id) ? <Lock size={14} /> : <Unlock size={14} />} 
-                          Lock Group
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Prevent new members from joining
-                        </p>
-                      </div>
-                      <Switch 
-                        checked={isGroupLocked(selectedSquad.id)} 
-                        onCheckedChange={(checked) => toggleLock(selectedSquad.id, checked)}
-                        data-testid="switch-lock-group"
-                      />
-                    </div>
-                  </Card>
-                )}
-
-                {/* Members List */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-muted-foreground">Members</Label>
+                  {/* Invite Link */}
                   <div className="space-y-2">
-                    {selectedSquad.members.map((memberId, i) => (
-                      <div key={memberId} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/5" data-testid={`member-${memberId}`}>
-                        <Avatar className="h-9 w-9 border border-white/10">
-                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-blue-500/20 text-xs font-bold">
-                            {memberId === user?.id ? 'ME' : `U${i}`}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="font-medium text-sm flex items-center gap-2">
-                            {memberId === user?.id ? 'You' : `User ${memberId.substr(0,4)}`}
-                            {memberId === selectedSquad.adminId && (
-                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-primary/20 text-primary">Admin</Badge>
-                            )}
+                    <Label className="text-sm font-medium text-muted-foreground">Invite Link</Label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs font-mono truncate text-muted-foreground">
+                        {window.location.origin}/join/{selectedSquad.inviteCode}
+                      </div>
+                      <Button size="icon" variant="outline" onClick={() => handleCopyLink(selectedSquad.inviteCode)} className="border-white/10" data-testid="button-copy-link">
+                        {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Admin Lock Toggle */}
+                  {isAdmin(selectedSquad.id) && (
+                    <Card className="p-4 bg-white/5 border-white/10">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium flex items-center gap-2">
+                            {isGroupLocked(selectedSquad.id) ? <Lock size={14} /> : <Unlock size={14} />} 
+                            Lock Group
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Prevent new members from joining
+                          </p>
+                        </div>
+                        <Switch 
+                          checked={isGroupLocked(selectedSquad.id)} 
+                          onCheckedChange={(checked) => toggleLock(selectedSquad.id, checked)}
+                          data-testid="switch-lock-group"
+                        />
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Members List */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-muted-foreground">Members</Label>
+                    <div className="space-y-2">
+                      {selectedSquad.members.map((memberId, i) => (
+                        <div key={memberId} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/5" data-testid={`member-${memberId}`}>
+                          <Avatar className="h-9 w-9 border border-white/10">
+                            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-blue-500/20 text-xs font-bold">
+                              {memberId === user?.id ? 'ME' : `U${i}`}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm flex items-center gap-2">
+                              {memberId === user?.id ? 'You' : `User ${memberId.substr(0,4)}`}
+                              {memberId === selectedSquad.adminId && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-primary/20 text-primary">Admin</Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </SheetContent>
       </Sheet>
     </Layout>

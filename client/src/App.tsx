@@ -7,7 +7,6 @@ import { Session } from "@/pages/session";
 import { SessionComplete } from "@/pages/session-complete";
 import { NewPlan } from "@/pages/new-plan";
 import { GroupDetails } from "@/pages/group-details";
-import { Groups } from "@/pages/groups";
 import { Profile } from "@/pages/profile";
 import { History } from "@/pages/history";
 import { UpdatesPage } from "@/pages/updates";
@@ -161,9 +160,6 @@ function Router() {
     <Switch>
       <Route path="/onboarding" component={Onboarding} />
       
-      <Route path="/groups">
-        <PrivateRoute component={Home} />
-      </Route>
       <Route path="/group/:id">
         <PrivateRoute component={Home} />
       </Route>
