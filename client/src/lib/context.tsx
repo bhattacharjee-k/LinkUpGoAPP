@@ -5,6 +5,8 @@ import { MOCK_SUGGESTIONS, MOCK_SUGGESTIONS_BY_CITY, CITY_COORDS, type City } fr
 // WebSocket connection for real-time updates
 let wsConnection: WebSocket | null = null;
 const messageListeners: Map<string, Set<(message: any) => void>> = new Map();
+const voteListeners: Map<string, Set<(data: any) => void>> = new Map();
+const sessionUpdateListeners: Map<string, Set<(data: any) => void>> = new Map();
 
 function getWebSocket(): WebSocket {
   if (!wsConnection || wsConnection.readyState === WebSocket.CLOSED) {
@@ -19,6 +21,14 @@ function getWebSocket(): WebSocket {
           if (listeners) {
             listeners.forEach(cb => cb(data.message));
           }
+        } else if (data.type === 'vote_update' && data.suggestionId) {
+          voteListeners.forEach((listeners) => {
+            listeners.forEach(cb => cb(data));
+          });
+        } else if (data.type === 'session_update' && data.session) {
+          sessionUpdateListeners.forEach((listeners) => {
+            listeners.forEach(cb => cb(data));
+          });
         }
       } catch (e) {
         console.error('WebSocket message parse error:', e);
@@ -55,11 +65,40 @@ export function subscribeToSessionMessages(sessionId: string, callback: (message
       listeners.delete(callback);
       if (listeners.size === 0) {
         messageListeners.delete(sessionId);
-        // Send leave message to server when no more listeners for this session
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'leave' }));
         }
       }
+    }
+  };
+}
+
+export function subscribeToVoteUpdates(sessionId: string, callback: (data: any) => void): () => void {
+  if (!voteListeners.has(sessionId)) {
+    voteListeners.set(sessionId, new Set());
+  }
+  voteListeners.get(sessionId)!.add(callback);
+  getWebSocket();
+  return () => {
+    const listeners = voteListeners.get(sessionId);
+    if (listeners) {
+      listeners.delete(callback);
+      if (listeners.size === 0) voteListeners.delete(sessionId);
+    }
+  };
+}
+
+export function subscribeToSessionUpdates(sessionId: string, callback: (data: any) => void): () => void {
+  if (!sessionUpdateListeners.has(sessionId)) {
+    sessionUpdateListeners.set(sessionId, new Set());
+  }
+  sessionUpdateListeners.get(sessionId)!.add(callback);
+  getWebSocket();
+  return () => {
+    const listeners = sessionUpdateListeners.get(sessionId);
+    if (listeners) {
+      listeners.delete(callback);
+      if (listeners.size === 0) sessionUpdateListeners.delete(sessionId);
     }
   };
 }
@@ -109,7 +148,7 @@ export interface Suggestion {
   budget: string;
   description: string;
   tags: string[];
-  votes: Record<string, string>;
+  votes: Record<string, { voteType: string; reasons?: string[] | null; note?: string | null }>;
 }
 
 export interface ParticipantDetail {

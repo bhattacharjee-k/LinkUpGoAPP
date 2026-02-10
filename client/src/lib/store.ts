@@ -78,7 +78,7 @@ export interface Suggestion {
   budget: Budget;
   description: string;
   tags: string[];
-  votes: Record<string, 'yes' | 'no' | 'fire' | 'cant'>;
+  votes: Record<string, { voteType: string; reasons?: string[] | null; note?: string | null }>;
   detailUrl?: string;
   reservationUrl?: string;
   ticketUrl?: string;

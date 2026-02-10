@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { useApp, subscribeToSessionMessages } from '@/lib/context';
+import { useApp, subscribeToSessionMessages, subscribeToVoteUpdates, subscribeToSessionUpdates } from '@/lib/context';
 import { api } from '@/lib/api';
 import { Layout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
@@ -103,6 +103,20 @@ export function Session() {
     return () => {
       unsubscribe();
       setRealtimeMessages([]);
+    };
+  }, [session?.id]);
+
+  useEffect(() => {
+    if (!session?.id) return;
+    const unsubVotes = subscribeToVoteUpdates(session.id, () => {
+      refreshSession(session.id);
+    });
+    const unsubSession = subscribeToSessionUpdates(session.id, () => {
+      refreshSession(session.id);
+    });
+    return () => {
+      unsubVotes();
+      unsubSession();
     };
   }, [session?.id]);
 

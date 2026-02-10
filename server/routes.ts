@@ -743,7 +743,25 @@ export async function registerRoutes(
           participantIds,
           eventDetails,
         }).catch(err => console.error('[Notify] Error sending lock notification:', err));
+        
+        const locker = await storage.getUser(userId);
+        const lockerName = locker?.name || locker?.username || 'Someone';
+        const lockMessage = await storage.createMessage({
+          sessionId: req.params.id,
+          sender: 'system',
+          senderName: 'System',
+          text: `${lockerName} locked in the plan — you're going to ${winningOption}!`,
+        });
+        broadcastToSession(req.params.id, {
+          type: 'new_message',
+          message: lockMessage,
+        });
       }
+      
+      broadcastToSession(req.params.id, {
+        type: 'session_update',
+        session: updated,
+      });
       
       res.json(updated);
     } catch (error: any) {
@@ -764,18 +782,37 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Session not found" });
       }
       
-      // If memberId is provided, admin can add other users
       const { memberId, status } = req.body;
+      let joinedUserId: string;
       if (memberId) {
         const group = await storage.getGroup(session.groupId);
         if (group?.adminId !== userId) {
           return res.status(403).json({ message: "Only admin can add other participants" });
         }
         await storage.addSessionParticipant(req.params.id, memberId, status || 'active');
+        joinedUserId = memberId;
       } else {
-        // Self-join
         await storage.addSessionParticipant(req.params.id, userId, status || 'active');
+        joinedUserId = userId;
       }
+      
+      const joinedUser = await storage.getUser(joinedUserId);
+      const joinedName = joinedUser?.name || joinedUser?.username || 'Someone';
+      const joinMessage = await storage.createMessage({
+        sessionId: req.params.id,
+        sender: 'system',
+        senderName: 'System',
+        text: `${joinedName} joined the plan`,
+      });
+      broadcastToSession(req.params.id, {
+        type: 'new_message',
+        message: joinMessage,
+      });
+      broadcastToSession(req.params.id, {
+        type: 'session_update',
+        session: { ...session, id: req.params.id },
+      });
+      
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -791,6 +828,26 @@ export async function registerRoutes(
       }
       
       await storage.updateParticipantStatus(req.params.id, req.params.participantId, req.body.status);
+      
+      const participant = await storage.getUser(req.params.participantId);
+      const participantName = participant?.name || participant?.username || 'Someone';
+      const statusText = req.body.status === 'cant_make_it' ? "can't make it" : 
+                          req.body.status === 'left' ? 'left the plan' : 'is back in';
+      const statusMessage = await storage.createMessage({
+        sessionId: req.params.id,
+        sender: 'system',
+        senderName: 'System',
+        text: `${participantName} ${statusText}`,
+      });
+      broadcastToSession(req.params.id, {
+        type: 'new_message',
+        message: statusMessage,
+      });
+      broadcastToSession(req.params.id, {
+        type: 'session_update',
+        session: { id: req.params.id },
+      });
+      
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -989,6 +1046,37 @@ export async function registerRoutes(
       }
       
       await storage.vote(suggestionId, userId, voteType, reasons, note);
+      
+      const suggestion = await storage.getSuggestion(suggestionId);
+      if (suggestion) {
+        const sessionId = suggestion.sessionId;
+        const allVotes = await storage.getSuggestionVotes(suggestionId);
+        const votesRecord: Record<string, { voteType: string; reasons?: string[] | null; note?: string | null }> = {};
+        allVotes.forEach(v => {
+          votesRecord[v.userId] = { voteType: v.voteType, reasons: v.reasons, note: v.note };
+        });
+        
+        broadcastToSession(sessionId, {
+          type: 'vote_update',
+          suggestionId,
+          votes: votesRecord,
+        });
+        
+        const voter = await storage.getUser(userId);
+        const voterName = voter?.name || voter?.username || 'Someone';
+        const action = voteType === 'up' ? 'voted for' : 'voted against';
+        const systemMessage = await storage.createMessage({
+          sessionId,
+          sender: 'system',
+          senderName: 'System',
+          text: `${voterName} ${action} ${suggestion.name}`,
+        });
+        broadcastToSession(sessionId, {
+          type: 'new_message',
+          message: systemMessage,
+        });
+      }
+      
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
