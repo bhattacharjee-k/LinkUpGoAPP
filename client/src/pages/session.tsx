@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useApp, subscribeToSessionMessages, subscribeToVoteUpdates, subscribeToSessionUpdates } from '@/lib/context';
 import { api } from '@/lib/api';
@@ -30,6 +30,7 @@ export function Session() {
   const [input, setInput] = useState('');
   const [_, setLocation] = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [realtimeMessages, setRealtimeMessages] = useState<any[]>([]);
@@ -137,6 +138,25 @@ export function Session() {
       }));
     }
   }, [session?.filters]);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const keyboardOpen = vv.height < window.innerHeight * 0.75;
+      const nav = document.querySelector('[data-bottom-nav]') as HTMLElement;
+      if (nav) {
+        nav.style.display = keyboardOpen ? 'none' : '';
+      }
+      if (keyboardOpen && chatInputRef.current) {
+        setTimeout(() => {
+          chatInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 100);
+      }
+    };
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, []);
 
   // Check if feedback already submitted for locked sessions
   useEffect(() => {
@@ -1520,17 +1540,23 @@ export function Session() {
                 )}
               </div>
             </ScrollArea>
-            <div className="p-4 bg-background border-t border-white/10 flex gap-2">
+            <div ref={chatInputRef} className="p-4 bg-background border-t border-white/10 flex gap-2">
               <div className="relative flex-1">
                 <Input 
                   placeholder="Discuss or ask @Planner..." 
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      chatInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    }, 300);
+                  }}
                   className="pr-10 bg-white/5 border-white/10 focus-visible:ring-primary text-white placeholder:text-muted-foreground"
+                  data-testid="input-chat-message"
                 />
               </div>
-              <Button size="icon" onClick={handleSend} className="bg-primary hover:bg-primary/90 text-black">
+              <Button size="icon" onClick={handleSend} className="bg-primary hover:bg-primary/90 text-black" data-testid="button-send-chat">
                 <Send size={16} />
               </Button>
             </div>

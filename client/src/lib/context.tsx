@@ -21,14 +21,19 @@ function getWebSocket(): WebSocket {
           if (listeners) {
             listeners.forEach(cb => cb(data.message));
           }
-        } else if (data.type === 'vote_update' && data.suggestionId) {
-          voteListeners.forEach((listeners) => {
+        } else if (data.type === 'vote_update' && data.sessionId) {
+          const listeners = voteListeners.get(data.sessionId);
+          if (listeners) {
             listeners.forEach(cb => cb(data));
-          });
+          }
         } else if (data.type === 'session_update' && data.session) {
-          sessionUpdateListeners.forEach((listeners) => {
-            listeners.forEach(cb => cb(data));
-          });
+          const sid = data.session.id;
+          if (sid) {
+            const listeners = sessionUpdateListeners.get(sid);
+            if (listeners) {
+              listeners.forEach(cb => cb(data));
+            }
+          }
         }
       } catch (e) {
         console.error('WebSocket message parse error:', e);

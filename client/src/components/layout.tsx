@@ -31,7 +31,7 @@ export function Layout({ children, hideNav = false }: LayoutProps) {
 
       {/* Bottom Navigation */}
       {!hideNav && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-safe">
+        <div data-bottom-nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-safe">
           <nav className="glass-panel mx-4 mb-4 px-6 py-3 rounded-2xl flex items-center justify-between w-full max-w-md backdrop-blur-xl bg-black/80 border-white/10">
             {navItems.map((item) => {
               const isActive = location === item.path;

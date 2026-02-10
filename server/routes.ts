@@ -1058,6 +1058,7 @@ export async function registerRoutes(
         
         broadcastToSession(sessionId, {
           type: 'vote_update',
+          sessionId,
           suggestionId,
           votes: votesRecord,
         });
