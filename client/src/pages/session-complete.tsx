@@ -49,14 +49,18 @@ export function SessionComplete() {
   
   const checkExistingFeedback = async () => {
     try {
-      const response = await api.get(`/api/sessions/${params?.id}/feedback`);
-      const myFeedback = response.find((f: any) => f.userId === user?.id);
-      if (myFeedback) {
-        setExistingFeedback(myFeedback);
-        setRating(myFeedback.rating);
-        setReview(myFeedback.review || '');
-        setSelectedTags(myFeedback.tags || []);
-        setHasSubmitted(true);
+      const data = await api.feedback.get(params?.id || '');
+      if (data.hasSubmitted && data.feedback) {
+        const myFeedback = Array.isArray(data.feedback) 
+          ? data.feedback.find((f: any) => f.userId === user?.id)
+          : data.feedback;
+        if (myFeedback) {
+          setExistingFeedback(myFeedback);
+          setRating(myFeedback.rating);
+          setReview(myFeedback.review || '');
+          setSelectedTags(myFeedback.tags || []);
+          setHasSubmitted(true);
+        }
       }
     } catch (error) {
       console.error('Error checking feedback:', error);
@@ -92,7 +96,7 @@ export function SessionComplete() {
     
     setIsSubmitting(true);
     try {
-      await api.post(`/api/sessions/${session.id}/feedback`, {
+      await api.feedback.submit(session.id, {
         suggestionId: winningSuggestion?.id,
         rating,
         review: review.trim() || null,
