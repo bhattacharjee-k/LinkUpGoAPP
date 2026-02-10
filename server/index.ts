@@ -8,6 +8,7 @@ import { requestLogger, logger } from "./logger";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler";
 
 const app = express();
+app.set('trust proxy', 1);
 const httpServer = createServer(app);
 
 declare module "http" {

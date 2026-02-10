@@ -9,12 +9,39 @@ import { getSuggestions, SuggestionOption, generateWhyExplanation, GroupPreferen
 import { notifyPlanJoined, notifyPlanLocked } from "./notifications";
 import { requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant, requireSessionNotLocked } from "./middleware/auth";
 import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from "./middleware/error-handler";
-import { LoginRequestSchema, RegisterRequestSchema, SuggestRequestSchema, CreateGroupRequestSchema, VoteRequestSchema, CreateMessageRequestSchema, ProposeTimeRequestSchema } from "@shared/api-schemas";
+import { LoginRequestSchema, RegisterRequestSchema, SuggestRequestSchema, CreateGroupRequestSchema, VoteRequestSchema, CreateMessageRequestSchema } from "@shared/api-schemas";
 import { logger } from "./logger";
 
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
+
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(maxAttempts: number, windowMs: number) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const entry = rateLimitStore.get(ip);
+    if (!entry || now > entry.resetAt) {
+      rateLimitStore.set(ip, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    if (entry.count >= maxAttempts) {
+      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+      res.set('Retry-After', String(retryAfter));
+      return res.status(429).json({ message: `Too many attempts. Try again in ${retryAfter} seconds.` });
+    }
+    entry.count++;
+    return next();
+  };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore) {
+    if (now > entry.resetAt) rateLimitStore.delete(key);
+  }
+}, 60_000);
 
 // Store WebSocket connections by session ID
 const sessionConnections: Map<string, Set<WebSocket>> = new Map();
@@ -84,7 +111,7 @@ export async function registerRoutes(
   });
   
   // Auth routes
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", rateLimit(10, 15 * 60 * 1000), async (req, res) => {
     try {
       // Map frontend camelCase to database snake_case
       const { hardNos, ...rest } = req.body;
@@ -112,7 +139,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", rateLimit(10, 15 * 60 * 1000), async (req, res) => {
     try {
       const { username, password } = req.body;
       const user = await storage.getUserByUsername(username);

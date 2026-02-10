@@ -524,6 +524,22 @@ export function Session() {
   }
 
   if (session.suggestions.length === 0) {
+      const handleRetryWithWiderSearch = async () => {
+        if (!session?.id) return;
+        const currentFilters = (session.filters as any) || {};
+        const updatedFilters = { ...currentFilters, distance: '5 mi' };
+        await updateSessionFilters(session.id, updatedFilters);
+        await regenerateSuggestions(session.id);
+        toast({ title: "Searching wider", description: "Looking for options in a larger area." });
+      };
+      const handleRetryWithFlexBudget = async () => {
+        if (!session?.id) return;
+        const currentFilters = (session.filters as any) || {};
+        const updatedFilters = { ...currentFilters, budget: '$$$$' };
+        await updateSessionFilters(session.id, updatedFilters);
+        await regenerateSuggestions(session.id);
+        toast({ title: "Budget expanded", description: "Searching across all price ranges." });
+      };
       return (
           <Layout hideNav>
              <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-6">
@@ -539,17 +555,18 @@ export function Session() {
                        <MapPin size={40} className="text-muted-foreground" />
                    </div>
                    <div className="space-y-2">
-                       <h2 className="text-2xl font-bold">No options found</h2>
-                       <p className="text-muted-foreground">Try relaxing your filters to see more results.</p>
+                       <h2 className="text-2xl font-bold" data-testid="text-no-options">No options found</h2>
+                       <p className="text-muted-foreground">We couldn't find matches for your filters. Try broadening your search.</p>
                    </div>
                    <div className="flex flex-col gap-2 w-full max-w-xs">
-                       <Button variant="outline" onClick={() => toast({title: "Filters Updated", description: "Search radius increased."})}>Increase Distance</Button>
-                       <Button variant="outline" onClick={() => toast({title: "Filters Updated", description: "Budget filter removed."})}>Increase Budget</Button>
+                       <Button variant="outline" onClick={handleRetryWithWiderSearch} data-testid="button-increase-distance">Widen Search Area</Button>
+                       <Button variant="outline" onClick={handleRetryWithFlexBudget} data-testid="button-increase-budget">Expand Budget</Button>
                    </div>
                    <Button 
                      variant="ghost" 
                      className="text-muted-foreground"
                      onClick={() => window.history.back()}
+                     data-testid="button-go-back"
                    >
                      Go Back
                    </Button>
