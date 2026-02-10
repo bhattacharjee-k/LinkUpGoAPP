@@ -56,9 +56,10 @@ export function Home() {
     return session.suggestions.find(s => s.id === session.winningOptionId) || null;
   };
 
-  const formatLockedDate = (lockedAt?: number) => {
+  const formatLockedDate = (lockedAt?: string | number | null) => {
     if (!lockedAt) return '';
     const d = new Date(lockedAt);
+    if (isNaN(d.getTime())) return '';
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 

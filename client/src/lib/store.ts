@@ -108,7 +108,7 @@ export interface PlanningSession {
   groupId: string;
   status: 'draft' | 'voting' | 'locked';
   lockedByUserId?: string;
-  lockedAt?: number;
+  lockedAt?: string | number | null;
   winningOptionId?: string;
   participantStatusByUserId: Record<string, 'active' | 'cant_make_it'>; // Default 'active'
   

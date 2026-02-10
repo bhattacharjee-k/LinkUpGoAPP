@@ -702,7 +702,11 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Only admin can lock session" });
       }
       
-      const updated = await storage.updateSession(req.params.id, req.body);
+      const updatePayload = { ...req.body };
+      if (updatePayload.status === 'locked' && session.status !== 'locked') {
+        updatePayload.lockedAt = new Date();
+      }
+      const updated = await storage.updateSession(req.params.id, updatePayload);
       
       // If session was just locked, notify all participants with calendar invite
       if (req.body.status === 'locked' && session.status !== 'locked') {
