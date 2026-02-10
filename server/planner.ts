@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { Session, Message, User, Suggestion, InsertSuggestion } from "@shared/schema";
-import { getSuggestions, generateWhyExplanation, GroupPreferenceSummary } from "./suggestions";
+import { getSuggestions, getOrchestratedSuggestions, generateWhyExplanation, GroupPreferenceSummary } from "./suggestions";
 import { aggregateGroupPreferences } from "./group-preferences";
 import { storage } from "./storage";
 
@@ -286,26 +286,6 @@ async function executeToolCall(
       // Delete existing suggestions
       await storage.deleteSessionSuggestions(sessionId);
       
-      // Fetch new suggestions with updated filters including user preferences
-      const result = await getSuggestions({
-        city,
-        categories: args.categories || filters.category || [],
-        budget: args.budget,
-        neighborhood: args.neighborhood || context.session.neighborhood || undefined,
-        specificDate: filters.specificDate,
-        specificTime: filters.specificTime,
-        timeWindow: filters.timeWindow,
-        energy: filters.energy,
-        discoveryStyle: context.user.discoveryStyle as 'hidden_gems' | 'popular' | 'mixed' | undefined,
-        crowdPreference: context.user.crowdPreference as 'quiet' | 'buzzing' | 'no_preference' | undefined,
-        favoriteNeighborhoods: context.user.favoriteNeighborhoods || undefined,
-      });
-      
-      // Save new suggestions
-      const sourceMap: Record<string, string> = { 'Google': 'Web', 'Ticketmaster': 'Web' };
-      const newSuggestions: Suggestion[] = [];
-      
-      // Build group preferences using proper aggregation from all participants
       const userPrefsForAggregation = context.participants.map(p => ({
         id: p.userId,
         name: p.name,
@@ -331,9 +311,26 @@ async function executeToolCall(
         discoveryStyle: aggregated.discoveryStyle,
         favoriteNeighborhoods: aggregated.favoriteNeighborhoods.length > 0 ? aggregated.favoriteNeighborhoods : undefined,
       };
+
+      const result = await getOrchestratedSuggestions({
+        city,
+        categories: args.categories || filters.category || [],
+        budget: args.budget,
+        neighborhood: args.neighborhood || context.session.neighborhood || undefined,
+        specificDate: filters.specificDate,
+        specificTime: filters.specificTime,
+        timeWindow: filters.timeWindow,
+        energy: filters.energy,
+        discoveryStyle: context.user.discoveryStyle as 'hidden_gems' | 'popular' | 'mixed' | undefined,
+        crowdPreference: context.user.crowdPreference as 'quiet' | 'buzzing' | 'no_preference' | undefined,
+        favoriteNeighborhoods: context.user.favoriteNeighborhoods || undefined,
+      }, undefined, undefined, groupPrefs);
+      
+      const sourceMap: Record<string, string> = { 'Google': 'Web', 'Ticketmaster': 'Web' };
+      const newSuggestions: Suggestion[] = [];
       
       for (const opt of result.options.slice(0, 8)) {
-        const whyExplanation = generateWhyExplanation(opt, groupPrefs);
+        const whyExplanation = opt.whyExplanation || generateWhyExplanation(opt, groupPrefs);
         const suggestion = await storage.createSuggestion({
           sessionId,
           name: opt.title,

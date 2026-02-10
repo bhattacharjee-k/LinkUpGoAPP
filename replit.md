@@ -81,35 +81,38 @@ Preferred communication style: Simple, everyday language.
 - **SSE Response**: Planner route sends `suggestionsUpdated` flag when suggestions change, with `newSuggestions` array
 
 ### API Integrations
-- **Google Places API (New)**: Real venue suggestions with location data, ratings, price levels
+- **Google Places API (New)**: Real venue suggestions with location data, ratings, price levels, opening hours
 - **Ticketmaster Discovery API**: Live event/concert information with ticket URLs
 - **Perplexity API**: Web search for venue validation and current intel (trending spots, recent reviews)
-- **OpenAI (Replit AI Integrations)**: Orchestrates the planner, generates personalized explanations
+- **OpenAI (Replit AI Integrations)**: Orchestrates the planner, generates personalized explanations, drives the suggestion orchestrator
 - **Caching**: LRU cache with stale-while-revalidate (10m suggestions, 15m Places, 5m events, 5m Perplexity)
 - **City Filtering**: Haversine distance with 35mi (NYC) / 30mi (Chicago) radius boundaries
 
-### Personalized "Why" Explanations
-- **Generation**: Each suggestion includes a `whyExplanation` field explaining why it was picked
-- **Factors Considered**:
-  - Bucket type (safe = "Highly rated", explore = "Hidden gem", wildcard = "Wild card")
-  - Category match with group preferences
-  - Budget alignment
-  - Crowd preference match (quiet vs buzzing)
-  - Neighborhood match with favorites
-  - Distance/convenience
-  - Group size suitability
-- **Group Preference Aggregation**: `server/group-preferences.ts` combines user preferences
-- **Perplexity Validation**: `server/perplexity.ts` can validate venues and discover trending spots
-- **UI Display**: Suggestion cards show the "why" explanation in a highlighted box
+### AI-Driven Suggestion Orchestrator (Primary Pipeline)
+- **Module**: `server/orchestrator.ts` — OpenAI-driven suggestion pipeline replacing hardcoded heuristics
+- **Phase 1 — Context Synthesis**: OpenAI analyzes all user signals (group prefs, energy, time, budget, downvotes, feedback history) and produces a structured brief with:
+  - Natural language intent (2-3 sentence description of what the group actually wants)
+  - Smart API parameters: Google Places types/text queries, Ticketmaster classifications, Perplexity query
+  - Exclusion criteria (e.g., exclude restaurants for late-night clubbing)
+  - Vibe keywords, opening time requirements, radius bias
+- **Phase 2 — Intelligent Querying**: Brief drives parallel API calls:
+  - Google Places type-based search + text search (for categories like "speakeasy bars" that type search misses)
+  - Perplexity with AI-crafted natural language query (not hardcoded template)
+  - Ticketmaster with dynamically selected classifications
+- **Phase 3 — AI Validation & Ranking**: OpenAI reviews all candidates against the brief:
+  - Validates each venue matches the intent (a restaurant won't pass nightlife filter)
+  - Generates personalized "why" explanations in casual friend-recommendation tone
+  - Ranks by vibe score (1-10) and selects top 5 with diversity
+- **Fallback**: If OpenAI calls fail, falls back to legacy bucket scoring algorithm
+- **Entry Point**: `getOrchestratedSuggestions()` in `server/suggestions.ts`
 
-### Multi-Bucket Suggestion Generation (Diversity-First)
+### Legacy Bucket System (Fallback)
 - **SAFE bucket**: 2 options with high rating (≥4.4), higher review count (≥50), preferred radius
 - **EXPLORE bucket**: 2 options with lower review count (<200), expanded radius (+25%), novelty-weighted
 - **WILDCARD bucket**: 1 option with relaxed constraints, random selection for surprise
 - **Deduplication**: By placeId/eventId/name before bucket selection
 - **Downvote Learning**: "Too far" tightens radius, "Too expensive" tightens budget filtering
-- **Quota Redistribution**: Fills from remaining candidates if buckets are empty
-- **Internal Tagging**: generationType field for debugging (not shown in UI)
+- **Status**: Kept as fallback in `getSuggestions()`, primary path uses orchestrator
 
 ### Discovery Preferences (Curated Suggestions)
 - **Discovery Style**: User preference collected in onboarding step 6

@@ -1,6 +1,7 @@
 import { getSearchCenter, haversineDistance, isWithinCity, LatLng } from './geo';
 import { devLog } from './logger';
-import { discoverTrendingVenues } from './perplexity';
+import { discoverTrendingVenues, discoverVenuesFromQuery } from './perplexity';
+import { synthesizeContext, validateAndRankSuggestions, OrchestratorBrief } from './orchestrator';
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY;
@@ -30,10 +31,12 @@ export interface SuggestionOption {
   venueName?: string;
   source: string;
   score?: number;
-  generationType?: GenerationType; // Internal tagging for debugging
-  placeId?: string; // For deduplication
-  eventId?: string; // For deduplication
-  whyExplanation?: string; // AI-generated personalized reason
+  generationType?: GenerationType;
+  placeId?: string;
+  eventId?: string;
+  whyExplanation?: string;
+  openNow?: boolean;
+  openingHoursText?: string[];
 }
 
 export interface SuggestRequest {
@@ -887,7 +890,7 @@ async function fetchGooglePlaces(center: LatLng, radiusMeters: number, types: st
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
-          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.websiteUri,places.googleMapsUri,places.primaryType,places.editorialSummary',
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.websiteUri,places.googleMapsUri,places.primaryType,places.editorialSummary,places.currentOpeningHours',
         },
         body: JSON.stringify({
           includedTypes: [type],
@@ -914,6 +917,8 @@ async function fetchGooglePlaces(center: LatLng, radiusMeters: number, types: st
         const lng = place.location?.longitude;
         const distance = lat && lng ? haversineDistance(center.lat, center.lng, lat, lng) : null;
 
+        const openingHours = place.currentOpeningHours;
+
         results.push({
           optionType: 'place',
           title: place.displayName?.text || 'Unknown',
@@ -935,7 +940,9 @@ async function fetchGooglePlaces(center: LatLng, radiusMeters: number, types: st
           ticketUrl: null,
           eventUrl: null,
           source: 'Google',
-          placeId: place.id, // For deduplication
+          placeId: place.id,
+          openNow: openingHours?.openNow,
+          openingHoursText: openingHours?.weekdayDescriptions,
         });
       }
     } catch (err) {
@@ -1071,7 +1078,7 @@ async function fetchGooglePlacesByName(center: LatLng, radiusMeters: number, ven
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
-          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.websiteUri,places.googleMapsUri,places.primaryType,places.editorialSummary',
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.websiteUri,places.googleMapsUri,places.primaryType,places.editorialSummary,places.currentOpeningHours',
         },
         body: JSON.stringify({
           textQuery: `${name} ${city}`,
@@ -1101,6 +1108,7 @@ async function fetchGooglePlacesByName(center: LatLng, radiusMeters: number, ven
       const lat = place.location?.latitude;
       const lng = place.location?.longitude;
       const distance = lat && lng ? haversineDistance(center.lat, center.lng, lat, lng) : null;
+      const openingHours = place.currentOpeningHours;
 
       results.push({
         optionType: 'place',
@@ -1121,9 +1129,90 @@ async function fetchGooglePlacesByName(center: LatLng, radiusMeters: number, ven
         eventUrl: null,
         source: 'Google',
         placeId: place.id,
+        openNow: openingHours?.openNow,
+        openingHoursText: openingHours?.weekdayDescriptions,
       });
     } catch (err) {
       console.error(`[Suggestions] Error resolving trending venue "${name}":`, err);
+    }
+  }
+
+  return results;
+}
+
+export async function fetchGooglePlacesTextSearch(center: LatLng, radiusMeters: number, queries: string[], city: string): Promise<SuggestionOption[]> {
+  if (!GOOGLE_PLACES_API_KEY || queries.length === 0) return [];
+
+  const results: SuggestionOption[] = [];
+
+  for (const query of queries.slice(0, 3)) {
+    try {
+      const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.websiteUri,places.googleMapsUri,places.primaryType,places.editorialSummary,places.currentOpeningHours',
+        },
+        body: JSON.stringify({
+          textQuery: query,
+          locationBias: {
+            circle: {
+              center: { latitude: center.lat, longitude: center.lng },
+              radius: radiusMeters,
+            },
+          },
+          maxResultCount: 5,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error(`[Suggestions] Text search error for "${query}":`, await response.text());
+        continue;
+      }
+
+      const data = await response.json();
+      const places = data.places || [];
+
+      for (const place of places) {
+        const primaryType = (place.primaryType || '').toLowerCase();
+        const invalidTypes = ['apartment', 'hotel', 'motel', 'school', 'hospital', 'church', 'parking', 'gas_station', 'grocery', 'supermarket', 'shopping_mall', 'real_estate'];
+        if (invalidTypes.some(t => primaryType.includes(t))) continue;
+
+        const lat = place.location?.latitude;
+        const lng = place.location?.longitude;
+        const distance = lat && lng ? haversineDistance(center.lat, center.lng, lat, lng) : null;
+        const openingHours = place.currentOpeningHours;
+
+        results.push({
+          optionType: 'place',
+          title: place.displayName?.text || 'Unknown',
+          description: place.editorialSummary?.text || `A spot in ${city}`,
+          address: place.formattedAddress || '',
+          city,
+          lat,
+          lng,
+          rating: place.rating?.toString(),
+          ratingCount: place.userRatingCount,
+          priceLevel: priceLevelMap[place.priceLevel] || '$$',
+          distance: distance ? `${distance.toFixed(1)} mi` : undefined,
+          tags: [
+            place.primaryType?.replace('_', ' ') || 'venue',
+            ...(query.toLowerCase().includes('speakeasy') ? ['speakeasy'] : []),
+            ...(query.toLowerCase().includes('rooftop') ? ['rooftop'] : []),
+          ],
+          detailUrl: place.websiteUri || place.googleMapsUri,
+          reservationUrl: null,
+          ticketUrl: null,
+          eventUrl: null,
+          source: 'Google',
+          placeId: place.id,
+          openNow: openingHours?.openNow,
+          openingHoursText: openingHours?.weekdayDescriptions,
+        });
+      }
+    } catch (err) {
+      console.error(`[Suggestions] Text search error for "${query}":`, err);
     }
   }
 
@@ -1254,4 +1343,131 @@ export async function enrichSuggestionsWithExplanations(
     ...option,
     whyExplanation: generateWhyExplanation(option, groupPrefs),
   }));
+}
+
+export async function getOrchestratedSuggestions(
+  req: SuggestRequest,
+  downvoteReasons?: DownvoteReasonAggregates,
+  referenceVenues?: ReferenceVenue[],
+  groupPrefs?: GroupPreferenceSummary,
+  feedbackHistory?: Array<{ venueName: string; rating: number; tags?: string[] | null; review?: string | null }>,
+): Promise<{ options: SuggestionOption[]; meta: SuggestMeta; referenceProfile?: ReferenceProfile; brief?: OrchestratorBrief }> {
+  const startTime = Date.now();
+  
+  console.log(`[Orchestrator] Starting orchestrated suggestion pipeline for ${req.city}`);
+
+  let brief: OrchestratorBrief;
+  try {
+    brief = await synthesizeContext(req, groupPrefs, downvoteReasons, feedbackHistory);
+    console.log(`[Orchestrator] Brief synthesized in ${Date.now() - startTime}ms`);
+    console.log(`[Orchestrator] Intent: ${brief.naturalLanguageIntent}`);
+    console.log(`[Orchestrator] Places types: [${brief.googlePlacesTypes.join(', ')}], Exclude: [${brief.excludeTypes.join(', ')}]`);
+    console.log(`[Orchestrator] Perplexity query: ${brief.perplexityQuery}`);
+  } catch (err) {
+    console.error('[Orchestrator] Brief synthesis failed, falling back to legacy pipeline', err);
+    return getSuggestions(req, downvoteReasons, referenceVenues);
+  }
+
+  let refProfile: ReferenceProfile | null = null;
+  if (referenceVenues && referenceVenues.length > 0) {
+    const venueDetails = await fetchVenueDetails(referenceVenues.map(v => v.placeId));
+    refProfile = extractReferenceProfile(venueDetails);
+  }
+
+  const center = getSearchCenter(req.city, req.neighborhood, req.userLat, req.userLng);
+  const radiusBiasMultiplier = brief.radiusBias === 'tight' ? 0.7 : brief.radiusBias === 'wide' ? 1.5 : 1.0;
+  const baseRadiusMeters = Math.round(3000 * radiusBiasMultiplier);
+  const maxRadiusMeters = Math.round(baseRadiusMeters * 1.3);
+
+  const apiStart = Date.now();
+  const [placesResults, textSearchResults, eventsResults, trendingVenueNames] = await Promise.all([
+    fetchGooglePlaces(center, maxRadiusMeters, brief.googlePlacesTypes.slice(0, 5), req.city),
+    
+    brief.googlePlacesTextQueries.length > 0
+      ? fetchGooglePlacesTextSearch(center, maxRadiusMeters, brief.googlePlacesTextQueries, req.city)
+      : Promise.resolve([]),
+
+    brief.ticketmasterClassifications.length > 0
+      ? fetchTicketmasterEvents(center, brief.ticketmasterClassifications, req.specificDate)
+      : Promise.resolve([]),
+
+    PERPLEXITY_API_KEY
+      ? discoverVenuesFromQuery(brief.perplexityQuery).catch(err => {
+          console.error('[Orchestrator] Perplexity error:', err);
+          return [] as string[];
+        })
+      : Promise.resolve([] as string[]),
+  ]);
+  console.log(`[Orchestrator] API calls completed in ${Date.now() - apiStart}ms: places=${placesResults.length}, textSearch=${textSearchResults.length}, events=${eventsResults.length}, trending=${trendingVenueNames.length}`);
+
+  let trendingPlaceResults: SuggestionOption[] = [];
+  if (trendingVenueNames.length > 0) {
+    console.log(`[Orchestrator] Resolving trending: [${trendingVenueNames.join(', ')}]`);
+    trendingPlaceResults = await fetchGooglePlacesByName(center, maxRadiusMeters, trendingVenueNames, req.city);
+    console.log(`[Orchestrator] Resolved ${trendingPlaceResults.length} trending venues`);
+  }
+
+  let allCandidates = [...placesResults, ...textSearchResults, ...trendingPlaceResults, ...eventsResults];
+
+  allCandidates = allCandidates.filter(opt => {
+    if (opt.lat && opt.lng) {
+      return isWithinCity(req.city, opt.lat, opt.lng);
+    }
+    const cityLower = req.city.toLowerCase();
+    const addressLower = (opt.address || '').toLowerCase();
+    const optCityLower = (opt.city || '').toLowerCase();
+    if (req.city === 'NYC') {
+      return addressLower.includes('new york') || addressLower.includes('brooklyn') || 
+             addressLower.includes('queens') || addressLower.includes('manhattan') ||
+             optCityLower.includes('new york') || optCityLower === 'nyc';
+    }
+    return addressLower.includes(cityLower) || optCityLower.includes(cityLower);
+  });
+
+  for (const opt of allCandidates) {
+    if (opt.lat != null && opt.lng != null) {
+      const dist = haversineDistance(center.lat, center.lng, opt.lat, opt.lng);
+      opt.distance = `${dist.toFixed(1)} mi`;
+    }
+  }
+
+  const uniqueIds = new Set<string>();
+  allCandidates = allCandidates.filter(opt => {
+    const id = opt.placeId || opt.eventId || opt.title.toLowerCase().trim();
+    if (uniqueIds.has(id)) return false;
+    uniqueIds.add(id);
+    return true;
+  });
+
+  console.log(`[Orchestrator] ${allCandidates.length} unique candidates after dedup and city filter`);
+
+  const validationStart = Date.now();
+  let rankedOptions: SuggestionOption[];
+  try {
+    rankedOptions = await validateAndRankSuggestions(allCandidates, brief, groupPrefs);
+    console.log(`[Orchestrator] AI validation completed in ${Date.now() - validationStart}ms`);
+    console.log(`[Orchestrator] Final selection: ${rankedOptions.map(o => `${o.title} (score=${o.score})`).join(' | ')}`);
+  } catch (err) {
+    console.error('[Orchestrator] AI validation failed, using basic ranking', err);
+    rankedOptions = allCandidates
+      .sort((a, b) => parseFloat(b.rating || '0') - parseFloat(a.rating || '0'))
+      .slice(0, 5);
+  }
+
+  const totalTime = Date.now() - startTime;
+  console.log(`[Orchestrator] Total pipeline time: ${totalTime}ms`);
+
+  return {
+    options: rankedOptions,
+    meta: {
+      city: req.city,
+      centerLatLng: center,
+      radiusMeters: baseRadiusMeters,
+      placesCount: placesResults.length + textSearchResults.length + trendingPlaceResults.length,
+      eventsCount: eventsResults.length,
+      filteredCount: rankedOptions.length,
+    },
+    referenceProfile: refProfile || undefined,
+    brief,
+  };
 }

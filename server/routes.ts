@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { insertUserSchema, insertGroupSchema, insertSessionSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { getSuggestions, SuggestionOption, generateWhyExplanation, GroupPreferenceSummary } from "./suggestions";
+import { getSuggestions, getOrchestratedSuggestions, SuggestionOption, generateWhyExplanation, GroupPreferenceSummary } from "./suggestions";
 import { notifyPlanJoined, notifyPlanLocked } from "./notifications";
 import { requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant, requireSessionNotLocked } from "./middleware/auth";
 import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from "./middleware/error-handler";
@@ -257,7 +257,6 @@ export async function registerRoutes(
   app.post("/api/suggest", requireAuth, asyncHandler(async (req: Request, res: Response) => {
     const data = SuggestRequestSchema.parse(req.body);
     
-    // Merge user preferences from authenticated user if not provided in request
     // @ts-ignore
     const userId = req.session?.userId;
     const user = userId ? await storage.getUser(userId) : null;
@@ -267,17 +266,9 @@ export async function registerRoutes(
       crowdPreference: data.crowdPreference || user?.crowdPreference as 'quiet' | 'buzzing' | 'no_preference' | undefined,
       favoriteNeighborhoods: data.favoriteNeighborhoods || user?.favoriteNeighborhoods || undefined,
     };
-    
-    const result = await getSuggestions(enrichedData, undefined, data.referenceVenues);
 
-    const sourceMap: Record<string, string> = {
-      'Google': 'Web',
-      'Ticketmaster': 'Web',
-    };
-
-    // Build group preference summary for "why" explanation generation
     const groupPrefs: GroupPreferenceSummary = {
-      memberCount: 1, // Single user context for /api/suggest
+      memberCount: 1,
       categories: enrichedData.categories || [],
       commonCategories: enrichedData.categories || [],
       budget: enrichedData.budget || '$$',
@@ -287,8 +278,17 @@ export async function registerRoutes(
       favoriteNeighborhoods: enrichedData.favoriteNeighborhoods,
     };
 
+    const result = await getOrchestratedSuggestions(
+      enrichedData, undefined, data.referenceVenues, groupPrefs
+    );
+
+    const sourceMap: Record<string, string> = {
+      'Google': 'Web',
+      'Ticketmaster': 'Web',
+    };
+
     const suggestions = result.options.map(opt => {
-      const whyExplanation = generateWhyExplanation(opt, groupPrefs);
+      const whyExplanation = opt.whyExplanation || generateWhyExplanation(opt, groupPrefs);
       const suggestion: Record<string, any> = {
         name: opt.title,
         city: data.city,
@@ -923,12 +923,10 @@ export async function registerRoutes(
       const currentSuggestions = await storage.getSessionSuggestions(session.id);
       const existingNames = new Set(currentSuggestions.map(s => s.name.toLowerCase()));
       
-      // Import the suggestion generator
-      const { getSuggestions } = await import('./suggestions');
+      const { getOrchestratedSuggestions: getOrchSuggestions } = await import('./suggestions');
       
-      // Generate new suggestions
       const filters = session.filters as any;
-      const { options } = await getSuggestions({
+      const { options } = await getOrchSuggestions({
         city: filters?.locationScope || 'NYC',
         categories: filters?.category || ['Drinks'],
         budget: filters?.budget || '$$',

@@ -199,13 +199,21 @@ export async function discoverTrendingVenues(
     query = `What are the best ${vibeHint} for ${categoryList} in ${city} right now? Focus on places that opened recently or are currently trending. List just the venue names.`;
   }
   
-  const result = await searchPerplexity(query);
+  return discoverVenuesFromQuery(query);
+}
+
+export async function discoverVenuesFromQuery(query: string): Promise<string[]> {
+  const result = await searchPerplexity(query + ' List just the venue names.');
   
   if (!result || !result.answer) {
     return [];
   }
 
-  const cleanAnswer = result.answer.replace(/\[\d+\]/g, '').replace(/\n-\s*/g, '\n');
+  return extractVenueNames(result.answer);
+}
+
+export function extractVenueNames(rawAnswer: string): string[] {
+  const cleanAnswer = rawAnswer.replace(/\[\d+\]/g, '').replace(/\n-\s*/g, '\n');
   
   const venueMatches = cleanAnswer.match(/[""\*\*]([^""\*]+)[""\*\*]/g) || [];
   let venues = venueMatches
@@ -223,7 +231,11 @@ export async function discoverTrendingVenues(
   const filtered = venues.filter(v => {
     const lower = v.toLowerCase();
     const badTypes = ['apartment', 'hotel', 'motel', 'hospital', 'school', 'church', 'park', 'mall'];
-    return !badTypes.some(t => lower.includes(t));
+    if (badTypes.some(t => lower.includes(t))) return false;
+    const headerPatterns = /^(popular|hidden|best|top|notable|honorable|other)\s*(spots|gems|picks|mentions|choices|options)?:?\s*$/i;
+    if (headerPatterns.test(v.trim())) return false;
+    if (v.trim().endsWith(':')) return false;
+    return true;
   });
   
   console.log(`[Perplexity] Extracted venues: [${filtered.join(', ')}]`);
