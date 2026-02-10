@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import logoImg from '@/assets/brand/linkupgo-logo.png';
 
-const RETURNING_USER_KEY = 'vibecheck_has_account';
+const RETURNING_USER_KEY = 'linkupgo_has_account';
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error';
 

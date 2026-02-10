@@ -147,14 +147,14 @@ export function SessionComplete() {
     const venueName = winningSuggestion.name;
     const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//VibeCheck//EN
+PRODID:-//LinkUpGo//EN
 BEGIN:VEVENT
-UID:${session.id}@vibecheck.app
+UID:${session.id}@linkupgo.app
 DTSTAMP:${formatICSDate(new Date())}
 DTSTART:${formatICSDate(eventDate)}
 DTEND:${formatICSDate(endDate)}
-SUMMARY:${session.name || 'VibeCheck Plan'} at ${venueName}
-DESCRIPTION:Locked in via VibeCheck! ${winningSuggestion.description || ''}
+SUMMARY:${session.name || 'LinkUpGo Plan'} at ${venueName}
+DESCRIPTION:Locked in via LinkUpGo! ${winningSuggestion.description || ''}
 LOCATION:${venueName}
 END:VEVENT
 END:VCALENDAR`;
@@ -163,7 +163,7 @@ END:VCALENDAR`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `vibecheck-${session.id.slice(0, 8)}.ics`;
+    a.download = `linkupgo-${session.id.slice(0, 8)}.ics`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

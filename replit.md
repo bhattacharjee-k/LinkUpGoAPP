@@ -1,8 +1,8 @@
-# VibeCheck - Social Event Planner
+# LinkUpGo - Social Event Planner
 
 ## Overview
 
-VibeCheck is an AI-driven social planning application for young professionals in NYC and Chicago. It enables users to create groups ("squads"), plan social events collaboratively, vote on suggestions, and lock in plans. The app features user onboarding with preference collection, group management with invite codes, and session-based event planning with voting mechanics.
+LinkUpGo is an AI-driven social planning application for young professionals in NYC and Chicago. It enables users to create groups ("squads"), plan social events collaboratively, vote on suggestions, and lock in plans. The app features user onboarding with preference collection, group management with invite codes, and session-based event planning with voting mechanics.
 
 ## User Preferences
 

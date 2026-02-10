@@ -332,11 +332,11 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 // but actually, let's try to do a robust LocalStorage implementation.
 
 export const saveState = (state: any) => {
-  localStorage.setItem('vibecheck_state', JSON.stringify(state));
+  localStorage.setItem('linkupgo_state', JSON.stringify(state));
 };
 
 export const loadState = () => {
-  const stored = localStorage.getItem('vibecheck_state');
+  const stored = localStorage.getItem('linkupgo_state');
   if (stored) return JSON.parse(stored);
   return {
     currentUser: null, // Start null to show onboarding

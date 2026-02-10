@@ -18,7 +18,7 @@ export function generateICSFile(params: CalendarEventParams): string {
   };
   
   const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
-  const uid = `vibecheck-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@vibecheck.app`;
+  const uid = `linkupgo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@linkupgo.app`;
   
   const escapeText = (text: string): string => {
     return text
@@ -31,7 +31,7 @@ export function generateICSFile(params: CalendarEventParams): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//VibeCheck//Event Planner//EN',
+    'PRODID:-//LinkUpGo//Event Planner//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
@@ -135,7 +135,7 @@ async function sendEmailNotification(params: {
           </div>
         </div>
         <p style="color: #525252; text-align: center; margin: 16px 0 0 0; font-size: 12px;">
-          Sent by VibeCheck • <a href="${appBaseUrl}/settings" style="color: #84cc16;">Manage notifications</a>
+          Sent by LinkUpGo • <a href="${appBaseUrl}/settings" style="color: #84cc16;">Manage notifications</a>
         </p>
       </div>
     `;
@@ -282,7 +282,7 @@ async function sendCalendarInviteEmails(params: {
 
   const icsContent = generateICSFile({
     title: `${sessionName}: ${winningOption}`,
-    description: eventDetails.description || `Event planned with VibeCheck!\n\nVenue: ${winningOption}`,
+    description: eventDetails.description || `Event planned with LinkUpGo!\n\nVenue: ${winningOption}`,
     location: eventDetails.location,
     startDate: eventDetails.startDate,
     url: `${appBaseUrl}${url}`,
@@ -327,7 +327,7 @@ async function sendCalendarInviteEmails(params: {
             </div>
           </div>
           <p style="color: #525252; text-align: center; margin: 16px 0 0 0; font-size: 12px;">
-            Sent by VibeCheck • <a href="${appBaseUrl}/profile" style="color: #84cc16;">Manage notifications</a>
+            Sent by LinkUpGo • <a href="${appBaseUrl}/profile" style="color: #84cc16;">Manage notifications</a>
           </p>
         </div>
       `;
