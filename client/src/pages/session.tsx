@@ -64,6 +64,8 @@ export function Session() {
     wouldRecommend: null as boolean | null,
   });
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [isLockingPlan, setIsLockingPlan] = useState(false);
+  const [votingInProgress, setVotingInProgress] = useState<string | null>(null);
   const [proposedTimes, setProposedTimes] = useState<Array<{
     id: string;
     sessionId: string;
@@ -438,27 +440,46 @@ export function Session() {
   };
 
   const handleUpvote = async (suggestionId: string) => {
-    await upvoteForSuggestion(session.id, suggestionId);
+    if (votingInProgress) return;
+    setVotingInProgress(suggestionId);
+    try {
+      await upvoteForSuggestion(session.id, suggestionId);
+    } finally {
+      setVotingInProgress(null);
+    }
   };
 
   const handleDownvote = (suggestionId: string, name: string) => {
+    if (votingInProgress) return;
     setDownvoteSuggestion({ id: suggestionId, name });
     setDownvoteModalOpen(true);
   };
 
   const submitDownvote = async (reasons: string[], note?: string) => {
     if (downvoteSuggestion) {
-      await downvoteForSuggestion(session.id, downvoteSuggestion.id, reasons, note);
+      setVotingInProgress(downvoteSuggestion.id);
+      try {
+        await downvoteForSuggestion(session.id, downvoteSuggestion.id, reasons, note);
+      } finally {
+        setVotingInProgress(null);
+      }
     }
   };
 
   const handleLockIn = async (suggestionId: string) => {
-      await confirmPlan(session.id, suggestionId);
-      toast({ title: "Plan Locked!", description: "The group is going!" });
-      setConfirmLockOpen(false);
-      setPendingLockSuggestionId(null);
-      // Navigate to the complete page
-      setLocation(`/session/${session.id}/complete`);
+      if (isLockingPlan) return;
+      setIsLockingPlan(true);
+      try {
+        await confirmPlan(session.id, suggestionId);
+        toast({ title: "Plan Locked!", description: "The group is going!" });
+        setConfirmLockOpen(false);
+        setPendingLockSuggestionId(null);
+        setLocation(`/session/${session.id}/complete`);
+      } catch (err) {
+        toast({ title: "Error", description: "Failed to lock plan. Please try again.", variant: "destructive" });
+      } finally {
+        setIsLockingPlan(false);
+      }
   };
   
   const handleAdminLock = () => {
@@ -1416,10 +1437,14 @@ export function Session() {
                          size="sm"
                          className={cn("h-12 rounded-lg border border-white/5 flex-col gap-0.5", myVote === 'up' ? "bg-primary text-black border-primary font-bold" : "bg-white/5 hover:bg-white/10")}
                          onClick={() => handleUpvote(suggestion.id)}
-                         disabled={isLocked}
+                         disabled={isLocked || votingInProgress !== null}
                          data-testid={`button-upvote-${suggestion.id}`}
                        >
-                         <ThumbsUp size={18} className={cn(myVote === 'up' ? "fill-black" : "")} />
+                         {votingInProgress === suggestion.id ? (
+                           <RefreshCw size={18} className="animate-spin" />
+                         ) : (
+                           <ThumbsUp size={18} className={cn(myVote === 'up' ? "fill-black" : "")} />
+                         )}
                          <span className="text-xs">{voteSummary.upvotes}</span>
                        </Button>
                        
@@ -1428,7 +1453,7 @@ export function Session() {
                          size="sm"
                          className={cn("h-12 rounded-lg border border-white/5 flex-col gap-0.5", myVote === 'down' ? "bg-red-500 text-white border-red-500 font-bold" : "bg-white/5 hover:bg-white/10")}
                          onClick={() => handleDownvote(suggestion.id, suggestion.name)}
-                         disabled={isLocked}
+                         disabled={isLocked || votingInProgress !== null}
                          data-testid={`button-downvote-${suggestion.id}`}
                        >
                          <ThumbsDown size={18} />
@@ -1522,8 +1547,30 @@ export function Session() {
                }, 0);
                const hasAnyVotes = totalVotes >= 1;
                
+               const activeParticipants = session.participantDetails?.filter((p: any) => p.status === 'active') || [];
+               const activeCount = activeParticipants.length || participants.length;
+               const voterIds = new Set<string>();
+               session.suggestions.forEach(s => {
+                 Object.keys(s.votes || {}).forEach(uid => {
+                   const status = session.participantStatusByUserId?.[uid];
+                   if (status !== 'cant_make_it' && status !== 'left') {
+                     voterIds.add(uid);
+                   }
+                 });
+               });
+               const voterCount = voterIds.size;
+               
                return (
                  <div className="sticky bottom-0 pt-4 pb-2 bg-gradient-to-t from-background via-background to-transparent z-10">
+                    {hasAnyVotes && (
+                      <div className="flex items-center justify-center gap-2 mb-2" data-testid="text-vote-progress">
+                        <Users size={14} className="text-muted-foreground" />
+                        <span className={cn("text-xs font-medium", voterCount >= activeCount ? "text-primary" : "text-muted-foreground")}>
+                          {voterCount} of {activeCount} voted
+                        </span>
+                        {voterCount >= activeCount && <Check size={14} className="text-primary" />}
+                      </div>
+                    )}
                     <Button 
                       onClick={handleAdminLock} 
                       disabled={!hasAnyVotes}
@@ -1552,6 +1599,14 @@ export function Session() {
           <TabsContent value="chat" className="flex-1 flex flex-col overflow-hidden data-[state=inactive]:hidden">
             <ScrollArea className="flex-1 px-4 py-4" ref={scrollRef}>
               <div className="space-y-4 min-h-full flex flex-col justify-end pb-4">
+                {session.messages.length === 0 && realtimeMessages.length === 0 && !isStreaming && (
+                  <div className="flex flex-col items-center justify-center py-16 text-center space-y-3 opacity-60">
+                    <Bot size={32} className="text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground max-w-xs">
+                      Chat with the AI planner to refine your options, or message your squad to coordinate.
+                    </p>
+                  </div>
+                )}
                 {[...session.messages, ...realtimeMessages.filter(rm => !session.messages.some(m => m.id === rm.id))].map(msg => {
                   const isCurrentUser = msg.sender === user?.id;
                   const isPlannerAi = msg.sender === 'planner-ai';
@@ -1682,9 +1737,14 @@ export function Session() {
                     <Button 
                       className="bg-primary text-black font-bold" 
                       onClick={() => pendingLockSuggestionId && handleLockIn(pendingLockSuggestionId)}
+                      disabled={isLockingPlan}
                       data-testid="button-confirm-lock"
                     >
-                        <Check size={16} className="mr-2" /> Lock In Plan
+                        {isLockingPlan ? (
+                          <><RefreshCw size={16} className="mr-2 animate-spin" /> Locking...</>
+                        ) : (
+                          <><Check size={16} className="mr-2" /> Lock In Plan</>
+                        )}
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -698,7 +698,7 @@ export async function registerRoutes(
           // Only include event details if the date is valid
           if (!isNaN(parsedDate.getTime())) {
             eventDetails = {
-              location: winningSuggestion.address || winningSuggestion.neighborhood || 'See venue details',
+              location: winningSuggestion.name || 'See venue details',
               startDate: parsedDate,
               description: winningSuggestion.description || undefined,
             };

@@ -72,17 +72,21 @@ export interface Suggestion {
   name: string;
   city: City;
   source: 'Web' | 'Beli' | 'Partiful' | 'Posh.vip';
-  rating: number;
-  turnout: string; // e.g. "5/6"
+  rating: number | string;
+  turnout: string;
   distance: string;
   budget: Budget;
   description: string;
   tags: string[];
-  votes: Record<string, 'yes' | 'no' | 'fire' | 'cant'>; // userId -> vote
-  detailUrl?: string; // Optional general more info link
-  reservationUrl?: string; // Optional reservation link
-  ticketUrl?: string; // Optional ticket purchase link
-  eventUrl?: string; // Optional event page link
+  votes: Record<string, 'yes' | 'no' | 'fire' | 'cant'>;
+  detailUrl?: string;
+  reservationUrl?: string;
+  ticketUrl?: string;
+  eventUrl?: string;
+  kind?: 'venue' | 'event';
+  venueName?: string;
+  startTime?: string;
+  whyExplanation?: string;
 }
 
 // City coordinates for location grounding
