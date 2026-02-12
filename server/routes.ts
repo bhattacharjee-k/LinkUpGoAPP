@@ -1185,11 +1185,17 @@ export async function registerRoutes(
         return res.status(401).json({ message: "User not found" });
       }
       
-      // Save the user's message first
-      await storage.createMessage({
+      // Save the user's message first and broadcast to all clients
+      const senderName = user.name || user.username || 'Anonymous';
+      const userMsg = await storage.createMessage({
         sessionId,
         sender: userId,
+        senderName,
         text: userMessage
+      });
+      broadcastToSession(sessionId, {
+        type: 'new_message',
+        message: userMsg
       });
       
       // Set up SSE
@@ -1228,12 +1234,17 @@ export async function registerRoutes(
           }
         }
         
-        // Save the AI response
-        await storage.createMessage({
+        // Save the AI response and broadcast to all clients
+        const aiMsg = await storage.createMessage({
           sessionId,
           sender: 'planner-ai',
+          senderName: 'Planner AI',
           text: fullResponse || plannerResult?.text || '',
           metadata: { kind: 'planner', suggestionsUpdated: plannerResult?.suggestionsUpdated }
+        });
+        broadcastToSession(sessionId, {
+          type: 'new_message',
+          message: aiMsg
         });
         
         // Send done event with suggestions updated flag

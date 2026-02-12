@@ -78,10 +78,12 @@ export function Session() {
   });
   
   const session = getSession(params?.id || '');
+  const [sessionLoading, setSessionLoading] = useState(true);
 
   useEffect(() => {
     if (params?.id) {
-      refreshSession(params.id);
+      setSessionLoading(true);
+      refreshSession(params.id).finally(() => setSessionLoading(false));
     }
   }, [params?.id]);
 
@@ -118,8 +120,11 @@ export function Session() {
     const unsubVotes = subscribeToVoteUpdates(session.id, () => {
       refreshSession(session.id);
     });
-    const unsubSession = subscribeToSessionUpdates(session.id, () => {
+    const unsubSession = subscribeToSessionUpdates(session.id, (data) => {
       refreshSession(session.id);
+      if (data?.session?.status === 'locked') {
+        setLocation(`/session/${session.id}/complete`);
+      }
     });
     return () => {
       unsubVotes();
@@ -209,12 +214,28 @@ export function Session() {
     { value: 'great_service', label: 'Great service' },
   ];
 
-  if (!session) return (
+  if (!session) {
+    if (sessionLoading) {
+      return (
+        <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading session...</p>
+        </div>
+      );
+    }
+    return (
       <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-4">
           <h2 className="text-xl font-bold">Session Not Found</h2>
           <Button onClick={() => setLocation('/')}>Go Home</Button>
       </div>
-  );
+    );
+  }
+
+  useEffect(() => {
+    if (session?.status === 'locked' && !sessionLoading) {
+      setLocation(`/session/${session.id}/complete`);
+    }
+  }, [session?.status, sessionLoading]);
 
   const group = groups.find(g => g.id === session.groupId);
   const allParticipants = session.participants || [];

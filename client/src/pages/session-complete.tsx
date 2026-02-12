@@ -26,7 +26,7 @@ const FEEDBACK_TAGS = [
 
 export function SessionComplete() {
   const [match, params] = useRoute('/session/:id/complete');
-  const { getSession, user, refreshSession } = useApp();
+  const { getSession, user, refreshSession, groups, isAdmin } = useApp();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
   
@@ -37,12 +37,14 @@ export function SessionComplete() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [existingFeedback, setExistingFeedback] = useState<any>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
   
   const session = getSession(params?.id || '');
   
   useEffect(() => {
     if (params?.id) {
-      refreshSession(params.id);
+      setSessionLoading(true);
+      refreshSession(params.id).finally(() => setSessionLoading(false));
       checkExistingFeedback();
     }
   }, [params?.id]);
@@ -68,6 +70,15 @@ export function SessionComplete() {
   };
   
   if (!match || !session) {
+    if (sessionLoading) {
+      return (
+        <Layout>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        </Layout>
+      );
+    }
     return (
       <Layout>
         <div className="flex-1 flex items-center justify-center">
@@ -172,6 +183,20 @@ END:VCALENDAR`;
     toast({ title: "Calendar downloaded!", description: "Add it to your calendar app" });
   };
   
+  const group = groups.find(g => g.id === session.groupId);
+  const isUserAdmin = group ? isAdmin(group.id) : false;
+
+  const handleUnlock = async () => {
+    try {
+      await api.sessions.update(session.id, { status: 'voting', winningOptionId: null });
+      await refreshSession(session.id);
+      toast({ title: "Plan Unlocked", description: "Voting is open again." });
+      setLocation(`/session/${session.id}`);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to unlock plan", variant: "destructive" });
+    }
+  };
+
   return (
     <Layout>
       <div className="flex-1 flex flex-col max-w-lg mx-auto w-full px-4 py-6 space-y-6">
@@ -180,15 +205,26 @@ END:VCALENDAR`;
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => setLocation(`/session/${session.id}`)}
+            onClick={() => setLocation('/')}
             data-testid="button-back"
           >
             <ArrowLeft size={20} />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold">Plan Locked In!</h1>
             <p className="text-muted-foreground text-sm">You're all set for your outing</p>
           </div>
+          {isUserAdmin && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleUnlock}
+              className="text-xs border-white/10 bg-white/5"
+              data-testid="button-unlock-plan"
+            >
+              Unlock
+            </Button>
+          )}
         </div>
         
         {/* Winning Venue Card */}

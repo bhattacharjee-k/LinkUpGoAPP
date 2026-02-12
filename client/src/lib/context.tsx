@@ -437,7 +437,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshSession = async (id: string) => {
     try {
       const sessionData = await api.sessions.get(id);
-      setSessions(prev => prev.map(s => s.id === id ? sessionData : s));
+      setSessions(prev => {
+        const exists = prev.some(s => s.id === id);
+        if (exists) {
+          return prev.map(s => s.id === id ? sessionData : s);
+        }
+        return [...prev, sessionData];
+      });
     } catch (error) {
       console.error('Failed to refresh session:', error);
     }
