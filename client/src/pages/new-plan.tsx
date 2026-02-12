@@ -5,7 +5,7 @@ import { useLocation, useSearch } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon, ChevronRight, MapPin, UserPlus, Users, Check, Navigation, X } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronRight, MapPin, UserPlus, Users, Check, Navigation, X, Sparkles, Search, Star } from 'lucide-react';
 import { City, Budget, Energy, Category } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { Calendar } from "@/components/ui/calendar";
@@ -14,7 +14,15 @@ import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { PlacesAutocomplete } from '@/components/places-autocomplete';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { ReferenceVenue } from '@shared/schema';
+
+const LOADING_MESSAGES = [
+  { icon: Search, text: "Searching the best spots nearby..." },
+  { icon: Star, text: "Finding top-rated venues..." },
+  { icon: MapPin, text: "Checking what's open and available..." },
+  { icon: Sparkles, text: "Curating personalized picks for your group..." },
+];
 
 interface PlaceResult {
   placeId: string;
@@ -52,6 +60,7 @@ export function NewPlan() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [locationPermission, setLocationPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [showLocationPrompt, setShowLocationPrompt] = useState(true);
@@ -66,6 +75,17 @@ export function NewPlan() {
     if (othersCount === 1) return `${user?.name?.split(' ')[0] || 'You'} +1`;
     return `${user?.name?.split(' ')[0] || 'You'} +${othersCount}`;
   };
+
+  useEffect(() => {
+    if (!isCreating) {
+      setLoadingStep(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setLoadingStep(prev => (prev + 1) % LOADING_MESSAGES.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [isCreating]);
 
   const findMatchingGroup = (memberIds: string[]) => {
     const sortedMemberIds = [...memberIds].sort();
@@ -229,6 +249,72 @@ export function NewPlan() {
     <div className="min-h-screen bg-background flex flex-col px-6 py-6 relative overflow-hidden">
       <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-primary/10 rounded-full blur-[100px]" />
       
+      <AnimatePresence>
+        {isCreating && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center px-8"
+          >
+            <div className="absolute top-[20%] left-[-10%] w-72 h-72 bg-primary/15 rounded-full blur-[120px]" />
+            <div className="absolute bottom-[20%] right-[-10%] w-64 h-64 bg-purple-500/10 rounded-full blur-[100px]" />
+
+            <motion.div
+              className="relative z-10 flex flex-col items-center text-center space-y-8"
+            >
+              <div className="relative">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  className="w-20 h-20 rounded-full border-2 border-primary/30 border-t-primary"
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <motion.div
+                    key={loadingStep}
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.5 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    {React.createElement(LOADING_MESSAGES[loadingStep].icon, {
+                      size: 28,
+                      className: "text-primary"
+                    })}
+                  </motion.div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h2 className="text-xl font-bold text-white">Finding your perfect plan</h2>
+                <motion.p
+                  key={loadingStep}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.4 }}
+                  className="text-muted-foreground text-sm"
+                >
+                  {LOADING_MESSAGES[loadingStep].text}
+                </motion.p>
+              </div>
+
+              <div className="flex gap-2 mt-4">
+                {LOADING_MESSAGES.map((_, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "w-2 h-2 rounded-full transition-all duration-300",
+                      i === loadingStep ? "bg-primary w-6" : "bg-white/20"
+                    )}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="z-10 w-full max-w-md mx-auto flex-1 flex flex-col pb-8">
         <div className="mb-8">
           <Button 
