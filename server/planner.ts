@@ -238,6 +238,12 @@ YOUR ROLE:
 5. Encourage group consensus and decision-making
 6. Keep responses brief (2-3 sentences) unless asked for detail
 
+CRITICAL TOOL USAGE RULES:
+- When asked to regenerate, refresh, find new, or update suggestions/options, you MUST call the regenerate_suggestions tool. NEVER list venues in your text response — the tool updates the Suggestions tab directly.
+- When asked to add a specific venue, you MUST call the add_suggestion tool.
+- When asked to remove a venue, you MUST call the remove_suggestion tool.
+- After calling any tool, your text response should be SHORT (1-2 sentences) confirming what you did and telling the user to check the Suggestions tab. Do NOT repeat or list the new suggestions in your message.
+
 IMPORTANT RULES:
 - Only discuss venues in ${filters.locationScope || 'NYC'} - never suggest places outside this city
 - Be conversational and fun - use casual language appropriate for young professionals
@@ -548,7 +554,7 @@ export async function* streamPlannerResponse(
         model: 'gpt-4o-mini',
         messages: messagesWithTool,
         stream: true,
-        max_tokens: 500,
+        max_tokens: 150,
       });
       
       let fullText = '';
