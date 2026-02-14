@@ -292,8 +292,9 @@ export function Session() {
         });
         
         if (suggestionsUpdated) {
+          await refreshSession(session.id);
           setActiveTab('suggestions');
-          toast({ title: "Options refreshed!", description: "The planner updated your suggestions." });
+          toast({ title: "Options refreshed!", description: "Check the Suggestions tab for your new options." });
         }
         
         if (response.includes("trouble connecting") || response.includes("Try again")) {

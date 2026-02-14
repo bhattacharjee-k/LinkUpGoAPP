@@ -124,11 +124,19 @@ export const api = {
       
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
         
-        buffer += decoder.decode(value, { stream: true });
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+        }
+        
+        if (done) {
+          buffer += decoder.decode();
+        }
+        
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
+        
+        let returnValue: { suggestionsUpdated: boolean } | undefined;
         
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -139,13 +147,20 @@ export const api = {
               } else if (data.error) {
                 throw new Error(data.error);
               } else if (data.done) {
-                return { suggestionsUpdated: data.suggestionsUpdated || false };
+                returnValue = { suggestionsUpdated: data.suggestionsUpdated || false };
               }
             } catch (e) {
-              // Skip malformed JSON
+              if (e instanceof SyntaxError) continue;
+              throw e;
             }
           }
         }
+        
+        if (returnValue) {
+          return returnValue;
+        }
+        
+        if (done) break;
       }
     },
   },
