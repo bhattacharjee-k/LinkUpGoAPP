@@ -126,6 +126,20 @@ Preferred communication style: Simple, everyday language.
   - Soft boost (+3 for safe, +20 for explore) for venues in preferred neighborhoods
 - **Integration**: Preferences are automatically merged from user profile in /api/suggest route
 
+### Location Mode Selection
+- **Three Modes**: Selectable during plan creation via UI selector with icons
+  - `near_me`: Default — biases suggestions toward user's location (proximity-weighted)
+  - `explore_anywhere`: City-wide best spots — removes proximity bias, uses 2.0x radius multiplier, centers on city
+  - `meet_in_the_middle`: Computes geographic midpoint of all participants' starting neighborhoods
+- **Meet in the Middle Flow**:
+  - Participants see a banner to set their starting neighborhood when joining
+  - Backend geocodes neighborhoods and computes 3D Cartesian midpoint (`server/geo.ts`)
+  - Midpoint stored in session filters (`midpointLat`, `midpointLng`)
+  - Suggestions centered on computed midpoint with standard radius
+- **Integration**: Location mode flows through orchestrator context synthesis, planner system prompt, regenerate_suggestions tool, and manual regenerate button
+- **Schema**: `locationMode`, `midpointLat`, `midpointLng` in SuggestRequestSchema and CreateSessionRequestSchema filters; `startingNeighborhood` on sessionParticipants table
+- **UI**: Badge shows in session header for non-default modes; planner can change mode via chat
+
 ### Reference Venues (Style Anchoring)
 - **Optional Input**: Users can select 1-3 favorite places during plan creation
 - **Google Places Autocomplete**: Search for venues with city bias
