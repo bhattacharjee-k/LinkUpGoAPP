@@ -819,12 +819,124 @@ export async function registerRoutes(
         type: 'new_message',
         message: joinMessage,
       });
+      
       broadcastToSession(req.params.id, {
         type: 'session_update',
         session: { ...session, id: req.params.id },
       });
-      
+
       res.json({ success: true });
+
+      if (session.status !== 'locked') {
+        (async () => {
+          try {
+            const participants = await storage.getSessionParticipants(req.params.id);
+            const activeParticipants = participants.filter(p => p.status !== 'left');
+            const participantUsers = await Promise.all(
+              activeParticipants.map(p => storage.getUser(p.userId))
+            );
+            const validUsers = participantUsers.filter(Boolean) as any[];
+            if (validUsers.length === 0) return;
+
+            const allCategories = validUsers.flatMap(u => u.categories || []);
+            const categoryFreq: Record<string, number> = {};
+            allCategories.forEach(c => { categoryFreq[c] = (categoryFreq[c] || 0) + 1; });
+            const commonCategories = Object.entries(categoryFreq)
+              .filter(([_, count]) => count >= Math.ceil(validUsers.length / 2))
+              .map(([cat]) => cat);
+
+            const budgetOrder = ['$', '$$', '$$$', '$$$$'];
+            const budgets = validUsers.map(u => u.budget || '$$');
+            const avgBudgetIdx = Math.round(budgets.reduce((sum, b) => sum + budgetOrder.indexOf(b), 0) / budgets.length);
+
+            const energyOrder = ['Chill', 'Vibey', 'Hype'];
+            const energies = validUsers.map(u => u.energy || 'Vibey');
+            const avgEnergyIdx = Math.round(energies.reduce((sum, e) => sum + energyOrder.indexOf(e), 0) / energies.length);
+
+            const allNeighborhoods = validUsers.flatMap(u => u.favoriteNeighborhoods || []);
+            const uniqueNeighborhoods = [...new Set(allNeighborhoods)];
+
+            const filters = session.filters as any || {};
+            const mergedGroupPrefs: GroupPreferenceSummary = {
+              memberCount: validUsers.length,
+              categories: [...new Set(allCategories)],
+              commonCategories: commonCategories.length > 0 ? commonCategories : (filters.categories || filters.category || ['Drinks']),
+              budget: budgetOrder[avgBudgetIdx] || '$$',
+              energy: energyOrder[avgEnergyIdx] || 'Vibey',
+              crowdPreference: validUsers[0]?.crowdPreference || 'no_preference',
+              discoveryStyle: validUsers[0]?.discoveryStyle || 'mixed',
+              favoriteNeighborhoods: uniqueNeighborhoods,
+            };
+
+            await storage.deleteSessionSuggestions(req.params.id);
+
+            const enrichedData = {
+              city: filters.locationScope || validUsers[0]?.city || 'NYC',
+              neighborhood: filters.neighborhood,
+              categories: mergedGroupPrefs.commonCategories,
+              budget: mergedGroupPrefs.budget,
+              energy: mergedGroupPrefs.energy,
+              timeWindow: filters.timeWindow,
+              specificDate: filters.specificDate,
+              specificTime: filters.specificTime,
+              discoveryStyle: mergedGroupPrefs.discoveryStyle as any,
+              crowdPreference: mergedGroupPrefs.crowdPreference as any,
+              favoriteNeighborhoods: mergedGroupPrefs.favoriteNeighborhoods,
+            };
+
+            const result = await getOrchestratedSuggestions(
+              enrichedData, undefined, filters.referenceVenues, mergedGroupPrefs
+            );
+
+            const sourceMap: Record<string, string> = { 'Google': 'Web', 'Ticketmaster': 'Web' };
+            for (const opt of result.options) {
+              const whyExplanation = opt.whyExplanation || generateWhyExplanation(opt, mergedGroupPrefs);
+              const suggestion: Record<string, any> = {
+                sessionId: req.params.id,
+                name: opt.title,
+                city: enrichedData.city,
+                source: sourceMap[opt.source] || 'Web',
+                kind: opt.optionType === 'event' ? 'event' : 'venue',
+                rating: opt.rating || '4.5',
+                turnout: '0/0',
+                distance: opt.distance || '1.0 mi',
+                budget: opt.priceLevel || '$$',
+                description: opt.description || `A great spot in ${enrichedData.city}`,
+                tags: opt.tags || [],
+                whyExplanation,
+              };
+              if (opt.detailUrl) suggestion.detailUrl = opt.detailUrl;
+              if (opt.reservationUrl) suggestion.reservationUrl = opt.reservationUrl;
+              if (opt.ticketUrl) suggestion.ticketUrl = opt.ticketUrl;
+              if (opt.eventUrl) suggestion.eventUrl = opt.eventUrl;
+              if (opt.venueName) suggestion.venueName = opt.venueName;
+              if (opt.startTime) suggestion.startTime = opt.startTime;
+              await storage.createSuggestion(suggestion as any);
+            }
+
+            const updatedSession = await storage.getSessionWithContext(req.params.id);
+            const regenMessage = await storage.createMessage({
+              sessionId: req.params.id,
+              sender: 'system',
+              senderName: 'System',
+              text: `Suggestions updated to match everyone's preferences`,
+            });
+            broadcastToSession(req.params.id, {
+              type: 'new_message',
+              message: regenMessage,
+            });
+            if (updatedSession) {
+              broadcastToSession(req.params.id, {
+                type: 'session_update',
+                session: updatedSession.session,
+              });
+            }
+            console.log(`[Session] Regenerated suggestions for session ${req.params.id} with ${validUsers.length} participants`);
+          } catch (error) {
+            console.error('[Session] Failed to regenerate suggestions after participant added:', error);
+          }
+        })();
+      }
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
