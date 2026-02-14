@@ -64,6 +64,8 @@ export const api = {
     addParticipant: (id: string, status?: string, memberId?: string) => fetchAPI(`/sessions/${id}/participants`, { method: 'POST', body: JSON.stringify({ status, memberId }) }),
     updateParticipantStatus: (sessionId: string, participantId: string, status: string) => 
       fetchAPI(`/sessions/${sessionId}/participants/${participantId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    updateParticipantNeighborhood: (sessionId: string, participantId: string, neighborhood: string) =>
+      fetchAPI(`/sessions/${sessionId}/participants/${participantId}/neighborhood`, { method: 'PATCH', body: JSON.stringify({ neighborhood }) }),
   },
   
   // Suggestions

@@ -128,3 +128,29 @@ export function haversineDistance(lat1: number, lng1: number, lat2: number, lng2
 function toRad(deg: number): number {
   return deg * (Math.PI / 180);
 }
+
+export function computeMidpoint(points: LatLng[]): LatLng {
+  if (points.length === 0) return { lat: 0, lng: 0 };
+  if (points.length === 1) return points[0];
+
+  let x = 0, y = 0, z = 0;
+  for (const p of points) {
+    const latRad = toRad(p.lat);
+    const lngRad = toRad(p.lng);
+    x += Math.cos(latRad) * Math.cos(lngRad);
+    y += Math.cos(latRad) * Math.sin(lngRad);
+    z += Math.sin(latRad);
+  }
+  x /= points.length;
+  y /= points.length;
+  z /= points.length;
+
+  const lngRad = Math.atan2(y, x);
+  const hyp = Math.sqrt(x * x + y * y);
+  const latRad = Math.atan2(z, hyp);
+
+  return {
+    lat: latRad * (180 / Math.PI),
+    lng: lngRad * (180 / Math.PI),
+  };
+}

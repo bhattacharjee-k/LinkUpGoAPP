@@ -6,6 +6,7 @@ import { insertUserSchema, insertGroupSchema, insertSessionSchema } from "@share
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { getSuggestions, getOrchestratedSuggestions, SuggestionOption, generateWhyExplanation, GroupPreferenceSummary } from "./suggestions";
+import { computeMidpoint, getNeighborhoodCenter, LatLng } from "./geo";
 import { notifyPlanJoined, notifyPlanLocked } from "./notifications";
 import { requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant, requireSessionNotLocked } from "./middleware/auth";
 import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from "./middleware/error-handler";
@@ -589,6 +590,10 @@ export async function registerRoutes(
               acc[p.userId] = p.status;
               return acc;
             }, {} as Record<string, string>),
+            participantNeighborhoods: participants.reduce((acc, p) => {
+              if (p.startingNeighborhood) acc[p.userId] = p.startingNeighborhood;
+              return acc;
+            }, {} as Record<string, string>),
             suggestions: suggestionsWithVotes,
             messages
           };
@@ -685,6 +690,10 @@ export async function registerRoutes(
         participantDetails,
         participantStatusByUserId: participants.reduce((acc, p) => {
           acc[p.userId] = p.status;
+          return acc;
+        }, {} as Record<string, string>),
+        participantNeighborhoods: participants.reduce((acc, p) => {
+          if (p.startingNeighborhood) acc[p.userId] = p.startingNeighborhood;
           return acc;
         }, {} as Record<string, string>),
         suggestions: suggestionsWithVotes,
@@ -879,6 +888,10 @@ export async function registerRoutes(
               timeWindow: filters.timeWindow,
               specificDate: filters.specificDate,
               specificTime: filters.specificTime,
+              vibeDescription: filters.vibeDescription,
+              locationMode: filters.locationMode as 'near_me' | 'explore_anywhere' | 'meet_in_the_middle' | undefined,
+              midpointLat: filters.midpointLat,
+              midpointLng: filters.midpointLng,
               discoveryStyle: mergedGroupPrefs.discoveryStyle as any,
               crowdPreference: mergedGroupPrefs.crowdPreference as any,
               favoriteNeighborhoods: mergedGroupPrefs.favoriteNeighborhoods,
@@ -976,6 +989,57 @@ export async function registerRoutes(
       res.status(400).json({ message: error.message });
     }
   });
+
+  app.patch("/api/sessions/:id/participants/:participantId/neighborhood", requireAuth, asyncHandler(async (req: Request, res: Response) => {
+    const { neighborhood } = req.body;
+    if (!neighborhood || typeof neighborhood !== 'string') {
+      return res.status(400).json({ message: "Neighborhood is required" });
+    }
+
+    // @ts-ignore
+    const userId = req.session?.userId;
+    if (userId !== req.params.participantId) {
+      return res.status(403).json({ message: "You can only set your own starting neighborhood" });
+    }
+
+    await storage.updateParticipantNeighborhood(req.params.id, req.params.participantId, neighborhood.trim());
+
+    const session = await storage.getSession(req.params.id);
+    const filters = (session?.filters as any) || {};
+
+    if (filters.locationMode === 'meet_in_the_middle') {
+      const participants = await storage.getSessionParticipants(req.params.id);
+      const city = filters.locationScope || 'NYC';
+      const points: LatLng[] = [];
+
+      for (const p of participants) {
+        if (p.startingNeighborhood && p.status !== 'left') {
+          const center = getNeighborhoodCenter(city, p.startingNeighborhood);
+          if (center) points.push(center);
+        }
+      }
+
+      if (points.length >= 2) {
+        const midpoint = computeMidpoint(points);
+        await storage.updateSession(req.params.id, {
+          filters: { ...filters, midpointLat: midpoint.lat, midpointLng: midpoint.lng }
+        } as any);
+      }
+    }
+
+    const participant = await storage.getUser(req.params.participantId);
+    const participantName = participant?.name || participant?.username || 'Someone';
+    const systemMsg = await storage.createMessage({
+      sessionId: req.params.id,
+      sender: 'system',
+      senderName: 'System',
+      text: `${participantName} is coming from ${neighborhood.trim()}`,
+    });
+    broadcastToSession(req.params.id, { type: 'new_message', message: systemMsg });
+    broadcastToSession(req.params.id, { type: 'session_update', session: { id: req.params.id } });
+
+    res.json({ success: true });
+  }));
 
   // Suggestion routes
   app.post("/api/suggestions", async (req, res) => {

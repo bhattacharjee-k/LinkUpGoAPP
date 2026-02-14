@@ -30,6 +30,11 @@ const plannerTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           neighborhood: {
             type: "string",
             description: "Specific neighborhood to search in (e.g., 'Williamsburg', 'Wicker Park')"
+          },
+          locationMode: {
+            type: "string",
+            enum: ["near_me", "explore_anywhere", "meet_in_the_middle"],
+            description: "How to pick the search area: 'near_me' (close to user), 'explore_anywhere' (best spots city-wide), 'meet_in_the_middle' (central for the group)"
           }
         },
         required: []
@@ -185,6 +190,12 @@ function buildSystemPrompt(context: PlannerContext): string {
       }).join('\n')
     : '';
   
+  const locationModeLabel = filters.locationMode === 'explore_anywhere' 
+    ? 'Explore Anywhere (best spots city-wide, distance doesn\'t matter)' 
+    : filters.locationMode === 'meet_in_the_middle' 
+    ? 'Meet in the Middle (finding central spots for everyone)' 
+    : 'Near Me (close to user\'s area)';
+
   return `You are the Planner, an AI assistant helping a group of friends plan a social outing in ${filters.locationScope || 'NYC'}. You're friendly, concise, and helpful.
 
 CURRENT PLAN CONTEXT:
@@ -193,6 +204,7 @@ CURRENT PLAN CONTEXT:
 - Budget: ${filters.budget || 'any'}
 - Vibe: ${filters.energy || 'any'}
 - Categories: ${(filters.category || []).join(', ') || 'any'}
+- Location Mode: ${locationModeLabel}
 ${filters.vibeDescription ? `- Vibe Description: "${filters.vibeDescription}" (this is the user's own words about what they want — keep this in mind for all suggestions)` : ''}
 ${session.neighborhood ? `- Neighborhood: ${session.neighborhood}` : ''}
 - Discovery Style: ${discoveryConsensus} (${discoveryConsensus === 'hidden_gems' ? 'prefer lesser-known spots' : discoveryConsensus === 'popular' ? 'prefer popular spots' : 'balanced mix'})
@@ -313,6 +325,8 @@ async function executeToolCall(
         favoriteNeighborhoods: aggregated.favoriteNeighborhoods.length > 0 ? aggregated.favoriteNeighborhoods : undefined,
       };
 
+      const effectiveLocationMode = args.locationMode || filters.locationMode || 'near_me';
+
       const result = await getOrchestratedSuggestions({
         city,
         categories: args.categories || filters.category || [],
@@ -323,6 +337,9 @@ async function executeToolCall(
         timeWindow: filters.timeWindow,
         energy: filters.energy,
         vibeDescription: filters.vibeDescription,
+        locationMode: effectiveLocationMode as 'near_me' | 'explore_anywhere' | 'meet_in_the_middle',
+        midpointLat: filters.midpointLat,
+        midpointLng: filters.midpointLng,
         discoveryStyle: context.user.discoveryStyle as 'hidden_gems' | 'popular' | 'mixed' | undefined,
         crowdPreference: context.user.crowdPreference as 'quiet' | 'buzzing' | 'no_preference' | undefined,
         favoriteNeighborhoods: context.user.favoriteNeighborhoods || undefined,

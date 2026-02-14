@@ -49,8 +49,9 @@ export interface IStorage {
   softDeleteSession(id: string): Promise<void>;
   leaveSession(sessionId: string, userId: string): Promise<void>;
   addSessionParticipant(sessionId: string, userId: string, status?: string): Promise<void>;
-  getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string }>>;
+  getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string; startingNeighborhood?: string | null }>>;
   updateParticipantStatus(sessionId: string, userId: string, status: string): Promise<void>;
+  updateParticipantNeighborhood(sessionId: string, userId: string, neighborhood: string): Promise<void>;
 
   // Suggestions
   getSuggestion(id: string): Promise<Suggestion | undefined>;
@@ -269,19 +270,27 @@ export class DbStorage implements IStorage {
       .onConflictDoNothing();
   }
 
-  async getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string }>> {
+  async getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string; startingNeighborhood?: string | null }>> {
     const participants = await db.select().from(schema.sessionParticipants).where(eq(schema.sessionParticipants.sessionId, sessionId));
-    // Deduplicate by userId, keeping the last status seen
-    const uniqueParticipants = new Map<string, string>();
+    const uniqueParticipants = new Map<string, { status: string; startingNeighborhood: string | null }>();
     participants.forEach(p => {
-      uniqueParticipants.set(p.userId, p.status);
+      uniqueParticipants.set(p.userId, { status: p.status, startingNeighborhood: p.startingNeighborhood });
     });
-    return Array.from(uniqueParticipants.entries()).map(([userId, status]) => ({ userId, status }));
+    return Array.from(uniqueParticipants.entries()).map(([userId, data]) => ({ userId, status: data.status, startingNeighborhood: data.startingNeighborhood }));
   }
 
   async updateParticipantStatus(sessionId: string, userId: string, status: string): Promise<void> {
     await db.update(schema.sessionParticipants)
       .set({ status })
+      .where(and(
+        eq(schema.sessionParticipants.sessionId, sessionId),
+        eq(schema.sessionParticipants.userId, userId)
+      ));
+  }
+
+  async updateParticipantNeighborhood(sessionId: string, userId: string, neighborhood: string): Promise<void> {
+    await db.update(schema.sessionParticipants)
+      .set({ startingNeighborhood: neighborhood })
       .where(and(
         eq(schema.sessionParticipants.sessionId, sessionId),
         eq(schema.sessionParticipants.userId, userId)

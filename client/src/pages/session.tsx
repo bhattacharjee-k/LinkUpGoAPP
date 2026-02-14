@@ -67,6 +67,8 @@ export function Session() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [isLockingPlan, setIsLockingPlan] = useState(false);
   const [votingInProgress, setVotingInProgress] = useState<string | null>(null);
+  const [neighborhoodInput, setNeighborhoodInput] = useState('');
+  const [isSettingNeighborhood, setIsSettingNeighborhood] = useState(false);
   const [editForm, setEditForm] = useState({
     date: new Date(),
     timeStart: '19:00',
@@ -911,7 +913,62 @@ export function Session() {
                 {cat}
               </Badge>
             ))}
+            {(session.filters as any)?.locationMode && (session.filters as any).locationMode !== 'near_me' && (
+              <Badge variant="secondary" className="bg-blue-500/10 border-blue-500/20 text-[10px] text-blue-400 gap-1">
+                <MapPin size={10} /> {(session.filters as any).locationMode === 'explore_anywhere' ? 'Anywhere' : 'Meet Up'}
+              </Badge>
+            )}
           </div>
+
+          {/* Meet in the Middle - Starting Neighborhood Banner */}
+          {!isLocked && (session.filters as any)?.locationMode === 'meet_in_the_middle' && user && (() => {
+            const myParticipant = session.participantStatusByUserId?.[user.id];
+            const hasSetNeighborhood = (session as any)?.participantNeighborhoods?.[user.id];
+            if (myParticipant && myParticipant !== 'left' && !hasSetNeighborhood) {
+              const city = (session.filters as any)?.locationScope || 'NYC';
+              return (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-blue-400">
+                    <MapPin size={14} />
+                    Where are you coming from?
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder={city === 'Chicago' ? "e.g. Wicker Park" : "e.g. East Village"}
+                      className="bg-white/5 border-white/10 h-8 text-xs flex-1"
+                      value={neighborhoodInput}
+                      onChange={e => setNeighborhoodInput(e.target.value)}
+                      data-testid="input-starting-neighborhood"
+                    />
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs px-3"
+                      disabled={!neighborhoodInput.trim() || isSettingNeighborhood}
+                      onClick={async () => {
+                        if (!neighborhoodInput.trim()) return;
+                        setIsSettingNeighborhood(true);
+                        try {
+                          await api.sessions.updateParticipantNeighborhood(session.id, user.id, neighborhoodInput.trim());
+                          refreshSession(session.id);
+                          toast({ title: "Set!", description: `Starting from ${neighborhoodInput.trim()}` });
+                          setNeighborhoodInput('');
+                        } catch (e: any) {
+                          toast({ title: "Error", description: e.message || "Failed to set neighborhood", variant: "destructive" });
+                        } finally {
+                          setIsSettingNeighborhood(false);
+                        }
+                      }}
+                      data-testid="button-set-neighborhood"
+                    >
+                      {isSettingNeighborhood ? '...' : 'Set'}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">We'll find spots central to everyone</p>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           {/* Locked Banner */}
           {isLocked && (

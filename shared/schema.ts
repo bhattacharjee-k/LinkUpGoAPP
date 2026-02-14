@@ -90,6 +90,7 @@ export const sessionParticipants = pgTable("session_participants", {
   sessionId: varchar("session_id").notNull().references(() => sessions.id, { onDelete: 'cascade' }),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   status: text("status").notNull().default('active'), // 'active' | 'cant_make_it' | 'left'
+  startingNeighborhood: text("starting_neighborhood"),
   joinedAt: timestamp("joined_at").notNull().defaultNow(),
 });
 

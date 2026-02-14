@@ -51,6 +51,9 @@ export interface SuggestRequest {
   specificDate?: string;
   specificTime?: string;
   vibeDescription?: string;
+  locationMode?: 'near_me' | 'explore_anywhere' | 'meet_in_the_middle';
+  midpointLat?: number;
+  midpointLng?: number;
   discoveryStyle?: 'hidden_gems' | 'popular' | 'mixed';
   crowdPreference?: 'quiet' | 'buzzing' | 'no_preference';
   favoriteNeighborhoods?: string[];
@@ -1374,8 +1377,20 @@ export async function getOrchestratedSuggestions(
     refProfile = extractReferenceProfile(venueDetails);
   }
 
-  const center = getSearchCenter(req.city, req.neighborhood, req.userLat, req.userLng);
-  const radiusBiasMultiplier = brief.radiusBias === 'tight' ? 0.7 : brief.radiusBias === 'wide' ? 1.5 : 1.0;
+  let center: LatLng;
+  let radiusBiasMultiplier: number;
+
+  if (req.locationMode === 'explore_anywhere') {
+    center = getSearchCenter(req.city);
+    radiusBiasMultiplier = 2.0;
+  } else if (req.locationMode === 'meet_in_the_middle' && req.midpointLat && req.midpointLng) {
+    center = { lat: req.midpointLat, lng: req.midpointLng };
+    radiusBiasMultiplier = brief.radiusBias === 'tight' ? 0.8 : brief.radiusBias === 'wide' ? 1.3 : 1.0;
+  } else {
+    center = getSearchCenter(req.city, req.neighborhood, req.userLat, req.userLng);
+    radiusBiasMultiplier = brief.radiusBias === 'tight' ? 0.7 : brief.radiusBias === 'wide' ? 1.5 : 1.0;
+  }
+
   const baseRadiusMeters = Math.round(3000 * radiusBiasMultiplier);
   const maxRadiusMeters = Math.round(baseRadiusMeters * 1.3);
 

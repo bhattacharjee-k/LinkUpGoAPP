@@ -5,7 +5,7 @@ import { useLocation, useSearch } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon, ChevronRight, MapPin, UserPlus, Users, Check, Navigation, X, Sparkles, Search, Star } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronRight, MapPin, UserPlus, Users, Check, Navigation, X, Sparkles, Search, Star, Compass, LocateFixed, GitMerge } from 'lucide-react';
 import { City, Budget, Energy, Category } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { Calendar } from "@/components/ui/calendar";
@@ -57,6 +57,7 @@ export function NewPlan() {
     categories: [] as Category[],
     referenceVenues: [] as PlaceResult[],
     vibeDescription: '',
+    locationMode: 'near_me' as 'near_me' | 'explore_anywhere' | 'meet_in_the_middle',
   });
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -164,6 +165,7 @@ export function NewPlan() {
         specificTime: `${formData.timeStart}-${formData.timeEnd}`,
         referenceVenues: referenceVenues.length > 0 ? referenceVenues : undefined,
         vibeDescription: formData.vibeDescription.trim() || undefined,
+        locationMode: formData.locationMode,
       }, formData.name || undefined);
 
       if (!matchingGroup && selectionMode !== 'group') {
@@ -351,8 +353,35 @@ export function NewPlan() {
           {/* Location & Neighborhood Section */}
           <div className="space-y-4 pt-4 border-t border-white/10">
             <Label className="text-lg">Where?</Label>
-            
-            {showLocationPrompt && locationPermission !== 'granted' && (
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">How should we pick the area?</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: 'near_me', label: 'Near Me', icon: LocateFixed, desc: 'Close to your area' },
+                  { value: 'explore_anywhere', label: 'Anywhere', icon: Compass, desc: 'Best spots city-wide' },
+                  { value: 'meet_in_the_middle', label: 'Meet Up', icon: GitMerge, desc: 'Central for everyone' },
+                ] as const).map((mode) => (
+                  <button
+                    key={mode.value}
+                    onClick={() => setFormData({...formData, locationMode: mode.value})}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all text-center",
+                      formData.locationMode === mode.value
+                        ? "bg-primary/20 border-primary/50 text-white"
+                        : "bg-white/5 border-white/10 text-muted-foreground hover:border-white/20"
+                    )}
+                    data-testid={`location-mode-${mode.value}`}
+                  >
+                    <mode.icon size={20} className={formData.locationMode === mode.value ? "text-primary" : ""} />
+                    <span className="text-xs font-medium">{mode.label}</span>
+                    <span className="text-[10px] opacity-70 leading-tight">{mode.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {formData.locationMode === 'near_me' && showLocationPrompt && locationPermission !== 'granted' && (
               <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="p-2 bg-primary/20 rounded-lg">
@@ -377,18 +406,28 @@ export function NewPlan() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                <MapPin size={12} /> Neighborhood (optional)
-              </Label>
-              <Input 
-                placeholder={formData.locationScope === 'Chicago' ? "e.g. River North, West Loop" : "e.g. Williamsburg, East Village"}
-                className="bg-white/5 border-white/10 h-10" 
-                value={formData.neighborhood}
-                onChange={e => setFormData({...formData, neighborhood: e.target.value})}
-                data-testid="input-neighborhood"
-              />
-            </div>
+            {formData.locationMode === 'meet_in_the_middle' && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                <p className="text-xs text-muted-foreground">
+                  Each person will pick their starting neighborhood after joining. We'll find spots central to everyone.
+                </p>
+              </div>
+            )}
+
+            {formData.locationMode !== 'meet_in_the_middle' && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                  <MapPin size={12} /> Neighborhood (optional)
+                </Label>
+                <Input 
+                  placeholder={formData.locationScope === 'Chicago' ? "e.g. River North, West Loop" : "e.g. Williamsburg, East Village"}
+                  className="bg-white/5 border-white/10 h-10" 
+                  value={formData.neighborhood}
+                  onChange={e => setFormData({...formData, neighborhood: e.target.value})}
+                  data-testid="input-neighborhood"
+                />
+              </div>
+            )}
           </div>
 
           {/* Date & Time Selection */}

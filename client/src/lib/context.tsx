@@ -401,6 +401,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         specificTime: initialFilters.specificTime,
         referenceVenues: initialFilters.referenceVenues,
         vibeDescription: initialFilters.vibeDescription,
+        locationMode: initialFilters.locationMode,
       });
       
       for (const suggestion of result.suggestions) {
@@ -543,6 +544,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         timeWindow: filters.timeWindow,
         specificDate: filters.specificDate,
         specificTime: filters.specificTime,
+        vibeDescription: filters.vibeDescription,
+        locationMode: filters.locationMode,
+        midpointLat: filters.midpointLat,
+        midpointLng: filters.midpointLng,
       });
       
       for (const suggestion of result.suggestions) {

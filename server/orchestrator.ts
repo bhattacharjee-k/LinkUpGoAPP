@@ -52,6 +52,7 @@ export async function synthesizeContext(
   const specificDate = req.specificDate || "";
   const neighborhood = req.neighborhood || "";
   const vibeDescription = req.vibeDescription || "";
+  const locationMode = req.locationMode || "near_me";
   const discoveryStyle = req.discoveryStyle || "mixed";
   const crowdPreference = req.crowdPreference || "no_preference";
   const favoriteNeighborhoods = req.favoriteNeighborhoods || [];
@@ -84,6 +85,7 @@ PLAN REQUEST:
 - Time: ${specificTime || timeWindow || "flexible"}
 - Date: ${specificDate || "flexible"}
 - Neighborhood: ${neighborhood || "any"}
+- Location Mode: ${locationMode} (${locationMode === 'explore_anywhere' ? 'User wants to explore the ENTIRE city — do NOT bias by proximity or neighborhood, use "wide" radiusBias, suggest best spots city-wide regardless of distance' : locationMode === 'meet_in_the_middle' ? 'Multiple people meeting from different neighborhoods — suggest spots in central/accessible areas' : 'Prefer spots near the user'})
 - Discovery Style: ${discoveryStyle} (hidden_gems = lesser-known spots, popular = well-known, mixed = both)
 - Crowd Preference: ${crowdPreference}
 - Favorite Neighborhoods: ${favoriteNeighborhoods.length > 0 ? favoriteNeighborhoods.join(", ") : "none"}
