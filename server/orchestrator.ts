@@ -51,6 +51,7 @@ export async function synthesizeContext(
   const specificTime = req.specificTime || "";
   const specificDate = req.specificDate || "";
   const neighborhood = req.neighborhood || "";
+  const vibeDescription = req.vibeDescription || "";
   const discoveryStyle = req.discoveryStyle || "mixed";
   const crowdPreference = req.crowdPreference || "no_preference";
   const favoriteNeighborhoods = req.favoriteNeighborhoods || [];
@@ -87,6 +88,7 @@ PLAN REQUEST:
 - Crowd Preference: ${crowdPreference}
 - Favorite Neighborhoods: ${favoriteNeighborhoods.length > 0 ? favoriteNeighborhoods.join(", ") : "none"}
 - Group Size: ${memberCount} people
+${vibeDescription ? `- User's Vibe Description: "${vibeDescription}" (THIS IS THE MOST IMPORTANT SIGNAL — prioritize matching this free-text description over generic category/energy filters)` : ""}
 
 PAST DOWNVOTE REASONS: ${downvoteSummary}
 PAST VENUE FEEDBACK:

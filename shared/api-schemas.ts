@@ -39,7 +39,7 @@ export const SuggestRequestSchema = z.object({
   specificDate: z.string().optional(),
   specificTime: z.string().optional(),
   referenceVenues: z.array(ReferenceVenueSchema).optional(),
-  // User preference fields for more curated suggestions
+  vibeDescription: z.string().max(500).optional(),
   discoveryStyle: z.enum(['hidden_gems', 'popular', 'mixed']).optional(),
   crowdPreference: z.enum(['quiet', 'buzzing', 'no_preference']).optional(),
   favoriteNeighborhoods: z.array(z.string()).optional(),
@@ -63,6 +63,7 @@ export const CreateSessionRequestSchema = z.object({
     specificTime: z.string().optional(),
     locationScope: z.string().optional(),
     inviteCode: z.string().optional(),
+    vibeDescription: z.string().max(500).optional(),
   }),
   guardrails: z.object({
     priority: z.string().optional(),

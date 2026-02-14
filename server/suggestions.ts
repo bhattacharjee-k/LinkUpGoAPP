@@ -50,7 +50,7 @@ export interface SuggestRequest {
   timeWindow?: string;
   specificDate?: string;
   specificTime?: string;
-  // User preference fields for more curated suggestions
+  vibeDescription?: string;
   discoveryStyle?: 'hidden_gems' | 'popular' | 'mixed';
   crowdPreference?: 'quiet' | 'buzzing' | 'no_preference';
   favoriteNeighborhoods?: string[];

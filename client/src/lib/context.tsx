@@ -400,6 +400,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         specificDate: initialFilters.specificDate,
         specificTime: initialFilters.specificTime,
         referenceVenues: initialFilters.referenceVenues,
+        vibeDescription: initialFilters.vibeDescription,
       });
       
       for (const suggestion of result.suggestions) {

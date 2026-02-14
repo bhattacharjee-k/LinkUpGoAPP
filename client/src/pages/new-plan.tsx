@@ -56,6 +56,7 @@ export function NewPlan() {
     energy: user?.energy || 'Vibey',
     categories: [] as Category[],
     referenceVenues: [] as PlaceResult[],
+    vibeDescription: '',
   });
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -162,6 +163,7 @@ export function NewPlan() {
         specificDate: formData.date,
         specificTime: `${formData.timeStart}-${formData.timeEnd}`,
         referenceVenues: referenceVenues.length > 0 ? referenceVenues : undefined,
+        vibeDescription: formData.vibeDescription.trim() || undefined,
       }, formData.name || undefined);
 
       if (!matchingGroup && selectionMode !== 'group') {
@@ -473,6 +475,22 @@ export function NewPlan() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-xs text-muted-foreground">Anything specific in mind? (Optional)</Label>
+              <textarea
+                placeholder="e.g. Rooftop with good cocktails, no loud music... or Somewhere with a dance floor and good DJs"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50"
+                rows={2}
+                maxLength={500}
+                value={formData.vibeDescription}
+                onChange={e => setFormData({...formData, vibeDescription: e.target.value})}
+                data-testid="input-vibe-description"
+              />
+              {formData.vibeDescription && (
+                <p className="text-[10px] text-muted-foreground text-right">{formData.vibeDescription.length}/500</p>
+              )}
             </div>
           </div>
 

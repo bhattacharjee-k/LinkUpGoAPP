@@ -193,6 +193,7 @@ CURRENT PLAN CONTEXT:
 - Budget: ${filters.budget || 'any'}
 - Vibe: ${filters.energy || 'any'}
 - Categories: ${(filters.category || []).join(', ') || 'any'}
+${filters.vibeDescription ? `- Vibe Description: "${filters.vibeDescription}" (this is the user's own words about what they want — keep this in mind for all suggestions)` : ''}
 ${session.neighborhood ? `- Neighborhood: ${session.neighborhood}` : ''}
 - Discovery Style: ${discoveryConsensus} (${discoveryConsensus === 'hidden_gems' ? 'prefer lesser-known spots' : discoveryConsensus === 'popular' ? 'prefer popular spots' : 'balanced mix'})
 - Crowd Preference: ${crowdConsensus}
@@ -321,6 +322,7 @@ async function executeToolCall(
         specificTime: filters.specificTime,
         timeWindow: filters.timeWindow,
         energy: filters.energy,
+        vibeDescription: filters.vibeDescription,
         discoveryStyle: context.user.discoveryStyle as 'hidden_gems' | 'popular' | 'mixed' | undefined,
         crowdPreference: context.user.crowdPreference as 'quiet' | 'buzzing' | 'no_preference' | undefined,
         favoriteNeighborhoods: context.user.favoriteNeighborhoods || undefined,
