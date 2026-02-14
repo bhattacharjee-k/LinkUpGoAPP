@@ -99,7 +99,7 @@ export const api = {
   
   // Planner AI
   planner: {
-    stream: async function*(sessionId: string, message: string): AsyncGenerator<string, void, unknown> {
+    stream: async function*(sessionId: string, message: string): AsyncGenerator<string, { suggestionsUpdated: boolean } | void, unknown> {
       const response = await fetch(`${API_BASE}/sessions/${sessionId}/planner`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,7 +137,7 @@ export const api = {
               } else if (data.error) {
                 throw new Error(data.error);
               } else if (data.done) {
-                return;
+                return { suggestionsUpdated: data.suggestionsUpdated || false };
               }
             } catch (e) {
               // Skip malformed JSON

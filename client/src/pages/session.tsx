@@ -47,6 +47,7 @@ export function Session() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [streamingResponse, setStreamingResponse] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [activeTab, setActiveTab] = useState('suggestions');
   const [downvoteModalOpen, setDownvoteModalOpen] = useState(false);
   const [downvoteSuggestion, setDownvoteSuggestion] = useState<{id: string; name: string} | null>(null);
   const [rankingInfoOpen, setRankingInfoOpen] = useState(false);
@@ -284,11 +285,15 @@ export function Session() {
       setStreamingResponse('');
       
       try {
-        const response = await sendPlannerMessage(session.id, messageText, (chunk) => {
+        const { response, suggestionsUpdated } = await sendPlannerMessage(session.id, messageText, (chunk) => {
           setStreamingResponse(prev => prev + chunk);
         });
         
-        // If the response indicates an error, show it
+        if (suggestionsUpdated) {
+          setActiveTab('suggestions');
+          toast({ title: "Options refreshed!", description: "The planner updated your suggestions." });
+        }
+        
         if (response.includes("trouble connecting") || response.includes("Try again")) {
           toast({ title: "Planner unavailable", description: response, variant: "destructive" });
         }
@@ -1213,7 +1218,7 @@ export function Session() {
           </div>
         </div>
 
-        <Tabs defaultValue="suggestions" className="flex-1 flex flex-col overflow-hidden">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
           <div className="px-6 py-2">
              <TabsList className="w-full grid grid-cols-2 bg-white/5">
               <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
@@ -1447,6 +1452,23 @@ export function Session() {
              })()
              )}
              
+             {/* Regenerate Options Button */}
+             {!isLocked && session.suggestions.length > 0 && (
+               <div className="flex justify-center pt-2">
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   onClick={handleRegenerate}
+                   disabled={isRegenerating}
+                   className="border-white/10 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white"
+                   data-testid="button-regenerate-options"
+                 >
+                   {isRegenerating ? <RefreshCw size={14} className="animate-spin mr-2" /> : <RefreshCw size={14} className="mr-2" />}
+                   {isRegenerating ? 'Finding new options...' : 'Regenerate Options'}
+                 </Button>
+               </div>
+             )}
+
              {/* All Votes In Button - admin only, active when at least 1 vote exists */}
              {isUserAdmin && !isLocked && session.suggestions.length > 0 && (() => {
                const totalVotes = session.suggestions.reduce((acc, s) => {

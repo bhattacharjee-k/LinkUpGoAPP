@@ -1359,7 +1359,16 @@ export async function registerRoutes(
           message: aiMsg
         });
         
-        // Send done event with suggestions updated flag
+        if (plannerResult?.suggestionsUpdated) {
+          const updatedSession = await storage.getSessionWithContext(sessionId);
+          if (updatedSession) {
+            broadcastToSession(sessionId, {
+              type: 'session_update',
+              session: updatedSession.session,
+            });
+          }
+        }
+        
         res.write(`data: ${JSON.stringify({ 
           done: true, 
           suggestionsUpdated: plannerResult?.suggestionsUpdated || false,

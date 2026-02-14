@@ -198,7 +198,7 @@ interface AppContextType {
   deleteSession: (sessionId: string) => Promise<void>;
   leaveSession: (sessionId: string) => Promise<void>;
   addMessage: (sessionId: string, text: string) => Promise<void>;
-  sendPlannerMessage: (sessionId: string, text: string, onStream: (chunk: string) => void) => Promise<string>;
+  sendPlannerMessage: (sessionId: string, text: string, onStream: (chunk: string) => void) => Promise<{ response: string; suggestionsUpdated: boolean }>;
   upvoteForSuggestion: (sessionId: string, suggestionId: string) => Promise<void>;
   downvoteForSuggestion: (sessionId: string, suggestionId: string, reasons: string[], note?: string) => Promise<void>;
   confirmPlan: (sessionId: string, suggestionId: string) => Promise<void>;
@@ -471,23 +471,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     sessionId: string, 
     text: string, 
     onStream: (chunk: string) => void
-  ): Promise<string> => {
+  ): Promise<{ response: string; suggestionsUpdated: boolean }> => {
     let fullResponse = '';
+    let suggestionsUpdated = false;
     
     try {
-      for await (const chunk of api.planner.stream(sessionId, text)) {
-        fullResponse += chunk;
-        onStream(chunk);
+      const generator = api.planner.stream(sessionId, text);
+      while (true) {
+        const { value, done } = await generator.next();
+        if (done) {
+          if (value && typeof value === 'object' && 'suggestionsUpdated' in value) {
+            suggestionsUpdated = value.suggestionsUpdated;
+          }
+          break;
+        }
+        if (typeof value === 'string') {
+          fullResponse += value;
+          onStream(value);
+        }
       }
     } catch (error: any) {
       console.error('[Planner] Stream error:', error);
       fullResponse = "Sorry, I'm having trouble connecting right now. Try again in a moment!";
     }
     
-    // Refresh session to get the saved messages
     await refreshSession(sessionId);
     
-    return fullResponse;
+    return { response: fullResponse, suggestionsUpdated };
   };
 
   const upvoteForSuggestion = async (sessionId: string, suggestionId: string) => {
