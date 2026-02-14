@@ -792,7 +792,8 @@ export function Session() {
                         </div>
                       </div>
 
-                      {/* Distance */}
+                      {/* Distance - hidden for Explore Anywhere since it searches city-wide */}
+                      {(session.filters as any)?.locationMode !== 'explore_anywhere' && (
                       <div className="space-y-3">
                         <Label className="text-sm font-medium">Distance</Label>
                         <div className="flex gap-2">
@@ -810,6 +811,7 @@ export function Session() {
                           ))}
                         </div>
                       </div>
+                      )}
 
                       {/* Participants section */}
                       <div className="space-y-3">
