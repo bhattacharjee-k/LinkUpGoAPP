@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Dev Commands
 
 ```bash
-npm run dev              # Start server (Express + Vite dev middleware) on port 5000
-npm run dev:client       # Start Vite client only on port 5000
+npm run dev              # Start server (Express + Vite dev middleware) on port 5003
+npm run dev:client       # Start Vite client only on port 5003
 npm run build            # Production build (runs script/build.ts → dist/)
 npm run start            # Run production build (node dist/index.cjs)
 npm run check            # TypeScript type-check (tsc --noEmit)

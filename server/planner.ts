@@ -4,10 +4,16 @@ import { getSuggestions, getOrchestratedSuggestions, generateWhyExplanation, Gro
 import { aggregateGroupPreferences } from "./group-preferences";
 import { storage } from "./storage";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+let _openai: OpenAI | null = null;
+function getOpenAI() {
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    });
+  }
+  return _openai;
+}
 
 const plannerTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -513,7 +519,7 @@ export async function* streamPlannerResponse(
   
   try {
     // First, check if a tool call is needed (non-streaming)
-    const initialResponse = await openai.chat.completions.create({
+    const initialResponse = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages,
       tools: plannerTools,
@@ -550,7 +556,7 @@ export async function* streamPlannerResponse(
         }))
       ];
       
-      const finalStream = await openai.chat.completions.create({
+      const finalStream = await getOpenAI().chat.completions.create({
         model: 'gpt-4o-mini',
         messages: messagesWithTool,
         stream: true,
@@ -588,7 +594,7 @@ export async function getPlannerResponse(
   const messages = buildConversationHistory(context, userMessage);
   
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages,
       tools: plannerTools,
@@ -624,7 +630,7 @@ export async function getPlannerResponse(
         }))
       ];
       
-      const finalResponse = await openai.chat.completions.create({
+      const finalResponse = await getOpenAI().chat.completions.create({
         model: 'gpt-4o-mini',
         messages: messagesWithTool,
         max_tokens: 500,
