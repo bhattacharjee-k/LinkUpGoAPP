@@ -1,12 +1,13 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput as RNTextInput, ScrollView, Pressable,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TextInput, Button, Chip } from 'react-native-paper';
 import { ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react-native';
 import Animated, { FadeIn, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
+import { Redirect } from 'expo-router';
 import { useApp } from '../../src/lib/context';
 import { api } from '../../src/lib/api';
 import { colors } from '../../src/theme';
@@ -17,12 +18,16 @@ import {
 
 const logoImage = require('../../assets/linkupgo-logo.png');
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const LOGO_WIDTH = SCREEN_WIDTH * 0.7;
+const LOGO_HEIGHT = LOGO_WIDTH / 4; // maintain ~4:1 aspect ratio
+
 function Logo() {
   return (
-    <View style={{ alignItems: 'center', marginBottom: 32 }}>
+    <View style={{ alignItems: 'center', marginBottom: 36 }}>
       <Image
         source={logoImage}
-        style={{ width: 340, height: 85 }}
+        style={{ width: LOGO_WIDTH, height: LOGO_HEIGHT }}
         resizeMode="contain"
       />
     </View>
@@ -32,7 +37,7 @@ function Logo() {
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error';
 
 export default function Onboarding() {
-  const { register, login } = useApp();
+  const { user, register, login } = useApp();
   const [step, setStep] = useState(1);
   const [isLoginMode, setIsLoginMode] = useState(false);
   const [error, setError] = useState('');
@@ -71,6 +76,9 @@ export default function Onboarding() {
     }, 500);
   }, []);
 
+  // Redirect to tabs once user is authenticated
+  if (user) return <Redirect href="/(tabs)" />;
+
   const handleLogin = async () => {
     try {
       setIsLoading(true);
@@ -78,6 +86,7 @@ export default function Onboarding() {
       await login(formData.username, formData.password);
     } catch (err: any) {
       setError(err.message || 'Login failed');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -101,6 +110,7 @@ export default function Onboarding() {
       });
     } catch (err: any) {
       setError(err.message || 'Registration failed');
+    } finally {
       setIsLoading(false);
     }
   };
