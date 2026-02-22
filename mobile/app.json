@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "LinkUpGo",
+    "slug": "linkupgo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "scheme": "linkupgo",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.linkupgo.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "LinkUpGo uses your location to find nearby venues and events.",
+        "NSUserTrackingUsageDescription": "This allows us to show you relevant ads.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true,
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-tracking-transparency",
+      "expo-font",
+      "expo-location",
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}

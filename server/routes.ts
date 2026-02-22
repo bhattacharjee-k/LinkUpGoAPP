@@ -9,6 +9,7 @@ import { getSuggestions, getOrchestratedSuggestions, SuggestionOption, generateW
 import { computeMidpoint, getNeighborhoodCenter, LatLng } from "./geo";
 import { notifyPlanJoined, notifyPlanLocked } from "./notifications";
 import { requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant, requireSessionNotLocked } from "./middleware/auth";
+import { signAccessToken, signRefreshToken, storeRefreshToken, validateAndRotateRefreshToken, revokeAllRefreshTokens, extractBearerToken, verifyToken } from "./middleware/jwt-auth";
 import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from "./middleware/error-handler";
 import { LoginRequestSchema, RegisterRequestSchema, SuggestRequestSchema, CreateGroupRequestSchema, VoteRequestSchema, CreateMessageRequestSchema } from "@shared/api-schemas";
 import { logger } from "./logger";
@@ -84,6 +85,18 @@ export async function registerRoutes(
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
   wss.on('connection', (ws, req) => {
+    // Support JWT auth via query param for mobile clients
+    try {
+      const url = new URL(req.url || '', `http://${req.headers.host}`);
+      const token = url.searchParams.get('token');
+      if (token) {
+        const payload = verifyToken(token);
+        if (payload && payload.type === 'access') {
+          (ws as any).userId = payload.userId;
+        }
+      }
+    } catch {}
+
     ws.on('message', (data) => {
       try {
         const msg = JSON.parse(data.toString());
@@ -112,6 +125,27 @@ export async function registerRoutes(
   });
   
   // Auth routes
+  // Global middleware: populate req.userId from JWT Bearer token or session cookie
+  // This allows all routes to use req.userId regardless of auth method
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    // Try JWT first
+    const token = extractBearerToken(req.headers.authorization);
+    if (token) {
+      const payload = verifyToken(token);
+      if (payload && payload.type === 'access') {
+        req.userId = payload.userId;
+      }
+    }
+    // Fall back to session cookie
+    if (!req.userId) {
+      const sessionUserId = (req.session as any)?.userId;
+      if (sessionUserId) {
+        req.userId = sessionUserId;
+      }
+    }
+    next();
+  });
+
   app.post("/api/auth/register", rateLimit(10, 15 * 60 * 1000), async (req, res) => {
     try {
       // Map frontend camelCase to database snake_case
@@ -165,18 +199,12 @@ export async function registerRoutes(
     });
   });
 
-  app.get("/api/auth/me", async (req, res) => {
-    // @ts-ignore
-    const userId = req.session?.userId;
-    if (!userId) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    
-    const user = await storage.getUser(userId);
+  app.get("/api/auth/me", requireAuth, async (req, res) => {
+    const user = await storage.getUser(req.userId!);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    
+
     const { password, ...userWithoutPassword } = user;
     res.json(userWithoutPassword);
   });
@@ -191,6 +219,69 @@ export async function registerRoutes(
       const existingUser = await storage.getUserByUsername(username);
       
       res.json({ available: !existingUser });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Mobile JWT auth endpoints
+  app.post("/api/auth/mobile/register", rateLimit(10, 15 * 60 * 1000), async (req, res) => {
+    try {
+      const { hardNos, ...rest } = req.body;
+      const mappedData = { ...rest, hardNos: hardNos || [] };
+
+      const data = insertUserSchema.parse(mappedData);
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+
+      const user = await storage.createUser({ ...data, password: hashedPassword });
+
+      const accessToken = signAccessToken(user.id);
+      const refreshToken = signRefreshToken(user.id);
+      await storeRefreshToken(user.id, refreshToken);
+
+      const { password, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword, accessToken, refreshToken });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/auth/mobile/login", rateLimit(10, 15 * 60 * 1000), async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      const user = await storage.getUserByUsername(username);
+
+      if (!user || !await bcrypt.compare(password, user.password)) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      const accessToken = signAccessToken(user.id);
+      const refreshToken = signRefreshToken(user.id);
+      await storeRefreshToken(user.id, refreshToken);
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword, accessToken, refreshToken });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/auth/mobile/refresh", async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+      if (!refreshToken) {
+        return res.status(400).json({ message: "Refresh token required" });
+      }
+
+      const result = await validateAndRotateRefreshToken(refreshToken);
+      if (!result) {
+        return res.status(401).json({ message: "Invalid refresh token", code: "REFRESH_INVALID" });
+      }
+
+      res.json({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
@@ -258,8 +349,7 @@ export async function registerRoutes(
   app.post("/api/suggest", requireAuth, asyncHandler(async (req: Request, res: Response) => {
     const data = SuggestRequestSchema.parse(req.body);
     
-    // @ts-ignore
-    const userId = req.session?.userId;
+    const userId = req.userId;
     const user = userId ? await storage.getUser(userId) : null;
     const enrichedData = {
       ...data,
@@ -318,8 +408,7 @@ export async function registerRoutes(
   // User routes
   app.patch("/api/users/me", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -340,8 +429,7 @@ export async function registerRoutes(
 
   app.patch("/api/users/me/location", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -366,14 +454,10 @@ export async function registerRoutes(
   });
 
   // Group routes
-  app.get("/api/groups", async (req, res) => {
+  app.get("/api/groups", requireAuth, async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
-      
+      const userId = req.userId!;
+
       const groups = await storage.getUserGroups(userId);
       res.json(groups);
     } catch (error: any) {
@@ -397,8 +481,7 @@ export async function registerRoutes(
 
   app.get("/api/groups/:id", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -441,8 +524,7 @@ export async function registerRoutes(
 
   app.post("/api/groups/join/:inviteCode", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -481,8 +563,7 @@ export async function registerRoutes(
   // Join a session directly via session invite code
   app.post("/api/sessions/join/:inviteCode", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -543,13 +624,9 @@ export async function registerRoutes(
   });
 
   // Session routes
-  app.get("/api/sessions", async (req, res) => {
+  app.get("/api/sessions", requireAuth, async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
+      const userId = req.userId!;
       
       const groups = await storage.getUserGroups(userId);
       const allSessions = await Promise.all(
@@ -608,8 +685,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -649,8 +725,7 @@ export async function registerRoutes(
 
   app.get("/api/sessions/:id", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -706,8 +781,7 @@ export async function registerRoutes(
 
   app.patch("/api/sessions/:id", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -791,8 +865,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/participants", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -957,8 +1030,7 @@ export async function registerRoutes(
 
   app.patch("/api/sessions/:id/participants/:participantId", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -996,8 +1068,7 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Neighborhood is required" });
     }
 
-    // @ts-ignore
-    const userId = req.session?.userId;
+    const userId = req.userId;
     if (userId !== req.params.participantId) {
       return res.status(403).json({ message: "You can only set your own starting neighborhood" });
     }
@@ -1044,8 +1115,7 @@ export async function registerRoutes(
   // Suggestion routes
   app.post("/api/suggestions", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1059,8 +1129,7 @@ export async function registerRoutes(
 
   app.delete("/api/sessions/:id/suggestions", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1075,8 +1144,7 @@ export async function registerRoutes(
   // Replace a single suggestion with a new one (admin only)
   app.post("/api/sessions/:id/suggestions/:suggestionId/replace", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1152,8 +1220,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/leave", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1180,8 +1247,7 @@ export async function registerRoutes(
 
   app.delete("/api/sessions/:id", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1211,8 +1277,7 @@ export async function registerRoutes(
   // Vote routes
   app.post("/api/votes", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1275,8 +1340,7 @@ export async function registerRoutes(
   // Remove vote
   app.delete("/api/votes/:suggestionId", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1295,8 +1359,7 @@ export async function registerRoutes(
   // Message routes
   app.post("/api/messages", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1328,8 +1391,7 @@ export async function registerRoutes(
   // Planner AI endpoint with SSE streaming
   app.post("/api/sessions/:id/planner", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1458,8 +1520,7 @@ export async function registerRoutes(
   // Notification routes
   app.get("/api/notifications", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1473,8 +1534,7 @@ export async function registerRoutes(
 
   app.get("/api/notifications/unread-count", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1488,8 +1548,7 @@ export async function registerRoutes(
 
   app.post("/api/notifications/read", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1508,8 +1567,7 @@ export async function registerRoutes(
 
   app.post("/api/notifications/read-all", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1523,8 +1581,7 @@ export async function registerRoutes(
 
   app.get("/api/notification-prefs", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1538,8 +1595,7 @@ export async function registerRoutes(
 
   app.post("/api/notification-prefs", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1555,8 +1611,7 @@ export async function registerRoutes(
   // Event Feedback routes
   app.get("/api/sessions/:sessionId/feedback", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
@@ -1571,8 +1626,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:sessionId/feedback", async (req, res) => {
     try {
-      // @ts-ignore
-      const userId = req.session?.userId;
+      const userId = req.userId;
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
