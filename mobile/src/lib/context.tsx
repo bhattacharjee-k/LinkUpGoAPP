@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { api, getAccessToken, setTokens, clearTokens, getWebSocketUrl } from './api';
-import EventSource from 'react-native-sse';
+import { api, getAccessToken, setTokens, clearTokens, getWebSocketUrl, fetchSSE } from './api';
 
 // Types matching web client
 export interface UserProfile {
@@ -406,39 +405,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let suggestionsUpdated = false;
 
     try {
-      const token = await getAccessToken();
-      const url = api.planner.getStreamUrl(sessionId);
-
-      const es = new EventSource(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ message: text }),
-      });
-
-      await new Promise<void>((resolve, reject) => {
-        es.addEventListener('message', (event: any) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.content) {
-              fullResponse += data.content;
-              onStream(data.content);
-            } else if (data.error) {
-              reject(new Error(data.error));
-            } else if (data.done) {
-              suggestionsUpdated = data.suggestionsUpdated || false;
-              resolve();
-            }
-          } catch {}
-        });
-        es.addEventListener('error', () => {
-          reject(new Error('SSE connection failed'));
-        });
-      });
-
-      es.close();
+      await fetchSSE(
+        `/sessions/${sessionId}/planner`,
+        { message: text },
+        (data) => {
+          if (data.content) {
+            fullResponse += data.content;
+            onStream(data.content);
+          } else if (data.done) {
+            suggestionsUpdated = data.suggestionsUpdated || false;
+          }
+        }
+      );
     } catch (error: any) {
       console.error('[Planner] Stream error:', error);
       fullResponse = "Sorry, I'm having trouble connecting right now. Try again in a moment!";

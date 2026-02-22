@@ -520,7 +520,7 @@ export async function* streamPlannerResponse(
   try {
     // First, check if a tool call is needed (non-streaming)
     const initialResponse = await getOpenAI().chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gemini-2.5-flash-lite',
       messages,
       tools: plannerTools,
       tool_choice: 'auto',
@@ -557,7 +557,7 @@ export async function* streamPlannerResponse(
       ];
       
       const finalStream = await getOpenAI().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gemini-2.5-flash-lite',
         messages: messagesWithTool,
         stream: true,
         max_tokens: 150,
@@ -595,7 +595,7 @@ export async function getPlannerResponse(
   
   try {
     const response = await getOpenAI().chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gemini-2.5-flash-lite',
       messages,
       tools: plannerTools,
       tool_choice: 'auto',
@@ -631,7 +631,7 @@ export async function getPlannerResponse(
       ];
       
       const finalResponse = await getOpenAI().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gemini-2.5-flash-lite',
         messages: messagesWithTool,
         max_tokens: 500,
       });

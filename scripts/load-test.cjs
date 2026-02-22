@@ -2,7 +2,7 @@
 
 const autocannon = require('autocannon');
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:5003';
 
 const testConfigs = {
   suggest: {

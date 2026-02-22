@@ -127,7 +127,7 @@ Return ONLY valid JSON, no markdown code fences.`;
 
   try {
     const response = await getOpenAI().chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gemini-2.5-flash-lite",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       max_tokens: 800,
@@ -282,7 +282,7 @@ Return ONLY valid JSON array, no markdown code fences.`;
 
   try {
     const response = await getOpenAI().chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gemini-2.5-flash-lite",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.4,
       max_tokens: 1200,
