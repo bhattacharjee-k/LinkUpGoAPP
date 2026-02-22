@@ -10,10 +10,16 @@
 ## Production Deployment (Full Plan: `docs/PRODUCTION-DEPLOYMENT.md`)
 
 ### Phase 1: Database — Neon Setup
+- [x] Create Neon setup/push/seed scripts (`scripts/neon-setup.ts`, `neon-push.ts`, `neon-seed.ts`)
+- [x] Add npm scripts: `db:neon:setup`, `db:neon:push:dev`, `db:neon:push:prod`, `db:neon:seed:dev`
+- [x] Update `.env.example` with `NEON_DATABASE_URL` pattern
 - [ ] Create Neon account and project
-- [ ] Get connection string
-- [ ] Run migrations against Neon: `DATABASE_URL=<neon-url> npm run db:push`
-- [ ] Optionally seed production data
+- [ ] Add `NEON_DATABASE_URL` to `.env`
+- [ ] Run `npm run db:neon:setup` (creates `dev` + `prod` schemas)
+- [ ] Run `npm run db:neon:push:dev` (push tables to dev schema)
+- [ ] Run `npm run db:neon:seed:dev` (seed dev with test data)
+- [ ] Run `npm run db:neon:push:prod` (push tables to prod schema)
+- [ ] Set production `DATABASE_URL` with `?options=-csearch_path%3Dprod`
 
 ### Phase 2: Server Changes for Production
 - [ ] Install `cors` + `@types/cors`

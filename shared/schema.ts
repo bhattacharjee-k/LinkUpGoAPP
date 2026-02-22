@@ -4,8 +4,8 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Re-export constants so existing imports from schema still work
-export { DownvoteReason, NotificationType, FeedbackTags } from "./constants.js";
-export type { DownvoteReason as DownvoteReasonType, NotificationType as NotificationTypeType, FeedbackTag } from "./constants.js";
+export { DownvoteReason, NotificationType, FeedbackTags } from "./constants";
+export type { DownvoteReason as DownvoteReasonType, NotificationType as NotificationTypeType, FeedbackTag } from "./constants";
 
 // Users table
 export const users = pgTable("users", {

@@ -12,7 +12,11 @@
     "db:push": "node --env-file=.env ./node_modules/.bin/drizzle-kit push",
     "db:generate": "node --env-file=.env ./node_modules/.bin/drizzle-kit generate",
     "db:migrate": "node --env-file=.env ./node_modules/.bin/tsx scripts/migrate.ts",
-    "db:seed": "node --env-file=.env ./node_modules/.bin/tsx scripts/seed.ts"
+    "db:seed": "node --env-file=.env ./node_modules/.bin/tsx scripts/seed.ts",
+    "db:neon:setup": "node --env-file=.env ./node_modules/.bin/tsx scripts/neon-setup.ts",
+    "db:neon:push:dev": "NEON_SCHEMA=dev node --env-file=.env ./node_modules/.bin/tsx scripts/neon-push.ts",
+    "db:neon:push:prod": "NEON_SCHEMA=prod node --env-file=.env ./node_modules/.bin/tsx scripts/neon-push.ts",
+    "db:neon:seed:dev": "NEON_SCHEMA=dev node --env-file=.env ./node_modules/.bin/tsx scripts/neon-seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
