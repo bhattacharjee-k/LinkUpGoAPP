@@ -13,13 +13,14 @@
 - [x] Create Neon setup/push/seed scripts (`scripts/neon-setup.ts`, `neon-push.ts`, `neon-seed.ts`)
 - [x] Add npm scripts: `db:neon:setup`, `db:neon:push:dev`, `db:neon:push:prod`, `db:neon:seed:dev`
 - [x] Update `.env.example` with `NEON_DATABASE_URL` pattern
-- [ ] Create Neon account and project
-- [ ] Add `NEON_DATABASE_URL` to `.env`
-- [ ] Run `npm run db:neon:setup` (creates `dev` + `prod` schemas)
-- [ ] Run `npm run db:neon:push:dev` (push tables to dev schema)
-- [ ] Run `npm run db:neon:seed:dev` (seed dev with test data)
-- [ ] Run `npm run db:neon:push:prod` (push tables to prod schema)
-- [ ] Set production `DATABASE_URL` with `?options=-csearch_path%3Dprod`
+- [x] Create Neon account and project
+- [x] Add `NEON_DATABASE_URL` to `.env`
+- [x] Run `npm run db:neon:setup` (creates `dev` + `prod` schemas)
+- [x] Run `npm run db:neon:push:dev` (push 14 tables to dev schema)
+- [x] Run `npm run db:neon:seed:dev` (seed dev with test data)
+- [x] Run `npm run db:neon:push:prod` (push 14 tables to prod schema)
+- [x] Fix `shared/schema.ts` constants import for drizzle-kit CJS compatibility
+- [ ] Set production `DATABASE_URL` with search_path=prod (at deploy time)
 
 ### Phase 2: Server Changes for Production
 - [ ] Install `cors` + `@types/cors`
