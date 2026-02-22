@@ -44,13 +44,6 @@ function RootNavigator() {
       >
         <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="new-plan" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="session/[id]" />
-        <Stack.Screen name="session-complete/[id]" />
-        <Stack.Screen name="group/[id]" />
-        <Stack.Screen name="history" />
-        <Stack.Screen name="join/[code]" />
-        <Stack.Screen name="join-plan/[code]" />
       </Stack>
       <StatusBar style="light" />
     </>

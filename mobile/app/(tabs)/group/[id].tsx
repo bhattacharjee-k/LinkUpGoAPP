@@ -6,8 +6,8 @@ import { Button, Avatar } from 'react-native-paper';
 import { ChevronLeft, Copy, Share2, Lock, Plus } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import Toast from 'react-native-toast-message';
-import { useApp } from '../../src/lib/context';
-import { colors } from '../../src/theme';
+import { useApp } from '../../../src/lib/context';
+import { colors } from '../../../src/theme';
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

@@ -3,8 +3,8 @@ import { View, Text, FlatList, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, MapPin, Lock } from 'lucide-react-native';
-import { useApp } from '../src/lib/context';
-import { colors } from '../src/theme';
+import { useApp } from '../../src/lib/context';
+import { colors } from '../../src/theme';
 
 export default function HistoryScreen() {
   const router = useRouter();

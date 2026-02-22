@@ -10,11 +10,11 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import Toast from 'react-native-toast-message';
-import { useApp, subscribeToSessionMessages, subscribeToVoteUpdates, subscribeToSessionUpdates } from '../../src/lib/context';
-import { api } from '../../src/lib/api';
-import { SuggestionCard } from '../../src/components/session/SuggestionCard';
-import { ChatPanel } from '../../src/components/session/ChatPanel';
-import { colors } from '../../src/theme';
+import { useApp, subscribeToSessionMessages, subscribeToVoteUpdates, subscribeToSessionUpdates } from '../../../src/lib/context';
+import { api } from '../../../src/lib/api';
+import { SuggestionCard } from '../../../src/components/session/SuggestionCard';
+import { ChatPanel } from '../../../src/components/session/ChatPanel';
+import { colors } from '../../../src/theme';
 import { DownvoteReason } from '@shared/constants';
 
 const DOWNVOTE_REASONS = [

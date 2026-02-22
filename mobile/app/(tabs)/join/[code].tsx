@@ -3,14 +3,13 @@ import { View, Text, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
-import { useApp } from '../../src/lib/context';
-import { api } from '../../src/lib/api';
-import { colors } from '../../src/theme';
+import { useApp } from '../../../src/lib/context';
+import { colors } from '../../../src/theme';
 
-export default function JoinPlanScreen() {
+export default function JoinGroupScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
   const router = useRouter();
-  const { user, refreshSessions } = useApp();
+  const { user, joinGroupByCode } = useApp();
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -18,18 +17,20 @@ export default function JoinPlanScreen() {
 
     const join = async () => {
       try {
-        const result = await api.sessions.join(code);
-        await refreshSessions();
-        Toast.show({ type: 'success', text1: 'Joined the plan!' });
-        router.replace(`/session/${result.id}`);
+        const group = await joinGroupByCode(code);
+        Toast.show({ type: 'success', text1: `Joined ${group.name}!` });
+        router.replace('/');
       } catch (err: any) {
-        setError(err.message || 'Failed to join plan');
+        setError(err.message || 'Failed to join group');
       }
     };
     join();
   }, [user, code]);
 
-  if (!user) return null;
+  if (!user) {
+    // Will be redirected to auth by root layout
+    return null;
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
@@ -38,7 +39,7 @@ export default function JoinPlanScreen() {
       ) : (
         <>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ color: colors.textSecondary, fontSize: 16, marginTop: 16 }}>Joining plan...</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 16, marginTop: 16 }}>Joining group...</Text>
         </>
       )}
     </SafeAreaView>

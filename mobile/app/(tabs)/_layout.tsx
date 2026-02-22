@@ -37,6 +37,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
         }}
       />
+      <Tabs.Screen name="new-plan" options={{ href: null }} />
+      <Tabs.Screen name="session/[id]" options={{ href: null }} />
+      <Tabs.Screen name="session-complete/[id]" options={{ href: null }} />
+      <Tabs.Screen name="group/[id]" options={{ href: null }} />
+      <Tabs.Screen name="history" options={{ href: null }} />
+      <Tabs.Screen name="join/[code]" options={{ href: null }} />
+      <Tabs.Screen name="join-plan/[code]" options={{ href: null }} />
     </Tabs>
   );
 }

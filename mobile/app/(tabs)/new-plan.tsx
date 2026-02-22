@@ -11,11 +11,11 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Animated, { FadeIn, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
-import { useApp } from '../src/lib/context';
-import { api } from '../src/lib/api';
-import { showInterstitialDuringLoad } from '../src/lib/ads';
-import { colors } from '../src/theme';
-import { Budget, Energy, Category, BUDGETS, ENERGIES, CATEGORIES, NEIGHBORHOODS, type City } from '../src/lib/store';
+import { useApp } from '../../src/lib/context';
+import { api } from '../../src/lib/api';
+import { showInterstitialDuringLoad } from '../../src/lib/ads';
+import { colors } from '../../src/theme';
+import { Budget, Energy, Category, BUDGETS, ENERGIES, CATEGORIES, NEIGHBORHOODS, type City } from '../../src/lib/store';
 
 const LOADING_MESSAGES = [
   { icon: Search, text: "Searching the best spots nearby..." },

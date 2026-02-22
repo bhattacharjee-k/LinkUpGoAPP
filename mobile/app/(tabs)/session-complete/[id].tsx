@@ -7,9 +7,9 @@ import { ChevronLeft, Star, MapPin, ExternalLink } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 import ConfettiCannon from 'react-native-confetti-cannon';
-import { useApp } from '../../src/lib/context';
-import { api } from '../../src/lib/api';
-import { colors } from '../../src/theme';
+import { useApp } from '../../../src/lib/context';
+import { api } from '../../../src/lib/api';
+import { colors } from '../../../src/theme';
 import { FeedbackTags } from '@shared/constants';
 
 const FEEDBACK_TAG_LABELS: Record<string, string> = {
