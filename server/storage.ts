@@ -16,9 +16,20 @@ import type {
   EventFeedback, InsertEventFeedback
 } from '@shared/schema';
 
+// Wrap DATABASE_URL to inject search_path for Neon pooled connections
+// (PgBouncer ignores search_path in URL options, so we prepend SET on each query via pool event)
+const dbSchema = process.env.DB_SCHEMA;
+
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
 });
+
+if (dbSchema) {
+  // Fires for every new connection from the pool, including the first
+  pool.on('connect', async (client) => {
+    await client.query(`SET search_path TO "${dbSchema}"`);
+  });
+}
 
 export const db = drizzle(pool, { schema });
 

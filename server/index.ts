@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import cors from "cors";
+import pg from "pg";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -26,12 +27,21 @@ app.use(cors({
   credentials: true,
 }));
 
-// Session configuration
+// Session store pool (separate from app pool so connect-pg-simple gets search_path)
+const sessionPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const dbSchema = process.env.DB_SCHEMA;
+if (dbSchema) {
+  sessionPool.on('connect', async (client) => {
+    await client.query(`SET search_path TO "${dbSchema}"`);
+  });
+}
+
 const PgStore = connectPgSimple(session);
 app.use(
   session({
     store: new PgStore({
-      conString: process.env.DATABASE_URL,
+      pool: sessionPool,
+      schemaName: dbSchema || 'public',
       createTableIfMissing: true,
     }),
     secret: process.env.SESSION_SECRET || 'linkupgo-secret-key-change-in-production',
