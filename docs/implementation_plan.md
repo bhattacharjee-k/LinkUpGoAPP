@@ -52,8 +52,10 @@
 - [ ] App Store Connect listing (screenshots, description, privacy policy)
 
 ### Phase 6: DNS Configuration
-- [ ] Add CNAME/A records for `linkupgoapp.com` → Cloud Run
-- [ ] Verify SSL/TLS provisioning
+- [x] Verify domain ownership via Google Search Console
+- [x] Map `linkupgoapp.com` → Cloud Run (`gcloud beta run domain-mappings`)
+- [x] Add A records (4x) in GoDaddy
+- [~] SSL/TLS certificate provisioning (auto, ~15 min)
 
 ### Verification
 - [x] Cloud Run URL `/api/auth/me` returns 401
