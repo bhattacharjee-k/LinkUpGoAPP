@@ -1,0 +1,7 @@
+node_modules
+mobile
+.git
+.env
+*.md
+dist
+.claude

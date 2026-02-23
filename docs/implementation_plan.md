@@ -30,9 +30,10 @@
 - [x] Update `client/src/lib/context.tsx` — derive WebSocket URL from API URL
 
 ### Phase 3: Dockerize
-- [ ] Create `Dockerfile` (multi-stage Node 20 Alpine build)
-- [ ] Create `.dockerignore`
-- [ ] Verify `npm run build` produces working `dist/index.cjs` + `dist/public/`
+- [x] Create `Dockerfile` (multi-stage Node 20 Alpine build)
+- [x] Create `.dockerignore`
+- [x] Verify `npm run build` produces working `dist/index.cjs` + `dist/public/`
+- [x] Verify Docker container serves both API and React app on port 8080
 
 ### Phase 4: Google Cloud Run Deployment
 - [ ] Install Google Cloud CLI
@@ -40,7 +41,7 @@
 - [ ] Enable Cloud Run + Artifact Registry APIs
 - [ ] Deploy with `gcloud run deploy`
 - [ ] Set production environment variables / secrets
-- [ ] Map custom domains: `linkupgoapp.com` + `api.linkupgoapp.com`
+- [ ] Map custom domain: `linkupgoapp.com` (single service serves both app + API)
 
 ### Phase 5: iOS App Store Deployment
 - [ ] Apple Developer Account setup
