@@ -10,8 +10,17 @@ const sessionUpdateListeners: Map<string, Set<(data: any) => void>> = new Map();
 
 function getWebSocket(): WebSocket {
   if (!wsConnection || wsConnection.readyState === WebSocket.CLOSED) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    wsConnection = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    const apiUrl = import.meta.env.VITE_API_URL;
+    let wsUrl: string;
+    if (apiUrl) {
+      // Cross-domain: derive WebSocket URL from API URL
+      wsUrl = apiUrl.replace(/^http/, 'ws') + '/ws';
+    } else {
+      // Same-origin: use current host
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//${window.location.host}/ws`;
+    }
+    wsConnection = new WebSocket(wsUrl);
     
     wsConnection.onmessage = (event) => {
       try {

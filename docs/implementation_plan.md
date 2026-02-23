@@ -23,11 +23,11 @@
 - [ ] Set production `DATABASE_URL` with search_path=prod (at deploy time)
 
 ### Phase 2: Server Changes for Production
-- [ ] Install `cors` + `@types/cors`
-- [ ] Add CORS middleware to `server/index.ts` (env-driven `ALLOWED_ORIGINS`)
-- [ ] Add `sameSite` and `domain` to session cookie config in `server/index.ts`
-- [ ] Update `client/src/lib/api.ts` — use `VITE_API_URL` env var for API base
-- [ ] Update `client/src/lib/context.tsx` — derive WebSocket URL from API URL
+- [x] Install `cors` + `@types/cors`
+- [x] Add CORS middleware to `server/index.ts` (env-driven `ALLOWED_ORIGINS`)
+- [x] Add `sameSite` and `domain` to session cookie config in `server/index.ts`
+- [x] Update `client/src/lib/api.ts` — use `VITE_API_URL` env var for API base
+- [x] Update `client/src/lib/context.tsx` — derive WebSocket URL from API URL
 
 ### Phase 3: Dockerize
 - [ ] Create `Dockerfile` (multi-stage Node 20 Alpine build)

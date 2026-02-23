@@ -1,6 +1,6 @@
 // API client for backend communication
 
-const API_BASE = '/api';
+const API_BASE = `${import.meta.env.VITE_API_URL || ''}/api`;
 
 async function fetchAPI(url: string, options?: RequestInit) {
   const response = await fetch(`${API_BASE}${url}`, {

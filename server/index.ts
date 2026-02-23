@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -17,6 +18,14 @@ declare module "http" {
   }
 }
 
+// CORS configuration (needed when web app and API are on different subdomains)
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || (process.env.NODE_ENV === 'production'
+    ? ['https://linkupgoapp.com']
+    : true), // allow all origins in development
+  credentials: true,
+}));
+
 // Session configuration
 const PgStore = connectPgSimple(session);
 app.use(
@@ -32,6 +41,8 @@ app.use(
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      sameSite: 'lax',
+      domain: process.env.COOKIE_DOMAIN || undefined,
     },
   })
 );
