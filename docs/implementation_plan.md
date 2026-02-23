@@ -41,7 +41,8 @@
 - [x] Enable Cloud Run + Artifact Registry + Cloud Build APIs
 - [x] Deploy with `gcloud run deploy` → `https://linkupgo-733928439758.us-central1.run.app`
 - [x] Set production environment variables / secrets
-- [ ] Map custom domain: `linkupgoapp.com` (single service serves both app + API)
+- [x] Map custom domain: `linkupgoapp.com` (single service serves both app + API)
+- [x] Fix `DB_SCHEMA=prod` for Neon pooled connections (pool.on('connect') SET search_path)
 
 ### Phase 5: iOS App Store Deployment
 - [ ] Apple Developer Account setup
@@ -55,14 +56,14 @@
 - [x] Verify domain ownership via Google Search Console
 - [x] Map `linkupgoapp.com` → Cloud Run (`gcloud beta run domain-mappings`)
 - [x] Add A records (4x) in GoDaddy
-- [~] SSL/TLS certificate provisioning (auto, ~15 min)
+- [x] SSL/TLS certificate provisioned (Google-managed)
 
 ### Verification
 - [x] Cloud Run URL `/api/auth/me` returns 401
 - [x] Cloud Run URL `/` loads React app
-- [ ] `https://linkupgoapp.com/api/auth/me` returns 401
-- [ ] `https://linkupgoapp.com` loads React app
-- [ ] Web login works
+- [x] `https://linkupgoapp.com/api/auth/me` returns 401
+- [x] `https://linkupgoapp.com` loads React app
+- [ ] Web login works (prod schema has no users yet — seed or register)
 - [ ] iOS app connects to production API
 - [ ] WebSocket `wss://linkupgoapp.com/ws` connects
 - [ ] App Store review passes
