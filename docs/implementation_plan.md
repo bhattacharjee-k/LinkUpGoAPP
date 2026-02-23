@@ -20,7 +20,7 @@
 - [x] Run `npm run db:neon:seed:dev` (seed dev with test data)
 - [x] Run `npm run db:neon:push:prod` (push 14 tables to prod schema)
 - [x] Fix `shared/schema.ts` constants import for drizzle-kit CJS compatibility
-- [ ] Set production `DATABASE_URL` with search_path=prod (at deploy time)
+- [x] Set production `DATABASE_URL` with search_path=prod (at deploy time)
 
 ### Phase 2: Server Changes for Production
 - [x] Install `cors` + `@types/cors`
@@ -36,11 +36,11 @@
 - [x] Verify Docker container serves both API and React app on port 8080
 
 ### Phase 4: Google Cloud Run Deployment
-- [ ] Install Google Cloud CLI
-- [ ] Create GCP project (`linkupgo`)
-- [ ] Enable Cloud Run + Artifact Registry APIs
-- [ ] Deploy with `gcloud run deploy`
-- [ ] Set production environment variables / secrets
+- [x] Install Google Cloud CLI
+- [x] Create GCP project (`linkupgo`)
+- [x] Enable Cloud Run + Artifact Registry + Cloud Build APIs
+- [x] Deploy with `gcloud run deploy` → `https://linkupgo-733928439758.us-central1.run.app`
+- [x] Set production environment variables / secrets
 - [ ] Map custom domain: `linkupgoapp.com` (single service serves both app + API)
 
 ### Phase 5: iOS App Store Deployment
@@ -52,14 +52,15 @@
 - [ ] App Store Connect listing (screenshots, description, privacy policy)
 
 ### Phase 6: DNS Configuration
-- [ ] Add CNAME records for `linkupgoapp.com` → Cloud Run
-- [ ] Add CNAME records for `api.linkupgoapp.com` → Cloud Run
+- [ ] Add CNAME/A records for `linkupgoapp.com` → Cloud Run
 - [ ] Verify SSL/TLS provisioning
 
 ### Verification
-- [ ] `https://api.linkupgoapp.com/api/auth/me` returns 401
+- [x] Cloud Run URL `/api/auth/me` returns 401
+- [x] Cloud Run URL `/` loads React app
+- [ ] `https://linkupgoapp.com/api/auth/me` returns 401
 - [ ] `https://linkupgoapp.com` loads React app
-- [ ] Web login works with cross-subdomain cookies
+- [ ] Web login works
 - [ ] iOS app connects to production API
-- [ ] WebSocket `wss://api.linkupgoapp.com/ws` connects
+- [ ] WebSocket `wss://linkupgoapp.com/ws` connects
 - [ ] App Store review passes
