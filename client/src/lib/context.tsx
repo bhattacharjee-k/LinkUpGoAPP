@@ -535,13 +535,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const regenerateSuggestions = async (sessionId: string) => {
-    const session = getSession(sessionId);
-    if (!session) return;
-    
+    // Fetch fresh session data from server to get latest filters
+    // (local state may be stale after updateSessionFilters)
+    const freshSession = await api.sessions.get(sessionId);
+    if (!freshSession) return;
+
     await api.suggestions.deleteForSession(sessionId);
-    
+
     try {
-      const filters = session.filters || {};
+      const filters = freshSession.filters || {};
       const result = await api.suggestions.fetch({
         city: filters.locationScope || user?.city || 'NYC',
         neighborhood: filters.neighborhood,
@@ -569,7 +571,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       console.log('[Suggestions] Fetched from APIs:', result.meta);
     } catch (error) {
       console.error('[Suggestions] API fetch failed, using fallback:', error);
-      const suggestions = generateSuggestionsForSession(session.filters);
+      const suggestions = generateSuggestionsForSession(freshSession.filters);
       for (const mockSugg of suggestions) {
         const { id, votes, score, ...suggestionData } = mockSugg as any;
         await api.suggestions.create({

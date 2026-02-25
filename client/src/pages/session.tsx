@@ -40,6 +40,7 @@ export function Session() {
   const [tieOptions, setTieOptions] = useState<string[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [replacingSuggestionId, setReplacingSuggestionId] = useState<string | null>(null);
   const [showRegenerateCta, setShowRegenerateCta] = useState(false);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
@@ -592,29 +593,45 @@ export function Session() {
       )
   }
 
-  if (session.suggestions.length === 0) {
+  if (session.suggestions.length === 0 && !isRetrying) {
       const handleRetryWithWiderSearch = async () => {
         if (!session?.id) return;
-        const currentFilters = (session.filters as any) || {};
-        const updatedFilters = { ...currentFilters, distance: '5 mi' };
-        await updateSessionFilters(session.id, updatedFilters);
-        await regenerateSuggestions(session.id);
-        toast({ title: "Searching wider", description: "Looking for options in a larger area." });
+        setIsRetrying(true);
+        try {
+          const currentFilters = (session.filters as any) || {};
+          const updatedFilters = { ...currentFilters, distance: '5 mi' };
+          await updateSessionFilters(session.id, updatedFilters);
+          await regenerateSuggestions(session.id);
+          toast({ title: "Searching wider", description: "Looking for options in a larger area." });
+        } catch (error) {
+          console.error('[Widen Search] Failed:', error);
+          toast({ title: "Search failed", description: "Please try again.", variant: "destructive" });
+        } finally {
+          setIsRetrying(false);
+        }
       };
       const handleRetryWithFlexBudget = async () => {
         if (!session?.id) return;
-        const currentFilters = (session.filters as any) || {};
-        const updatedFilters = { ...currentFilters, budget: '$$$$' };
-        await updateSessionFilters(session.id, updatedFilters);
-        await regenerateSuggestions(session.id);
-        toast({ title: "Budget expanded", description: "Searching across all price ranges." });
+        setIsRetrying(true);
+        try {
+          const currentFilters = (session.filters as any) || {};
+          const updatedFilters = { ...currentFilters, budget: '$$$$' };
+          await updateSessionFilters(session.id, updatedFilters);
+          await regenerateSuggestions(session.id);
+          toast({ title: "Budget expanded", description: "Searching across all price ranges." });
+        } catch (error) {
+          console.error('[Expand Budget] Failed:', error);
+          toast({ title: "Search failed", description: "Please try again.", variant: "destructive" });
+        } finally {
+          setIsRetrying(false);
+        }
       };
       return (
           <Layout hideNav>
              <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-6">
-                   <Button 
-                     variant="ghost" 
-                     size="icon" 
+                   <Button
+                     variant="ghost"
+                     size="icon"
                      className="absolute top-4 left-4"
                      onClick={() => window.history.back()}
                    >
@@ -631,8 +648,8 @@ export function Session() {
                        <Button variant="outline" onClick={handleRetryWithWiderSearch} data-testid="button-increase-distance">Widen Search Area</Button>
                        <Button variant="outline" onClick={handleRetryWithFlexBudget} data-testid="button-increase-budget">Expand Budget</Button>
                    </div>
-                   <Button 
-                     variant="ghost" 
+                   <Button
+                     variant="ghost"
                      className="text-muted-foreground"
                      onClick={() => window.history.back()}
                      data-testid="button-go-back"
