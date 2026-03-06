@@ -62,6 +62,127 @@ export function broadcastToSession(sessionId: string, message: any) {
   }
 }
 
+// Shared helper to regenerate suggestions for a session after membership changes
+async function regenerateSuggestionsForSession(sessionId: string, session: any, maxWidenAttempts: number = 0): Promise<void> {
+  const participants = await storage.getSessionParticipants(sessionId);
+  const activeParticipants = participants.filter(p => p.status !== 'left');
+  const participantUsers = await Promise.all(
+    activeParticipants.map(p => storage.getUser(p.userId))
+  );
+  const validUsers = participantUsers.filter(Boolean) as any[];
+  if (validUsers.length === 0) return;
+
+  const allCategories = validUsers.flatMap((u: any) => u.categories || []);
+  const categoryFreq: Record<string, number> = {};
+  allCategories.forEach((c: string) => { categoryFreq[c] = (categoryFreq[c] || 0) + 1; });
+  const commonCategories = Object.entries(categoryFreq)
+    .filter(([_, count]) => count >= Math.ceil(validUsers.length / 2))
+    .map(([cat]) => cat);
+
+  const budgetOrder = ['$', '$$', '$$$', '$$$$'];
+  const budgets = validUsers.map((u: any) => u.budget || '$$');
+  const avgBudgetIdx = Math.round(budgets.reduce((sum: number, b: string) => sum + budgetOrder.indexOf(b), 0) / budgets.length);
+
+  const energyOrder = ['Chill', 'Vibey', 'Hype'];
+  const energies = validUsers.map((u: any) => u.energy || 'Vibey');
+  const avgEnergyIdx = Math.round(energies.reduce((sum: number, e: string) => sum + energyOrder.indexOf(e), 0) / energies.length);
+
+  const allNeighborhoods = validUsers.flatMap((u: any) => u.favoriteNeighborhoods || []);
+  const uniqueNeighborhoods = [...new Set(allNeighborhoods)] as string[];
+
+  const filters = session.filters as any || {};
+  const mergedGroupPrefs: GroupPreferenceSummary = {
+    memberCount: validUsers.length,
+    categories: [...new Set(allCategories)] as string[],
+    commonCategories: commonCategories.length > 0 ? commonCategories : (filters.categories || filters.category || ['Drinks']),
+    budget: budgetOrder[avgBudgetIdx] || '$$',
+    energy: energyOrder[avgEnergyIdx] || 'Vibey',
+    crowdPreference: validUsers[0]?.crowdPreference || 'no_preference',
+    discoveryStyle: validUsers[0]?.discoveryStyle || 'mixed',
+    favoriteNeighborhoods: uniqueNeighborhoods,
+  };
+
+  await storage.deleteSessionSuggestions(sessionId);
+
+  const enrichedData: any = {
+    city: filters.locationScope || validUsers[0]?.city || 'NYC',
+    neighborhood: filters.neighborhood,
+    categories: mergedGroupPrefs.commonCategories,
+    budget: mergedGroupPrefs.budget,
+    energy: mergedGroupPrefs.energy,
+    timeWindow: filters.timeWindow,
+    specificDate: filters.specificDate,
+    specificTime: filters.specificTime,
+    vibeDescription: filters.vibeDescription,
+    locationMode: filters.locationMode as 'near_me' | 'explore_anywhere' | 'meet_in_the_middle' | undefined,
+    midpointLat: filters.midpointLat,
+    midpointLng: filters.midpointLng,
+    discoveryStyle: mergedGroupPrefs.discoveryStyle as any,
+    crowdPreference: mergedGroupPrefs.crowdPreference as any,
+    favoriteNeighborhoods: mergedGroupPrefs.favoriteNeighborhoods,
+    transportationModes: validUsers.map((u: any) => u.transportationMode || 'car'),
+  };
+
+  let result = await getOrchestratedSuggestions(
+    enrichedData, undefined, filters.referenceVenues, mergedGroupPrefs
+  );
+
+  // Auto-widen search if results are empty (Bug 7)
+  let widenAttempt = 0;
+  while (result.options.length === 0 && widenAttempt < maxWidenAttempts) {
+    widenAttempt++;
+    // Remove transport distance cap progressively by widening modes
+    if (widenAttempt === 1) {
+      // First attempt: upgrade all walkers to transit range
+      enrichedData.transportationModes = enrichedData.transportationModes.map(
+        (m: string) => m === 'walk' ? 'transit' : m
+      );
+    } else {
+      // Subsequent attempts: remove transport filter entirely
+      delete enrichedData.transportationModes;
+    }
+    console.log(`[Session] Auto-widen attempt ${widenAttempt}/${maxWidenAttempts} for session ${sessionId}`);
+    result = await getOrchestratedSuggestions(
+      enrichedData, undefined, filters.referenceVenues, mergedGroupPrefs
+    );
+  }
+
+  const sourceMap: Record<string, string> = { 'Google': 'Web' };
+  for (const opt of result.options) {
+    const whyExplanation = opt.whyExplanation || generateWhyExplanation(opt, mergedGroupPrefs);
+    const suggestion: Record<string, any> = {
+      sessionId,
+      name: opt.title,
+      city: enrichedData.city,
+      source: sourceMap[opt.source] || 'Web',
+      kind: 'venue',
+      rating: opt.rating || '4.5',
+      turnout: '0/0',
+      distance: opt.distance || '1.0 mi',
+      budget: opt.priceLevel || '$$',
+      description: opt.description || `A great spot in ${enrichedData.city}`,
+      tags: opt.tags || [],
+      whyExplanation,
+    };
+    if (opt.detailUrl) suggestion.detailUrl = opt.detailUrl;
+    if (opt.reservationUrl) suggestion.reservationUrl = opt.reservationUrl;
+    await storage.createSuggestion(suggestion as any);
+  }
+
+  const updatedSession = await storage.getSessionWithContext(sessionId);
+  const regenMessage = await storage.createMessage({
+    sessionId,
+    sender: 'system',
+    senderName: 'System',
+    text: `Suggestions updated to match everyone's preferences`,
+  });
+  broadcastToSession(sessionId, { type: 'new_message', message: regenMessage });
+  if (updatedSession) {
+    broadcastToSession(sessionId, { type: 'session_update', session: updatedSession.session });
+  }
+  console.log(`[Session] Regenerated suggestions for session ${sessionId} with ${validUsers.length} participants`);
+}
+
 function removeSocketFromSession(ws: WebSocket) {
   const prevSessionId = socketToSession.get(ws);
   if (prevSessionId) {
@@ -356,6 +477,7 @@ export async function registerRoutes(
       discoveryStyle: data.discoveryStyle || user?.discoveryStyle as 'hidden_gems' | 'popular' | 'mixed' | undefined,
       crowdPreference: data.crowdPreference || user?.crowdPreference as 'quiet' | 'buzzing' | 'no_preference' | undefined,
       favoriteNeighborhoods: data.favoriteNeighborhoods || user?.favoriteNeighborhoods || undefined,
+      transportationModes: user?.transportationMode ? [user.transportationMode] : undefined,
     };
 
     const groupPrefs: GroupPreferenceSummary = {
@@ -375,7 +497,6 @@ export async function registerRoutes(
 
     const sourceMap: Record<string, string> = {
       'Google': 'Web',
-      'Ticketmaster': 'Web',
     };
 
     const suggestions = result.options.map(opt => {
@@ -384,7 +505,7 @@ export async function registerRoutes(
         name: opt.title,
         city: data.city,
         source: sourceMap[opt.source] || 'Web',
-        kind: opt.optionType === 'event' ? 'event' : 'venue',
+        kind: 'venue',
         rating: opt.rating || '4.5',
         turnout: '0/0',
         distance: opt.distance || '1.0 mi',
@@ -395,10 +516,6 @@ export async function registerRoutes(
       };
       if (opt.detailUrl) suggestion.detailUrl = opt.detailUrl;
       if (opt.reservationUrl) suggestion.reservationUrl = opt.reservationUrl;
-      if (opt.ticketUrl) suggestion.ticketUrl = opt.ticketUrl;
-      if (opt.eventUrl) suggestion.eventUrl = opt.eventUrl;
-      if (opt.venueName) suggestion.venueName = opt.venueName;
-      if (opt.startTime) suggestion.startTime = opt.startTime;
       return suggestion;
     });
 
@@ -542,17 +659,32 @@ export async function registerRoutes(
       
       // Also add user to all active sessions of this group
       const sessions = await storage.getGroupSessions(group.id);
+      const joiner = await storage.getUser(userId);
+      const joinerName = joiner?.name || 'Someone';
       for (const session of sessions) {
         // Only add to active (non-locked, non-deleted) sessions
         if (session.status !== 'locked' && !session.deletedAt) {
           try {
             await storage.addSessionParticipant(session.id, userId, 'active');
+            // Broadcast join to session participants
+            const joinMsg = await storage.createMessage({
+              sessionId: session.id,
+              sender: 'system',
+              senderName: 'System',
+              text: `${joinerName} joined the plan`,
+            });
+            broadcastToSession(session.id, { type: 'new_message', message: joinMsg });
+            broadcastToSession(session.id, { type: 'session_update', session: { ...session, id: session.id } });
+            // Trigger suggestion regeneration with auto-widen
+            regenerateSuggestionsForSession(session.id, session, 4).catch(err =>
+              console.error('[Group Join] Failed to regenerate suggestions:', err)
+            );
           } catch (e) {
             // Ignore if already a participant
           }
         }
       }
-      
+
       const members = await storage.getGroupMembers(group.id);
       res.json({ ...group, members });
     } catch (error: any) {
@@ -603,20 +735,38 @@ export async function registerRoutes(
       // Add user to the session as participant
       try {
         await storage.addSessionParticipant(session.id, userId, 'active');
-        
+
         // Send notifications asynchronously
         const user = await storage.getUser(userId);
+        const joinerName = user?.name || 'Someone';
         notifyPlanJoined({
           sessionId: session.id,
           sessionName: session.name || 'the plan',
           joinerId: userId,
-          joinerName: user?.name || 'Someone',
+          joinerName,
           adminId: group.adminId,
         }).catch(err => console.error('[Notify] Error sending join notification:', err));
+
+        // Broadcast real-time update to session participants
+        const joinMsg = await storage.createMessage({
+          sessionId: session.id,
+          sender: 'system',
+          senderName: 'System',
+          text: `${joinerName} joined the plan`,
+        });
+        broadcastToSession(session.id, { type: 'new_message', message: joinMsg });
+        broadcastToSession(session.id, { type: 'session_update', session: { ...session, id: session.id } });
+
+        // Trigger suggestion regeneration in background
+        if (session.status !== 'locked') {
+          regenerateSuggestionsForSession(session.id, session, 4).catch(err =>
+            console.error('[Join] Failed to regenerate suggestions:', err)
+          );
+        }
       } catch (e) {
         // Ignore if already a participant
       }
-      
+
       res.json({ session, group: { ...group, members: await storage.getGroupMembers(group.id) } });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -910,118 +1060,9 @@ export async function registerRoutes(
       res.json({ success: true });
 
       if (session.status !== 'locked') {
-        (async () => {
-          try {
-            const participants = await storage.getSessionParticipants(req.params.id);
-            const activeParticipants = participants.filter(p => p.status !== 'left');
-            const participantUsers = await Promise.all(
-              activeParticipants.map(p => storage.getUser(p.userId))
-            );
-            const validUsers = participantUsers.filter(Boolean) as any[];
-            if (validUsers.length === 0) return;
-
-            const allCategories = validUsers.flatMap(u => u.categories || []);
-            const categoryFreq: Record<string, number> = {};
-            allCategories.forEach(c => { categoryFreq[c] = (categoryFreq[c] || 0) + 1; });
-            const commonCategories = Object.entries(categoryFreq)
-              .filter(([_, count]) => count >= Math.ceil(validUsers.length / 2))
-              .map(([cat]) => cat);
-
-            const budgetOrder = ['$', '$$', '$$$', '$$$$'];
-            const budgets = validUsers.map(u => u.budget || '$$');
-            const avgBudgetIdx = Math.round(budgets.reduce((sum, b) => sum + budgetOrder.indexOf(b), 0) / budgets.length);
-
-            const energyOrder = ['Chill', 'Vibey', 'Hype'];
-            const energies = validUsers.map(u => u.energy || 'Vibey');
-            const avgEnergyIdx = Math.round(energies.reduce((sum, e) => sum + energyOrder.indexOf(e), 0) / energies.length);
-
-            const allNeighborhoods = validUsers.flatMap(u => u.favoriteNeighborhoods || []);
-            const uniqueNeighborhoods = [...new Set(allNeighborhoods)];
-
-            const filters = session.filters as any || {};
-            const mergedGroupPrefs: GroupPreferenceSummary = {
-              memberCount: validUsers.length,
-              categories: [...new Set(allCategories)],
-              commonCategories: commonCategories.length > 0 ? commonCategories : (filters.categories || filters.category || ['Drinks']),
-              budget: budgetOrder[avgBudgetIdx] || '$$',
-              energy: energyOrder[avgEnergyIdx] || 'Vibey',
-              crowdPreference: validUsers[0]?.crowdPreference || 'no_preference',
-              discoveryStyle: validUsers[0]?.discoveryStyle || 'mixed',
-              favoriteNeighborhoods: uniqueNeighborhoods,
-            };
-
-            await storage.deleteSessionSuggestions(req.params.id);
-
-            const enrichedData = {
-              city: filters.locationScope || validUsers[0]?.city || 'NYC',
-              neighborhood: filters.neighborhood,
-              categories: mergedGroupPrefs.commonCategories,
-              budget: mergedGroupPrefs.budget,
-              energy: mergedGroupPrefs.energy,
-              timeWindow: filters.timeWindow,
-              specificDate: filters.specificDate,
-              specificTime: filters.specificTime,
-              vibeDescription: filters.vibeDescription,
-              locationMode: filters.locationMode as 'near_me' | 'explore_anywhere' | 'meet_in_the_middle' | undefined,
-              midpointLat: filters.midpointLat,
-              midpointLng: filters.midpointLng,
-              discoveryStyle: mergedGroupPrefs.discoveryStyle as any,
-              crowdPreference: mergedGroupPrefs.crowdPreference as any,
-              favoriteNeighborhoods: mergedGroupPrefs.favoriteNeighborhoods,
-            };
-
-            const result = await getOrchestratedSuggestions(
-              enrichedData, undefined, filters.referenceVenues, mergedGroupPrefs
-            );
-
-            const sourceMap: Record<string, string> = { 'Google': 'Web', 'Ticketmaster': 'Web' };
-            for (const opt of result.options) {
-              const whyExplanation = opt.whyExplanation || generateWhyExplanation(opt, mergedGroupPrefs);
-              const suggestion: Record<string, any> = {
-                sessionId: req.params.id,
-                name: opt.title,
-                city: enrichedData.city,
-                source: sourceMap[opt.source] || 'Web',
-                kind: opt.optionType === 'event' ? 'event' : 'venue',
-                rating: opt.rating || '4.5',
-                turnout: '0/0',
-                distance: opt.distance || '1.0 mi',
-                budget: opt.priceLevel || '$$',
-                description: opt.description || `A great spot in ${enrichedData.city}`,
-                tags: opt.tags || [],
-                whyExplanation,
-              };
-              if (opt.detailUrl) suggestion.detailUrl = opt.detailUrl;
-              if (opt.reservationUrl) suggestion.reservationUrl = opt.reservationUrl;
-              if (opt.ticketUrl) suggestion.ticketUrl = opt.ticketUrl;
-              if (opt.eventUrl) suggestion.eventUrl = opt.eventUrl;
-              if (opt.venueName) suggestion.venueName = opt.venueName;
-              if (opt.startTime) suggestion.startTime = opt.startTime;
-              await storage.createSuggestion(suggestion as any);
-            }
-
-            const updatedSession = await storage.getSessionWithContext(req.params.id);
-            const regenMessage = await storage.createMessage({
-              sessionId: req.params.id,
-              sender: 'system',
-              senderName: 'System',
-              text: `Suggestions updated to match everyone's preferences`,
-            });
-            broadcastToSession(req.params.id, {
-              type: 'new_message',
-              message: regenMessage,
-            });
-            if (updatedSession) {
-              broadcastToSession(req.params.id, {
-                type: 'session_update',
-                session: updatedSession.session,
-              });
-            }
-            console.log(`[Session] Regenerated suggestions for session ${req.params.id} with ${validUsers.length} participants`);
-          } catch (error) {
-            console.error('[Session] Failed to regenerate suggestions after participant added:', error);
-          }
-        })();
+        regenerateSuggestionsForSession(req.params.id, session).catch(err =>
+          console.error('[Session] Failed to regenerate suggestions after participant added:', err)
+        );
       }
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -1197,7 +1238,7 @@ export async function registerRoutes(
         name: newOption.title,
         city: filters?.locationScope || 'NYC',
         source: newOption.source || 'Google Places',
-        kind: newOption.optionType === 'event' ? 'event' : 'venue',
+        kind: 'venue',
         budget: newOption.priceLevel || '$$',
         rating: newOption.rating || '4.0',
         turnout: 'Medium',
@@ -1205,8 +1246,6 @@ export async function registerRoutes(
         description: newOption.description || '',
         tags: newOption.tags || [],
         reservationUrl: newOption.reservationUrl || null,
-        ticketUrl: newOption.ticketUrl || null,
-        eventUrl: newOption.eventUrl || null,
         detailUrl: newOption.detailUrl || null,
         whyExplanation: newOption.whyExplanation || null,
       });
@@ -1442,15 +1481,8 @@ export async function registerRoutes(
       res.setHeader('Connection', 'keep-alive');
       
       // Import and use the planner
-      const { streamPlannerResponse, fetchLiveEvents } = await import('./planner');
-      
-      // Fetch live events for the planner context
-      const filters = context.session.filters as any;
-      const liveEvents = await fetchLiveEvents(
-        filters?.locationScope || user.city || 'NYC',
-        filters?.specificDate
-      );
-      
+      const { streamPlannerResponse } = await import('./planner');
+
       // Fetch user's historical feedback for AI memory
       const userFeedback = await storage.getUserFeedbackWithVenues(userId);
       
@@ -1458,7 +1490,7 @@ export async function registerRoutes(
       let plannerResult: any = null;
       
       try {
-        const generator = streamPlannerResponse({ ...context, user, liveEvents, userFeedback }, userMessage);
+        const generator = streamPlannerResponse({ ...context, user, userFeedback }, userMessage);
         
         while (true) {
           const { value, done } = await generator.next();

@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "transportation_mode" text DEFAULT 'car';

@@ -4,14 +4,13 @@ import { discoverTrendingVenues, discoverVenuesFromQuery } from './perplexity';
 import { synthesizeContext, validateAndRankSuggestions, OrchestratorBrief } from './orchestrator';
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
-const TICKETMASTER_API_KEY = process.env.TICKETMASTER_API_KEY;
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
 
 // Bucket types for diversity-first generation
 export type GenerationType = 'safe' | 'explore' | 'wildcard';
 
 export interface SuggestionOption {
-  optionType: 'place' | 'event';
+  optionType: 'place';
   title: string;
   description: string;
   address: string;
@@ -25,15 +24,10 @@ export interface SuggestionOption {
   tags: string[];
   detailUrl?: string | null;
   reservationUrl?: string | null;
-  ticketUrl?: string | null;
-  eventUrl?: string | null;
-  startTime?: string;
-  venueName?: string;
   source: string;
   score?: number;
   generationType?: GenerationType;
   placeId?: string;
-  eventId?: string;
   whyExplanation?: string;
   openNow?: boolean;
   openingHoursText?: string[];
@@ -57,6 +51,20 @@ export interface SuggestRequest {
   discoveryStyle?: 'hidden_gems' | 'popular' | 'mixed';
   crowdPreference?: 'quiet' | 'buzzing' | 'no_preference';
   favoriteNeighborhoods?: string[];
+  transportationModes?: string[]; // Array of participant transport modes: 'car' | 'walk' | 'transit'
+}
+
+// Max distance (in miles) for each transportation mode
+const TRANSPORT_MAX_DISTANCE: Record<string, number> = {
+  walk: 1,
+  transit: 5,
+  car: 15,
+};
+
+function getMaxDistanceMiles(transportationModes?: string[]): number {
+  if (!transportationModes || transportationModes.length === 0) return 15; // default: car
+  // Use the most restrictive (smallest) distance among all participants
+  return Math.min(...transportationModes.map(m => TRANSPORT_MAX_DISTANCE[m] || 15));
 }
 
 interface SuggestMeta {
@@ -64,7 +72,6 @@ interface SuggestMeta {
   centerLatLng: LatLng;
   radiusMeters: number;
   placesCount: number;
-  eventsCount: number;
   filteredCount: number;
   bucketCounts?: {
     safe: number;
@@ -135,21 +142,6 @@ const categoryToPlaceTypes: Record<string, string[]> = {
   'Chill': ['cafe', 'restaurant', 'park'],
 };
 
-const categoryToTicketmaster: Record<string, string> = {
-  'Live Music': 'music',
-  'Club': 'music',
-  'Dancing': 'music',
-  'Drinks': 'music',
-  'Rooftop': 'music',
-  'Lounge': 'music',
-  'Comedy': 'arts & theatre',
-  'Culture': 'arts & theatre',
-  'Museum': 'arts & theatre',
-  'Active': 'sports',
-  'Big Group': 'music',
-  'Date Night': 'music',
-};
-
 const priceLevelMap: Record<string, string> = {
   'PRICE_LEVEL_INEXPENSIVE': '$',
   'PRICE_LEVEL_MODERATE': '$$',
@@ -204,21 +196,6 @@ function getTimeAwareTypes(categories: string[], specificTime?: string, timeWind
   return Array.from(placeTypes);
 }
 
-function getTimeAwareTicketmasterClasses(categories: string[], specificTime?: string, timeWindow?: string, energy?: string): string[] {
-  const classes = new Set<string>();
-  for (const cat of categories) {
-    if (categoryToTicketmaster[cat]) {
-      classes.add(categoryToTicketmaster[cat]);
-    }
-  }
-
-  if (isLateNight(specificTime, timeWindow) || isHighEnergy(energy)) {
-    classes.add('music');
-  }
-
-  return Array.from(classes);
-}
-
 const restaurantSignals = [
   'restaurant', 'cafe', 'eatery', 'dining', 'brunch', 'bistro', 'trattoria',
   'steakhouse', 'grill', 'kitchen', 'diner', 'pizzeria', 'sushi', 'ramen',
@@ -249,14 +226,12 @@ function scoreTimeAppropriateness(opt: SuggestionOption, specificTime?: string, 
 
   const isNightclub = tags.some(t => t.includes('night_club') || t.includes('night club'));
   const isBar = tags.some(t => t.includes('bar'));
-  const isEvent = opt.optionType === 'event';
   const isRestaurantLike = looksLikeRestaurant(opt);
   const isTrending = tags.some(t => t.includes('perplexity'));
 
   let score = 0;
   if (isNightclub) score += 20;
   if (isBar && !isRestaurantLike) score += 12;
-  if (isEvent) score += 15;
   if (isTrending) score += 10;
   
   if (isRestaurantLike && lateNight) score -= 25;
@@ -570,7 +545,6 @@ export async function getSuggestions(
         centerLatLng: getSearchCenter(req.city, req.neighborhood, req.userLat, req.userLng),
         radiusMeters: 3000,
         placesCount: 0,
-        eventsCount: 0,
         filteredCount: cached.options.length,
       },
     };
@@ -597,20 +571,16 @@ export async function getSuggestions(
   const baseRadiusMeters = 3000;
 
   const timeAwarePlaceTypes = getTimeAwareTypes(req.categories, req.specificTime, req.timeWindow, req.energy);
-  const timeAwareTicketClasses = getTimeAwareTicketmasterClasses(req.categories, req.specificTime, req.timeWindow, req.energy);
 
   const maxRadiusMeters = Math.round(baseRadiusMeters * 1.3);
-  
-  console.log(`[Suggestions] Request: city=${req.city}, categories=[${req.categories.join(',')}], energy=${req.energy}, time=${req.specificTime || req.timeWindow || 'none'}, placeTypes=[${timeAwarePlaceTypes.join(',')}], ticketClasses=[${timeAwareTicketClasses.join(',')}]`);
+
+  console.log(`[Suggestions] Request: city=${req.city}, categories=[${req.categories.join(',')}], energy=${req.energy}, time=${req.specificTime || req.timeWindow || 'none'}, placeTypes=[${timeAwarePlaceTypes.join(',')}]`);
 
   const perplexityCategories = req.categories.length > 0 ? req.categories : ['Drinks'];
   const shouldSearchPerplexity = PERPLEXITY_API_KEY && (isLateNight(req.specificTime, req.timeWindow) || isHighEnergy(req.energy));
 
-  const [placesResults, eventsResults, trendingVenueNames] = await Promise.all([
+  const [placesResults, trendingVenueNames] = await Promise.all([
     fetchGooglePlaces(center, maxRadiusMeters, timeAwarePlaceTypes, req.city),
-    timeAwareTicketClasses.length > 0 
-      ? fetchTicketmasterEvents(center, timeAwareTicketClasses, req.specificDate)
-      : Promise.resolve([]),
     shouldSearchPerplexity
       ? discoverTrendingVenues(req.city, perplexityCategories, {
           crowdPreference: req.crowdPreference,
@@ -626,7 +596,7 @@ export async function getSuggestions(
     placesResults.push(...trendingPlaceResults);
   }
 
-  let allCandidates = [...placesResults, ...eventsResults];
+  let allCandidates = [...placesResults];
 
   // Filter by city first
   allCandidates = allCandidates.filter(opt => {
@@ -652,11 +622,25 @@ export async function getSuggestions(
     }
   }
 
-  // Deduplicate by placeId/eventId/name BEFORE bucket selection
+  // Filter by transportation mode distance cap
+  const maxDistMiles = getMaxDistanceMiles(req.transportationModes);
+  if (maxDistMiles < 15) {
+    const beforeTransport = allCandidates.length;
+    allCandidates = allCandidates.filter(opt => {
+      const dist = parseFloat(opt.distance?.replace(' mi', '') || '0');
+      return dist <= maxDistMiles;
+    });
+    const removedByTransport = beforeTransport - allCandidates.length;
+    if (removedByTransport > 0) {
+      console.log(`[Suggestions] Transport filter (${maxDistMiles}mi cap): removed ${removedByTransport} venues`);
+    }
+  }
+
+  // Deduplicate by placeId/name BEFORE bucket selection
   const uniqueIds = new Set<string>();
   const preDedupCount = allCandidates.length;
   allCandidates = allCandidates.filter(opt => {
-    const id = opt.placeId || opt.eventId || opt.title.toLowerCase().trim();
+    const id = opt.placeId || opt.title.toLowerCase().trim();
     if (uniqueIds.has(id)) return false;
     uniqueIds.add(id);
     return true;
@@ -683,8 +667,8 @@ export async function getSuggestions(
   const usedIds = new Set<string>();
 
   // Helper to get unique ID for deduplication
-  const getUniqueId = (opt: SuggestionOption) => 
-    opt.placeId || opt.eventId || opt.title.toLowerCase().trim();
+  const getUniqueId = (opt: SuggestionOption) =>
+    opt.placeId || opt.title.toLowerCase().trim();
 
   // Helper to check if option is in user's favorite neighborhoods (soft boost, not filter)
   const isInFavoriteNeighborhood = (opt: SuggestionOption): boolean => {
@@ -848,7 +832,7 @@ export async function getSuggestions(
   // Apply scoring and ranking to final selection
   const rankedOptions = scoreAndRank(selectedOptions, req, center);
 
-  console.log(`[Suggestions] Pipeline results: places=${placesResults.length}, events=${eventsResults.length}, trending=${trendingVenueNames.length}, afterCityFilter=${allCandidates.length}, selected=${selectedOptions.length}`);
+  console.log(`[Suggestions] Pipeline results: places=${placesResults.length}, trending=${trendingVenueNames.length}, afterCityFilter=${allCandidates.length}, selected=${selectedOptions.length}`);
   console.log(`[Suggestions] Buckets: safe=${bucketCounts.safe}/${targetCounts.safe}, explore=${bucketCounts.explore}/${targetCounts.explore}, wildcard=${bucketCounts.wildcard}/${targetCounts.wildcard}`);
   console.log(`[Suggestions] Selected: ${rankedOptions.map(o => `${o.title} (${o.tags.join(',')}, score=${o.score?.toFixed(0)})`).join(' | ')}`);
   
@@ -869,7 +853,6 @@ export async function getSuggestions(
       centerLatLng: center,
       radiusMeters: baseRadiusMeters,
       placesCount: placesResults.length,
-      eventsCount: eventsResults.length,
       filteredCount: rankedOptions.length,
       bucketCounts,
       dedupedCount: allCandidates.length - selectedOptions.length,
@@ -940,8 +923,6 @@ async function fetchGooglePlaces(center: LatLng, radiusMeters: number, types: st
           ],
           detailUrl: place.websiteUri || place.googleMapsUri,
           reservationUrl: null,
-          ticketUrl: null,
-          eventUrl: null,
           source: 'Google',
           placeId: place.id,
           openNow: openingHours?.openNow,
@@ -950,80 +931,6 @@ async function fetchGooglePlaces(center: LatLng, radiusMeters: number, types: st
       }
     } catch (err) {
       console.error(`Error fetching places for type ${type}:`, err);
-    }
-  }
-
-  return results;
-}
-
-async function fetchTicketmasterEvents(center: LatLng, classifications: string[], specificDate?: string): Promise<SuggestionOption[]> {
-  if (!TICKETMASTER_API_KEY) {
-    console.warn('TICKETMASTER_API_KEY not set');
-    return [];
-  }
-
-  const results: SuggestionOption[] = [];
-  const radiusMiles = 25;
-
-  const now = new Date();
-  const startDateTime = specificDate ? new Date(specificDate) : now;
-  const endDateTime = new Date(startDateTime);
-  endDateTime.setDate(endDateTime.getDate() + 14);
-
-  console.log(`[Ticketmaster] Searching for ${classifications.join(', ')} near ${center.lat},${center.lng} from ${startDateTime.toISOString()} to ${endDateTime.toISOString()}`);
-
-  for (const classification of classifications) {
-    try {
-      const params = new URLSearchParams({
-        apikey: TICKETMASTER_API_KEY,
-        latlong: `${center.lat},${center.lng}`,
-        radius: radiusMiles.toString(),
-        unit: 'miles',
-        classificationName: classification,
-        startDateTime: startDateTime.toISOString().split('.')[0] + 'Z',
-        endDateTime: endDateTime.toISOString().split('.')[0] + 'Z',
-        size: '10',
-        sort: 'date,asc',
-      });
-
-      const response = await fetch(`https://app.ticketmaster.com/discovery/v2/events.json?${params}`);
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error(`[Ticketmaster] API error for ${classification}:`, errText);
-        continue;
-      }
-
-      const data = await response.json();
-      const events = data._embedded?.events || [];
-      console.log(`[Ticketmaster] Found ${events.length} events for ${classification}`);
-
-      for (const event of events) {
-        const venue = event._embedded?.venues?.[0];
-        const lat = venue?.location?.latitude ? parseFloat(venue.location.latitude) : undefined;
-        const lng = venue?.location?.longitude ? parseFloat(venue.location.longitude) : undefined;
-
-        results.push({
-          optionType: 'event',
-          title: event.name,
-          description: event.info || `${classification} event`,
-          address: venue?.address?.line1 ? `${venue.address.line1}, ${venue.city?.name || ''}` : '',
-          city: venue?.city?.name || '',
-          lat,
-          lng,
-          venueName: venue?.name,
-          startTime: event.dates?.start?.localTime,
-          tags: [classification, 'Event'],
-          detailUrl: event.url,
-          ticketUrl: event.url,
-          reservationUrl: null,
-          eventUrl: event.url,
-          source: 'Ticketmaster',
-          eventId: event.id, // For deduplication
-        });
-      }
-    } catch (err) {
-      console.error(`Error fetching Ticketmaster events for ${classification}:`, err);
     }
   }
 
@@ -1128,8 +1035,6 @@ async function fetchGooglePlacesByName(center: LatLng, radiusMeters: number, ven
         tags: [place.primaryType?.replace('_', ' ') || 'trending', 'Perplexity Pick'],
         detailUrl: place.websiteUri || place.googleMapsUri,
         reservationUrl: null,
-        ticketUrl: null,
-        eventUrl: null,
         source: 'Google',
         placeId: place.id,
         openNow: openingHours?.openNow,
@@ -1206,8 +1111,6 @@ export async function fetchGooglePlacesTextSearch(center: LatLng, radiusMeters: 
           ],
           detailUrl: place.websiteUri || place.googleMapsUri,
           reservationUrl: null,
-          ticketUrl: null,
-          eventUrl: null,
           source: 'Google',
           placeId: place.id,
           openNow: openingHours?.openNow,
@@ -1395,15 +1298,11 @@ export async function getOrchestratedSuggestions(
   const maxRadiusMeters = Math.round(baseRadiusMeters * 1.3);
 
   const apiStart = Date.now();
-  const [placesResults, textSearchResults, eventsResults, trendingVenueNames] = await Promise.all([
+  const [placesResults, textSearchResults, trendingVenueNames] = await Promise.all([
     fetchGooglePlaces(center, maxRadiusMeters, brief.googlePlacesTypes.slice(0, 5), req.city),
-    
+
     brief.googlePlacesTextQueries.length > 0
       ? fetchGooglePlacesTextSearch(center, maxRadiusMeters, brief.googlePlacesTextQueries, req.city)
-      : Promise.resolve([]),
-
-    brief.ticketmasterClassifications.length > 0
-      ? fetchTicketmasterEvents(center, brief.ticketmasterClassifications, req.specificDate)
       : Promise.resolve([]),
 
     PERPLEXITY_API_KEY
@@ -1413,7 +1312,7 @@ export async function getOrchestratedSuggestions(
         })
       : Promise.resolve([] as string[]),
   ]);
-  console.log(`[Orchestrator] API calls completed in ${Date.now() - apiStart}ms: places=${placesResults.length}, textSearch=${textSearchResults.length}, events=${eventsResults.length}, trending=${trendingVenueNames.length}`);
+  console.log(`[Orchestrator] API calls completed in ${Date.now() - apiStart}ms: places=${placesResults.length}, textSearch=${textSearchResults.length}, trending=${trendingVenueNames.length}`);
 
   let trendingPlaceResults: SuggestionOption[] = [];
   if (trendingVenueNames.length > 0) {
@@ -1422,7 +1321,7 @@ export async function getOrchestratedSuggestions(
     console.log(`[Orchestrator] Resolved ${trendingPlaceResults.length} trending venues`);
   }
 
-  let allCandidates = [...placesResults, ...textSearchResults, ...trendingPlaceResults, ...eventsResults];
+  let allCandidates = [...placesResults, ...textSearchResults, ...trendingPlaceResults];
 
   allCandidates = allCandidates.filter(opt => {
     if (opt.lat && opt.lng) {
@@ -1446,9 +1345,23 @@ export async function getOrchestratedSuggestions(
     }
   }
 
+  // Filter by transportation mode distance cap
+  const maxDistMilesOrch = getMaxDistanceMiles(req.transportationModes);
+  if (maxDistMilesOrch < 15) {
+    const beforeTransport = allCandidates.length;
+    allCandidates = allCandidates.filter(opt => {
+      const dist = parseFloat(opt.distance?.replace(' mi', '') || '0');
+      return dist <= maxDistMilesOrch;
+    });
+    const removedByTransport = beforeTransport - allCandidates.length;
+    if (removedByTransport > 0) {
+      console.log(`[Orchestrator] Transport filter (${maxDistMilesOrch}mi cap): removed ${removedByTransport} venues`);
+    }
+  }
+
   const uniqueIds = new Set<string>();
   allCandidates = allCandidates.filter(opt => {
-    const id = opt.placeId || opt.eventId || opt.title.toLowerCase().trim();
+    const id = opt.placeId || opt.title.toLowerCase().trim();
     if (uniqueIds.has(id)) return false;
     uniqueIds.add(id);
     return true;
@@ -1479,7 +1392,6 @@ export async function getOrchestratedSuggestions(
       centerLatLng: center,
       radiusMeters: baseRadiusMeters,
       placesCount: placesResults.length + textSearchResults.length + trendingPlaceResults.length,
-      eventsCount: eventsResults.length,
       filteredCount: rankedOptions.length,
     },
     referenceProfile: refProfile || undefined,

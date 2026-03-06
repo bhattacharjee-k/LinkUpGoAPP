@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, LogOut, Check, MapPin, DollarSign, Zap, X, Mail } from 'lucide-react';
+import { ArrowLeft, LogOut, Check, MapPin, DollarSign, Zap, X, Mail, Car, Footprints, Train } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { City, Budget, Energy, Category, DiscoveryStyle, CrowdPreference, NEIGHBORHOODS } from '@/lib/store';
@@ -16,6 +16,11 @@ const BUDGETS: Budget[] = ['$', '$$', '$$$', '$$$$'];
 const ENERGIES: Energy[] = ['Chill', 'Vibey', 'Going out', 'Full send'];
 const CATEGORIES: Category[] = ['Dinner', 'Brunch', 'Cocktails', 'Rooftop', 'Club', 'Live Music', 'Bowling', 'Comedy', 'Walk', 'Arcade', 'Big Group', 'Date Night'];
 const HARD_NOS = ['Clubs', 'Loud places', 'Ticketed events', 'Late nights', 'Expensive spots'];
+const TRANSPORTATION_OPTIONS: { value: string; label: string; icon: typeof Car }[] = [
+  { value: 'car', label: 'Car', icon: Car },
+  { value: 'walk', label: 'Walk', icon: Footprints },
+  { value: 'transit', label: 'Public Transit', icon: Train },
+];
 const DISCOVERY_OPTIONS: { value: DiscoveryStyle; label: string; desc: string }[] = [
   { value: 'hidden_gems', label: 'Hidden Gems', desc: 'Unique spots most people haven\'t tried' },
   { value: 'popular', label: 'Popular Favorites', desc: 'Well-known spots with proven track records' },
@@ -44,6 +49,7 @@ export function Profile() {
     discoveryStyle: (user?.discoveryStyle || 'mixed') as DiscoveryStyle,
     crowdPreference: (user?.crowdPreference || 'no_preference') as CrowdPreference,
     favoriteNeighborhoods: user?.favoriteNeighborhoods || [],
+    transportationMode: (user as any)?.transportationMode || 'car',
   });
 
   const toggleNeighborhood = (n: string) => {
@@ -211,6 +217,31 @@ export function Profile() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-3">
+            <Label>How do you get around?</Label>
+            <div className="flex gap-2">
+              {TRANSPORTATION_OPTIONS.map(opt => {
+                const Icon = opt.icon;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setFormData(prev => ({ ...prev, transportationMode: opt.value }))}
+                    className={cn(
+                      "flex-1 py-3 rounded-xl border text-sm font-medium transition-all flex items-center justify-center gap-2",
+                      formData.transportationMode === opt.value
+                        ? "bg-primary text-black border-primary"
+                        : "bg-white/5 border-white/10 text-muted-foreground"
+                    )}
+                    data-testid={`button-transport-${opt.value}`}
+                  >
+                    <Icon size={14} /> {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">Affects how far away suggestions can be</p>
           </div>
 
           <div className="space-y-3">

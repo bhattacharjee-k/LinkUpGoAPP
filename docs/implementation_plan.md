@@ -58,6 +58,52 @@
 - [x] Add A records (4x) in GoDaddy
 - [x] SSL/TLS certificate provisioned (Google-managed)
 
+---
+
+## Bug Fixes (from docs/buglist.md)
+
+### Bug 1 — No-Results Crash
+- [x] Add empty-suggestions UI with "Widen Search Area" + "Adjust Filters" buttons
+- [x] Add `isRetrying` state and error handling in `session.tsx`
+
+### Bug 4 — Active Plans Card Layout
+- [x] Swap so session/plan name is bold primary text, group name is secondary
+
+### Bug 5 — Details Button Opens Google Maps
+- [x] Replace `detailUrl` link with Google Maps search URL using `suggestion.name + suggestion.city`
+- [x] Remove `ticketUrl` and `eventUrl` link buttons
+
+### Bug 6 — Remove Ticketmaster API
+- [x] Remove `fetchTicketmasterEvents()` function from `suggestions.ts`
+- [x] Remove `categoryToTicketmaster` mapping and `getTimeAwareTicketmasterClasses()`
+- [x] Remove event fetching from `getSuggestions()` and `getOrchestratedSuggestions()`
+- [x] Remove Ticketmaster from `orchestrator.ts` prompts and brief interface
+- [x] Remove `fetchLiveEvents()` from `planner.ts`
+- [x] Remove Ticketmaster references from `routes.ts`
+- [x] Remove `TICKETMASTER_API_KEY` from `.env.example` and `CLAUDE.md`
+
+### Bug 3 — Transportation Mode per User
+- [x] Add `transportationMode` column to `users` table in `schema.ts`
+- [x] Generate Drizzle migration
+- [x] Add transportation mode selector UI in `profile.tsx` (Car, Walk, Public Transit)
+- [x] Add `TRANSPORT_MAX_DISTANCE` map and `getMaxDistanceMiles()` to `suggestions.ts`
+- [x] Apply transport distance filter in both `getSuggestions()` and `getOrchestratedSuggestions()`
+- [x] Pass `transportationModes` from routes when generating suggestions
+- [ ] Run `npm run db:push` to apply schema change
+
+### Bug 2 — Real-Time Update on Member Join
+- [x] Add WebSocket broadcasts in group join handler (`POST /api/groups/join/:inviteCode`)
+- [x] Add WebSocket broadcasts in session join handler (`POST /api/sessions/join/:inviteCode`)
+- [x] Extract `regenerateSuggestionsForSession()` helper function
+- [x] Trigger suggestion regeneration on join via invite code
+- [x] Deduplicate regeneration code in `POST /api/sessions/:id/participants`
+
+### Bug 7 — Auto-Widen Search on New Member Join
+- [x] Add `maxWidenAttempts` parameter to `regenerateSuggestionsForSession()`
+- [x] Progressive widening: upgrade walk→transit, then remove transport filter entirely
+- [x] Pass `maxWidenAttempts: 4` from join handlers
+- [x] Fall back to Bug 1 error state if still empty after max attempts
+
 ### Verification
 - [x] Cloud Run URL `/api/auth/me` returns 401
 - [x] Cloud Run URL `/` loads React app

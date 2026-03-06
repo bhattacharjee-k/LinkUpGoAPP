@@ -18,8 +18,6 @@ export interface OrchestratorBrief {
   perplexityQuery: string;
   googlePlacesTypes: string[];
   googlePlacesTextQueries: string[];
-  ticketmasterClassifications: string[];
-  ticketmasterKeywords: string[];
   excludeTypes: string[];
   vibeKeywords: string[];
   mustBeOpenAt: string | null;
@@ -81,7 +79,7 @@ export async function synthesizeContext(
 
   const memberCount = groupPrefs?.memberCount || 1;
 
-  const prompt = `You are a social event planning assistant for young professionals. Analyze this group's plan request and produce a structured brief that will drive API queries to Google Places, Ticketmaster, and Perplexity.
+  const prompt = `You are a social event planning assistant for young professionals. Analyze this group's plan request and produce a structured brief that will drive API queries to Google Places and Perplexity.
 
 PLAN REQUEST:
 - City: ${city}
@@ -107,14 +105,12 @@ Respond with a JSON object with these fields:
 2. "perplexityQuery": A natural language search query for Perplexity to find trending/current venues matching this intent. Be specific about the city, vibe, time, and what to EXCLUDE. Example: "Best nightclubs and dance bars in Chicago River North and West Loop open past 2AM on Saturdays, not restaurant-bars"
 3. "googlePlacesTypes": Array of Google Places API types to search (e.g., "night_club", "bar", "restaurant", "cafe", "bowling_alley", "museum", "park", "performing_arts_theater", "amusement_center")
 4. "googlePlacesTextQueries": Array of 1-3 specific text search queries for Google Places Text Search API. These find specific venue categories that type-based search misses. Example: ["speakeasy bars Chicago", "rooftop cocktail lounge Chicago"]
-5. "ticketmasterClassifications": Array of Ticketmaster event classifications to search (e.g., "music", "arts & theatre", "sports", "comedy"). Use empty array if events aren't relevant.
-6. "ticketmasterKeywords": Array of keywords to refine Ticketmaster search (e.g., ["DJ", "electronic", "hip-hop"]). Use empty array if not applicable.
-7. "excludeTypes": Array of Google Places primaryType values that should be EXCLUDED from results (e.g., "restaurant", "cafe" for late-night clubbing). Be aggressive about excluding mismatched types.
-8. "vibeKeywords": Array of 3-5 keywords that describe the ideal venue vibe, used for validation (e.g., ["dance floor", "DJ", "late-night", "cocktails", "trendy"])
-9. "mustBeOpenAt": If the user specified a time, return it in HH:MM format (24h). Otherwise null.
-10. "maxBudgetLevel": Budget as number 1-4 where $=1, $$=2, $$$=3, $$$$=4
-11. "preferredNeighborhoods": Array of neighborhoods to prioritize (from user favorites or request)
-12. "radiusBias": "tight" if user wants walkable/nearby, "wide" if exploring, "normal" otherwise. If downvotes include "tooFar", use "tight".
+5. "excludeTypes": Array of Google Places primaryType values that should be EXCLUDED from results (e.g., "restaurant", "cafe" for late-night clubbing). Be aggressive about excluding mismatched types.
+6. "vibeKeywords": Array of 3-5 keywords that describe the ideal venue vibe, used for validation (e.g., ["dance floor", "DJ", "late-night", "cocktails", "trendy"])
+7. "mustBeOpenAt": If the user specified a time, return it in HH:MM format (24h). Otherwise null.
+8. "maxBudgetLevel": Budget as number 1-4 where $=1, $$=2, $$$=3, $$$$=4
+9. "preferredNeighborhoods": Array of neighborhoods to prioritize (from user favorites or request)
+10. "radiusBias": "tight" if user wants walkable/nearby, "wide" if exploring, "normal" otherwise. If downvotes include "tooFar", use "tight".
 
 IMPORTANT RULES:
 - For late-night plans (after 9PM) or high-energy vibes ("Going out", "Full send"), AGGRESSIVELY exclude restaurant types. Bars that primarily serve food should be excluded too.
@@ -186,8 +182,6 @@ function buildFallbackBrief(req: SuggestRequest): OrchestratorBrief {
     perplexityQuery: `Best ${req.categories.join(" and ")} spots in ${req.city}`,
     googlePlacesTypes: Array.from(types),
     googlePlacesTextQueries: [],
-    ticketmasterClassifications: isHighEnergy || isLateNight ? ["music"] : [],
-    ticketmasterKeywords: [],
     excludeTypes,
     vibeKeywords: req.categories.map(c => c.toLowerCase()),
     mustBeOpenAt: req.specificTime?.split("-")[0] || null,
@@ -228,7 +222,6 @@ export async function validateAndRankSuggestions(
       `Source: ${c.source}`,
     ];
     if (c.description) parts.push(`Description: ${c.description.slice(0, 100)}`);
-    if (c.startTime) parts.push(`Event time: ${c.startTime}`);
     if (c.openNow !== undefined) parts.push(`Currently open: ${c.openNow ? "yes" : "no"}`);
     if (c.openingHoursText && c.openingHoursText.length > 0) {
       const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
@@ -276,8 +269,6 @@ RULES:
 - Prioritize DIVERSITY: mix of well-known and hidden gems, different neighborhoods if possible
 - The "whyExplanation" should feel like a friend's text, not a review. Be specific about WHY this place matches.
 - If a candidate is clearly a restaurant but they want nightlife, EXCLUDE it even if it has "bar" in its tags
-- Events from Ticketmaster are real upcoming events — prioritize them if they match the vibe
-
 Return ONLY valid JSON array, no markdown code fences.`;
 
   try {

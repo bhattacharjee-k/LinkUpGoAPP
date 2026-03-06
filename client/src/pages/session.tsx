@@ -1460,15 +1460,8 @@ export function Session() {
                      if (suggestion.reservationUrl) {
                        links.push({url: suggestion.reservationUrl, label: 'Reserve'});
                      }
-                     if (suggestion.ticketUrl) {
-                       links.push({url: suggestion.ticketUrl, label: 'Tickets'});
-                     }
-                     if (suggestion.eventUrl && links.length < 2) {
-                       links.push({url: suggestion.eventUrl, label: 'Events'});
-                     }
-                     if (suggestion.detailUrl && links.length < 2) {
-                       links.push({url: suggestion.detailUrl, label: 'Details'});
-                     }
+                     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(suggestion.name + ' ' + suggestion.city)}`;
+                     links.push({url: mapsUrl, label: 'Directions'});
                      
                      const displayLinks = links.slice(0, 2);
                      

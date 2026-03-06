@@ -120,7 +120,6 @@ interface PlannerContext {
   }[];
   suggestions: Suggestion[];
   recentMessages: Message[];
-  liveEvents?: { name: string; venue: string; date: string; ticketUrl: string }[];
   userFeedback?: Array<{
     rating: number;
     review: string | null;
@@ -131,7 +130,7 @@ interface PlannerContext {
 }
 
 function buildSystemPrompt(context: PlannerContext): string {
-  const { session, participants, suggestions, liveEvents, userFeedback } = context;
+  const { session, participants, suggestions, userFeedback } = context;
   const filters = session.filters as any;
   
   // Build detailed participant summary including discovery preferences
@@ -183,10 +182,6 @@ function buildSystemPrompt(context: PlannerContext): string {
     ? suggestions.map((s, i) => `${i + 1}. ${s.name} (${s.budget}, ${s.rating}★) - ${s.description.slice(0, 50)}...`).join('\n')
     : 'No suggestions generated yet.';
 
-  const eventsSummary = liveEvents && liveEvents.length > 0
-    ? liveEvents.map((e, i) => `${i + 1}. ${e.name} at ${e.venue} (${e.date}) - Tickets: ${e.ticketUrl}`).join('\n')
-    : 'No upcoming events found for this area.';
-  
   // Build user feedback history for AI memory
   const feedbackHistory = userFeedback && userFeedback.length > 0
     ? userFeedback.map(f => {
@@ -224,8 +219,6 @@ ${participantSummary || 'No participants yet.'}
 CURRENT SUGGESTIONS:
 ${suggestionSummary}
 
-LIVE CONCERTS & EVENTS (from Ticketmaster):
-${eventsSummary}
 ${feedbackHistory ? `
 USER'S PAST OUTING FEEDBACK (use this to personalize suggestions):
 ${feedbackHistory}
@@ -357,7 +350,7 @@ async function executeToolCall(
         favoriteNeighborhoods: context.user.favoriteNeighborhoods || undefined,
       }, undefined, undefined, groupPrefs);
       
-      const sourceMap: Record<string, string> = { 'Google': 'Web', 'Ticketmaster': 'Web' };
+      const sourceMap: Record<string, string> = { 'Google': 'Web' };
       const newSuggestions: Suggestion[] = [];
       
       for (const opt of result.options.slice(0, 8)) {
@@ -367,7 +360,7 @@ async function executeToolCall(
           name: opt.title,
           city,
           source: sourceMap[opt.source] || 'Web',
-          kind: opt.optionType === 'event' ? 'event' : 'venue',
+          kind: 'venue',
           rating: opt.rating || '4.5',
           turnout: '0/0',
           distance: opt.distance || '1.0 mi',
@@ -376,10 +369,6 @@ async function executeToolCall(
           tags: opt.tags || [],
           detailUrl: opt.detailUrl || null,
           reservationUrl: opt.reservationUrl || null,
-          ticketUrl: opt.ticketUrl || null,
-          eventUrl: opt.eventUrl || null,
-          venueName: opt.venueName || null,
-          startTime: opt.startTime || null,
           whyExplanation,
         });
         newSuggestions.push(suggestion);
@@ -464,10 +453,6 @@ async function executeToolCall(
         tags: args.tags || [],
         detailUrl: null,
         reservationUrl: null,
-        ticketUrl: null,
-        eventUrl: null,
-        venueName: null,
-        startTime: null,
         whyExplanation,
       });
       
@@ -648,25 +633,3 @@ export async function getPlannerResponse(
   }
 }
 
-export async function fetchLiveEvents(city: string, specificDate?: string): Promise<{ name: string; venue: string; date: string; ticketUrl: string }[]> {
-  try {
-    const result = await getSuggestions({
-      city,
-      categories: ['Live Music', 'Comedy', 'Club'],
-      specificDate,
-    });
-    
-    return result.options
-      .filter(opt => opt.optionType === 'event')
-      .slice(0, 10)
-      .map(opt => ({
-        name: opt.title,
-        venue: opt.venueName || 'TBA',
-        date: opt.startTime || 'Check website',
-        ticketUrl: opt.ticketUrl || opt.detailUrl || '',
-      }));
-  } catch (error) {
-    console.error('[Planner] Error fetching live events:', error);
-    return [];
-  }
-}

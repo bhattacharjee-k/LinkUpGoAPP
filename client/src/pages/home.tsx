@@ -120,11 +120,13 @@ export function Home() {
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary">
                             {session.status === 'voting' ? 'Voting' : 'Planning'}
                           </span>
-                          {session.name && <span className="text-xs text-muted-foreground">{session.name}</span>}
                         </div>
                         <h4 className="font-bold text-lg group-hover:text-primary transition-colors">
-                          {groups.find(g => g.id === session.groupId)?.name || 'Unknown Group'}
+                          {session.name || 'Untitled Plan'}
                         </h4>
+                        <p className="text-xs text-muted-foreground">
+                          {groups.find(g => g.id === session.groupId)?.name || 'Unknown Group'}
+                        </p>
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
                           {session.filters.category.join(', ')} • {session.filters.energy}
                         </p>

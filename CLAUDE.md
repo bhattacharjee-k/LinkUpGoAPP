@@ -52,7 +52,7 @@ No test runner or linter is configured.
 2. **State**: React Context for global state, TanStack Query for server state, WebSocket for real-time updates
 3. **Sessions lifecycle**: draft → voting → locked
 4. **AI pipeline**: User messages mentioning @Planner trigger OpenAI function calling → tool calls modify suggestions → SSE streams updates to client
-5. **Suggestion orchestration**: Context synthesis → parallel API queries (Google Places, Ticketmaster, Perplexity) → AI validation & ranking with personalized "why" explanations
+5. **Suggestion orchestration**: Context synthesis → parallel API queries (Google Places, Perplexity) → AI validation & ranking with personalized "why" explanations
 
 ### Database
 
@@ -62,7 +62,6 @@ Schema defined in `shared/schema.ts` using Drizzle ORM. Core tables: users, grou
 
 - **OpenAI** (via `AI_INTEGRATIONS_OPENAI_*` env vars) — planner and orchestrator
 - **Google Places** (`GOOGLE_PLACES_API_KEY`) — venue data
-- **Ticketmaster** (`TICKETMASTER_API_KEY`) — live events
 - **Perplexity** (`PERPLEXITY_API_KEY`) — web search for trending spots
 - **Resend** (`RESEND_API_KEY`) — optional email notifications
 

@@ -8,6 +8,13 @@
       "when": 1771567775873,
       "tag": "0000_powerful_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772830600483,
+      "tag": "0001_daffy_norman_osborn",
+      "breakpoints": true
     }
   ]
 }

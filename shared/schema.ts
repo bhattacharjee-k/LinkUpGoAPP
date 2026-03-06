@@ -26,6 +26,7 @@ export const users = pgTable("users", {
   lastKnownLng: text("last_known_lng"),
   lastLocationTimestamp: timestamp("last_location_timestamp"),
   locationPermission: text("location_permission").default('pending'), // 'pending' | 'granted' | 'denied'
+  transportationMode: text("transportation_mode").default('car'), // 'car' | 'walk' | 'transit'
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
