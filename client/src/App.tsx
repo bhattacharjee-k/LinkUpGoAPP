@@ -183,8 +183,12 @@ function Router() {
         <PrivateRoute component={NewPlan} />
       </Route>
 
-      <Route path="/session/:id/complete" component={SessionComplete} />
-      <Route path="/session/:id" component={Session} />
+      <Route path="/session/:id/complete">
+        <PrivateRoute component={SessionComplete} />
+      </Route>
+      <Route path="/session/:id">
+        <PrivateRoute component={Session} />
+      </Route>
       
       <Route path="/" component={user ? Home : Onboarding} />
       

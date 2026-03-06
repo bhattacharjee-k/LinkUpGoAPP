@@ -104,6 +104,18 @@
 - [x] Pass `maxWidenAttempts: 4` from join handlers
 - [x] Fall back to Bug 1 error state if still empty after max attempts
 
+### Session Refresh Error Fix
+- [x] Wrap `/session/:id` and `/session/:id/complete` routes in `<PrivateRoute>` in `App.tsx`
+- [x] Fix React hooks order violation in `session.tsx` — move `useEffect` before early return
+
+### Test Suite Setup
+- [x] Install Vitest, @testing-library/react, @testing-library/jest-dom, jsdom, supertest
+- [x] Create `vitest.config.ts` with path aliases
+- [x] Add `npm run test` and `npm run test:watch` scripts
+- [x] Shared tests: `ranking.test.ts` (15 tests), `api-schemas.test.ts` (37 tests), `constants.test.ts` (5 tests)
+- [x] Server tests: `cache.test.ts` (11 tests), `error-handler.test.ts` (12 tests), `auth-middleware.test.ts` (15 tests)
+- [x] All 95 tests passing
+
 ### Verification
 - [x] Cloud Run URL `/api/auth/me` returns 401
 - [x] Cloud Run URL `/` loads React app

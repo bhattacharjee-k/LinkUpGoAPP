@@ -182,12 +182,19 @@ export function Session() {
     }
   }, [session?.id, session?.status]);
 
+  // Redirect to complete page when session is locked
+  useEffect(() => {
+    if (session?.status === 'locked' && !sessionLoading) {
+      setLocation(`/session/${session.id}/complete`);
+    }
+  }, [session?.status, sessionLoading]);
+
   const handleSubmitFeedback = async () => {
     if (!session?.id || feedbackForm.rating === 0) return;
-    
+
     setIsSubmittingFeedback(true);
     try {
-      const winningSuggestion = session.winningOptionId 
+      const winningSuggestion = session.winningOptionId
         ? session.suggestions?.find(s => s.id === session.winningOptionId)
         : session.suggestions?.[0];
       await api.feedback.submit(session.id, {
@@ -234,12 +241,6 @@ export function Session() {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (session?.status === 'locked' && !sessionLoading) {
-      setLocation(`/session/${session.id}/complete`);
-    }
-  }, [session?.status, sessionLoading]);
 
   const group = groups.find(g => g.id === session.groupId);
   const allParticipants = session.participants || [];

@@ -10,10 +10,19 @@ npm run dev:client       # Start Vite client only on port 5003
 npm run build            # Production build (runs script/build.ts → dist/)
 npm run start            # Run production build (node dist/index.cjs)
 npm run check            # TypeScript type-check (tsc --noEmit)
+npm run test             # Run all tests (vitest)
+npm run test:watch       # Run tests in watch mode
 npm run db:push          # Push Drizzle schema changes to PostgreSQL
 ```
 
-No test runner or linter is configured.
+### Testing
+
+Tests use **Vitest** with config in `vitest.config.ts`. Test files are in `tests/` directory:
+- `tests/shared/` — Shared module tests (ranking, API schemas, constants)
+- `tests/server/` — Server tests (cache, error handler, auth middleware)
+- `tests/client/` — Client component tests (uses jsdom environment)
+
+No linter is configured.
 
 ## Architecture
 
