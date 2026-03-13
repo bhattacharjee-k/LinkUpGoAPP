@@ -572,17 +572,20 @@ export function Onboarding() {
           </div>
         )}
 
-        <Button 
-          onClick={isLoginMode ? handleLogin : handleNext} 
+        <Button
+          onClick={isLoginMode ? handleLogin : handleNext}
           data-testid="button-next"
           className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/20"
           disabled={(step === 1 && !isStep1Valid) || (step === 2 && !isStep2Valid) || isLoading}
         >
-          {isLoading ? (isLoginMode ? 'Signing in...' : 'Creating account...') : 
+          {isLoading ? (isLoginMode ? 'Signing in...' : 'Creating account...') :
            isLoginMode ? "Sign In" :
-           step === 6 ? "Complete Profile" : "Next"} 
+           step === 6 ? "Complete Profile" : "Next"}
           {!isLoading && <ChevronRight className="ml-2" />}
         </Button>
+
+        {/* Spacer for fixed banner ad */}
+        <div className="h-16" />
       </motion.div>
 
       {/* Banner ad at bottom */}
