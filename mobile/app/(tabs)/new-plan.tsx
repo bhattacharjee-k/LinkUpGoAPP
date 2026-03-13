@@ -106,7 +106,7 @@ export default function NewPlanScreen() {
         {/* Banner ad during loading */}
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 }}>
           <BannerAd
-            unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy'}
+            unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : 'ca-app-pub-7221066669944864/7069868704'}
             size={BannerAdSize.MEDIUM_RECTANGLE}
             onAdFailedToLoad={() => {}}
           />

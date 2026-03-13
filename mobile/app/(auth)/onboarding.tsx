@@ -502,7 +502,7 @@ export default function Onboarding() {
       {/* Banner ad at bottom */}
       <View style={{ alignItems: 'center', paddingBottom: 4 }}>
         <BannerAd
-          unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy'}
+          unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : 'ca-app-pub-7221066669944864/7069868704'}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
           onAdFailedToLoad={() => {}}
         />

@@ -327,7 +327,7 @@ export default function HomeScreen() {
       {/* Banner ad at bottom */}
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center', paddingBottom: 4 }}>
         <BannerAd
-          unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy'}
+          unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : 'ca-app-pub-7221066669944864/7069868704'}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
           onAdFailedToLoad={() => {}}
         />
