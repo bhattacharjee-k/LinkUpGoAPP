@@ -1,5 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
@@ -8,10 +9,26 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import * as SplashScreen from 'expo-splash-screen';
+import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
+import mobileAds from 'react-native-google-mobile-ads';
 import { AppProvider, useApp } from '../src/lib/context';
 import { theme, colors } from '../src/theme';
+import { preloadAd } from '../src/lib/ads';
 
 SplashScreen.preventAutoHideAsync();
+
+// Initialize ads: request ATT on iOS, then initialize AdMob and preload
+async function initializeAds() {
+  try {
+    if (Platform.OS === 'ios') {
+      await requestTrackingPermissionsAsync();
+    }
+    await mobileAds().initialize();
+    preloadAd();
+  } catch (e) {
+    console.warn('[Ads] Initialization failed:', e);
+  }
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +45,7 @@ function RootNavigator() {
   useEffect(() => {
     if (!isLoading) {
       SplashScreen.hideAsync();
+      initializeAds();
     }
   }, [isLoading]);
 

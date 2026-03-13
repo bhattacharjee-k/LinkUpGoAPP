@@ -9,6 +9,7 @@ import { Plus, MapPin, ArrowRight, Lock, Copy, Check, Clock, Bell } from 'lucide
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import { useApp } from '../../src/lib/context';
 import { colors } from '../../src/theme';
 
@@ -322,6 +323,15 @@ export default function HomeScreen() {
           )}
         </BottomSheetView>
       </BottomSheet>
+
+      {/* Banner ad at bottom */}
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center', paddingBottom: 4 }}>
+        <BannerAd
+          unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy'}
+          size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+          onAdFailedToLoad={() => {}}
+        />
+      </View>
     </SafeAreaView>
   );
 }

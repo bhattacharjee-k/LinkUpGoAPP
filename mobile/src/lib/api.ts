@@ -225,54 +225,68 @@ export function fetchSSE(
   onData: (data: any) => void
 ): Promise<void> {
   return new Promise(async (resolve, reject) => {
-    const token = await getAccessToken();
-    const xhr = new XMLHttpRequest();
-    let lastIndex = 0;
+    let token = await getAccessToken();
 
-    xhr.open('POST', `${API_URL}${url}`);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('Accept', 'text/event-stream');
-    if (token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    }
+    const doRequest = (authToken: string | null) => {
+      const xhr = new XMLHttpRequest();
+      let lastIndex = 0;
 
-    xhr.onprogress = () => {
-      const newText = xhr.responseText.substring(lastIndex);
-      lastIndex = xhr.responseText.length;
+      xhr.open('POST', `${API_URL}${url}`);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Accept', 'text/event-stream');
+      if (authToken) {
+        xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+      }
 
-      const lines = newText.split('\n');
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
+      xhr.onprogress = () => {
+        const newText = xhr.responseText.substring(lastIndex);
+        lastIndex = xhr.responseText.length;
+
+        const lines = newText.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.error) {
+                reject(new Error(data.error));
+                xhr.abort();
+                return;
+              }
+              onData(data);
+            } catch {}
+          }
+        }
+      };
+
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else if (xhr.status === 401 && authToken) {
+          // Token expired — try refreshing and retry once
+          const refreshed = await refreshAccessToken();
+          if (refreshed) {
+            const newToken = await getAccessToken();
+            doRequest(newToken);
+          } else {
+            reject(new Error('Authentication expired'));
+          }
+        } else {
           try {
-            const data = JSON.parse(line.slice(6));
-            if (data.error) {
-              reject(new Error(data.error));
-              xhr.abort();
-              return;
-            }
-            onData(data);
-          } catch {}
+            const error = JSON.parse(xhr.responseText);
+            reject(new Error(error.message || `Request failed (${xhr.status})`));
+          } catch {
+            reject(new Error(`Request failed (${xhr.status})`));
+          }
         }
-      }
+      };
+
+      xhr.onerror = () => reject(new Error('SSE connection failed'));
+      xhr.ontimeout = () => reject(new Error('SSE request timed out'));
+      xhr.timeout = 120000;
+
+      xhr.send(JSON.stringify(body));
     };
 
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve();
-      } else {
-        try {
-          const error = JSON.parse(xhr.responseText);
-          reject(new Error(error.message || `Request failed (${xhr.status})`));
-        } catch {
-          reject(new Error(`Request failed (${xhr.status})`));
-        }
-      }
-    };
-
-    xhr.onerror = () => reject(new Error('SSE connection failed'));
-    xhr.ontimeout = () => reject(new Error('SSE request timed out'));
-    xhr.timeout = 120000;
-
-    xhr.send(JSON.stringify(body));
+    doRequest(token);
   });
 }

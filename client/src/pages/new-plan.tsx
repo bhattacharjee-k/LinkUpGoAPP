@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '@/lib/context';
 import { api } from '@/lib/api';
+import { AdInline } from '@/components/ad-inline';
 import { useLocation, useSearch } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -155,7 +156,7 @@ export function NewPlan() {
       }));
 
       const id = await startSession(groupId, {
-        timeWindow, 
+        timeWindow,
         locationScope: formData.locationScope,
         neighborhood: formData.neighborhood || undefined,
         category: formData.categories.length > 0 ? formData.categories : ['Drinks'],
@@ -259,61 +260,49 @@ export function NewPlan() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center px-8"
+            className="fixed inset-0 z-50 bg-background flex flex-col px-8"
           >
             <div className="absolute top-[20%] left-[-10%] w-72 h-72 bg-primary/15 rounded-full blur-[120px]" />
             <div className="absolute bottom-[20%] right-[-10%] w-64 h-64 bg-purple-500/10 rounded-full blur-[100px]" />
 
+            {/* Top section: searching message */}
             <motion.div
-              className="relative z-10 flex flex-col items-center text-center space-y-8"
+              className="relative z-10 flex flex-col items-center text-center pt-16 space-y-4"
             >
-              <div className="relative">
+              <div className="flex items-center gap-3">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                  className="w-20 h-20 rounded-full border-2 border-primary/30 border-t-primary"
+                  className="w-10 h-10 rounded-full border-2 border-primary/30 border-t-primary"
                 />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <motion.div
+                <div className="text-left">
+                  <h2 className="text-lg font-bold text-white">Searching your right vibe</h2>
+                  <motion.p
                     key={loadingStep}
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="text-muted-foreground text-xs"
                   >
-                    {React.createElement(LOADING_MESSAGES[loadingStep].icon, {
-                      size: 28,
-                      className: "text-primary"
-                    })}
-                  </motion.div>
+                    {LOADING_MESSAGES[loadingStep].text}
+                  </motion.p>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <h2 className="text-xl font-bold text-white">Finding your perfect plan</h2>
-                <motion.p
-                  key={loadingStep}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.4 }}
-                  className="text-muted-foreground text-sm"
-                >
-                  {LOADING_MESSAGES[loadingStep].text}
-                </motion.p>
-              </div>
-
-              <div className="flex gap-2 mt-4">
+              <div className="flex gap-2 mt-2">
                 {LOADING_MESSAGES.map((_, i) => (
                   <div
                     key={i}
                     className={cn(
-                      "w-2 h-2 rounded-full transition-all duration-300",
-                      i === loadingStep ? "bg-primary w-6" : "bg-white/20"
+                      "w-1.5 h-1.5 rounded-full transition-all duration-300",
+                      i === loadingStep ? "bg-primary w-5" : "bg-white/20"
                     )}
                   />
                 ))}
               </div>
+
+              {/* Inline ad during loading */}
+              <AdInline />
             </motion.div>
           </motion.div>
         )}

@@ -1,10 +1,56 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, FlatList, TextInput, Pressable,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Animated,
 } from 'react-native';
 import { Send } from 'lucide-react-native';
 import { colors } from '../../theme';
+
+function TypingIndicator() {
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dot3 = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animate = (dot: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+        ])
+      );
+    const a1 = animate(dot1, 0);
+    const a2 = animate(dot2, 200);
+    const a3 = animate(dot3, 400);
+    a1.start(); a2.start(); a3.start();
+    return () => { a1.stop(); a2.stop(); a3.stop(); };
+  }, []);
+
+  return (
+    <View style={{ alignSelf: 'flex-start', maxWidth: '80%', marginVertical: 4 }}>
+      <Text style={{ color: colors.primary, fontSize: 12, marginBottom: 2, fontWeight: '500' }}>
+        @Planner
+      </Text>
+      <View style={{
+        backgroundColor: 'rgba(99,102,241,0.12)',
+        borderRadius: 16, borderBottomLeftRadius: 4,
+        padding: 12, flexDirection: 'row', gap: 4, alignItems: 'center',
+      }}>
+        {[dot1, dot2, dot3].map((dot, i) => (
+          <Animated.View
+            key={i}
+            style={{
+              width: 8, height: 8, borderRadius: 4,
+              backgroundColor: colors.primary,
+              opacity: dot,
+            }}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
 
 interface Message {
   id: string;
@@ -20,9 +66,10 @@ interface Props {
   onSendMessage: (text: string) => void;
   onSendPlannerMessage: (text: string) => void;
   plannerStreaming?: string;
+  plannerThinking?: boolean;
 }
 
-export function ChatPanel({ messages, userId, onSendMessage, onSendPlannerMessage, plannerStreaming }: Props) {
+export function ChatPanel({ messages, userId, onSendMessage, onSendPlannerMessage, plannerStreaming, plannerThinking }: Props) {
   const [text, setText] = useState('');
   const flatListRef = useRef<FlatList>(null);
 
@@ -32,12 +79,18 @@ export function ChatPanel({ messages, userId, onSendMessage, onSendPlannerMessag
     }
   }, [messages.length, plannerStreaming]);
 
+  // Auto-route to planner if the last non-system message was from planner-ai
+  const lastNonSystemMsg = [...messages].reverse().find(m => m.sender !== 'system');
+  const plannerActive = lastNonSystemMsg?.sender === 'planner-ai' || !!plannerStreaming;
+
   const handleSend = () => {
     if (!text.trim()) return;
     const msg = text.trim();
     setText('');
 
-    if (msg.toLowerCase().includes('@planner') || msg.toLowerCase().startsWith('planner ')) {
+    const explicitPlanner = msg.toLowerCase().includes('@planner') || msg.toLowerCase().startsWith('planner ');
+
+    if (explicitPlanner || plannerActive) {
       onSendPlannerMessage(msg);
     } else {
       onSendMessage(msg);
@@ -103,6 +156,7 @@ export function ChatPanel({ messages, userId, onSendMessage, onSendPlannerMessag
         renderItem={renderMessage}
         contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        ListFooterComponent={plannerThinking && !plannerStreaming ? <TypingIndicator /> : null}
       />
 
       <View style={{
@@ -114,7 +168,7 @@ export function ChatPanel({ messages, userId, onSendMessage, onSendPlannerMessag
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder="Message or @Planner..."
+          placeholder={plannerActive ? "Reply to @Planner..." : "Message or @Planner..."}
           placeholderTextColor={colors.textMuted}
           style={{
             flex: 1,

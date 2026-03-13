@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '@/lib/context';
+import { AdBanner } from '@/components/ad-banner';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -583,6 +584,13 @@ export function Onboarding() {
           {!isLoading && <ChevronRight className="ml-2" />}
         </Button>
       </motion.div>
+
+      {/* Banner ad at bottom */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-safe">
+        <div className="max-w-md w-full">
+          <AdBanner />
+        </div>
+      </div>
     </div>
   );
 }

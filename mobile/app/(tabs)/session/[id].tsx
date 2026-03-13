@@ -140,11 +140,16 @@ export default function SessionScreen() {
     await addMessage(session.id, text);
   };
 
+  const [plannerThinking, setPlannerThinking] = useState(false);
+
   const handleSendPlannerMessage = async (text: string) => {
+    setPlannerThinking(true);
     setPlannerStreaming('');
     const { suggestionsUpdated } = await sendPlannerMessage(session.id, text, (chunk) => {
+      setPlannerThinking(false);
       setPlannerStreaming(prev => prev + chunk);
     });
+    setPlannerThinking(false);
     setPlannerStreaming('');
     if (suggestionsUpdated) {
       Toast.show({ type: 'success', text1: 'Suggestions updated by @Planner' });
@@ -248,6 +253,7 @@ export default function SessionScreen() {
           onSendMessage={handleSendMessage}
           onSendPlannerMessage={handleSendPlannerMessage}
           plannerStreaming={plannerStreaming}
+          plannerThinking={plannerThinking}
         />
       )}
 

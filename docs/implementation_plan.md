@@ -116,6 +116,20 @@
 - [x] Server tests: `cache.test.ts` (11 tests), `error-handler.test.ts` (12 tests), `auth-middleware.test.ts` (15 tests)
 - [x] All 95 tests passing
 
+### Google Ads Integration
+- [x] Create web ads utility (`client/src/lib/ads.ts`) — AdSense interstitial with frequency cap (5 min)
+- [x] Initialize ads on app boot (`client/src/main.tsx`)
+- [x] Web: Interstitial during plan creation loading (`new-plan.tsx`) — runs in parallel with session creation
+- [x] Web: Interstitial after feedback submission (`session-complete.tsx`)
+- [x] Mobile: Rewrite ads library (`mobile/src/lib/ads.ts`) with `react-native-google-mobile-ads`
+- [x] Mobile: Interstitial after feedback submission (`session-complete/[id].tsx`)
+- [x] Mobile: ATT permission request + AdMob initialization in `_layout.tsx`
+- [x] Mobile: Add `react-native-google-mobile-ads` plugin to `app.json`
+- [x] Add `VITE_ADSENSE_CLIENT` and `VITE_ADSENSE_INTERSTITIAL_SLOT` to `.env.example`
+- [ ] Replace placeholder ad unit IDs with real ones from AdSense/AdMob dashboards
+- [ ] Test ads with test IDs in development
+- [ ] Verify frequency cap works across screens
+
 ### Verification
 - [x] Cloud Run URL `/api/auth/me` returns 401
 - [x] Cloud Run URL `/` loads React app

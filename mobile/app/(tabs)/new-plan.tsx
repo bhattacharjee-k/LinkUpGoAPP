@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 import { useApp } from '../../src/lib/context';
 import { api } from '../../src/lib/api';
-import { showInterstitialDuringLoad } from '../../src/lib/ads';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import { colors } from '../../src/theme';
 import { Budget, Energy, Category, BUDGETS, ENERGIES, CATEGORIES, NEIGHBORHOODS, type City } from '../../src/lib/store';
 
@@ -70,8 +70,7 @@ export default function NewPlanScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      // Start both session creation and ad preload in parallel
-      const sessionPromise = startSession(selectedGroupId, {
+      const sessionId = await startSession(selectedGroupId, {
         ...formData,
         category: formData.categories,
         specificDate: formData.date.toISOString().split('T')[0],
@@ -79,12 +78,6 @@ export default function NewPlanScreen() {
         timeWindow: `${formData.timeStart}-${formData.timeEnd}`,
       }, formData.name);
 
-      // Show interstitial ad during loading (with timeout + graceful fallback)
-      const adPromise = showInterstitialDuringLoad().catch(() => {});
-
-      // Wait for ad to finish, then navigate when session is ready
-      await adPromise;
-      const sessionId = await sessionPromise;
       router.replace(`/session/${sessionId}`);
     } catch (err: any) {
       Toast.show({ type: 'error', text1: 'Failed to create plan', text2: err.message });
@@ -96,14 +89,28 @@ export default function NewPlanScreen() {
   if (isCreating) {
     const CurrentIcon = LOADING_MESSAGES[loadingStep].icon;
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <Animated.View key={loadingStep} entering={FadeIn.duration(400)} style={{ alignItems: 'center' }}>
-          <CurrentIcon size={48} color={colors.primary} />
-          <Text style={{ color: colors.text, fontSize: 18, fontWeight: '600', marginTop: 20, textAlign: 'center' }}>
-            {LOADING_MESSAGES[loadingStep].text}
-          </Text>
-        </Animated.View>
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 32 }} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        {/* Top: searching message */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, paddingTop: 32, gap: 12 }}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.text, fontSize: 17, fontWeight: '700' }}>Searching your right vibe</Text>
+            <Animated.View key={loadingStep} entering={FadeIn.duration(400)}>
+              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}>
+                {LOADING_MESSAGES[loadingStep].text}
+              </Text>
+            </Animated.View>
+          </View>
+        </View>
+
+        {/* Banner ad during loading */}
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 }}>
+          <BannerAd
+            unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : 'ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy'}
+            size={BannerAdSize.MEDIUM_RECTANGLE}
+            onAdFailedToLoad={() => {}}
+          />
+        </View>
       </SafeAreaView>
     );
   }

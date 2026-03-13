@@ -275,14 +275,19 @@ export function Session() {
   };
   const isLocked = session.status === 'locked';
 
+  // Auto-route to planner if last non-system message was from planner-ai
+  const allChatMessages = [...(session.messages || []), ...realtimeMessages];
+  const lastNonSystemMsg = [...allChatMessages].reverse().find(m => m.sender !== 'system');
+  const plannerActive = lastNonSystemMsg?.sender === 'planner-ai' || isStreaming;
+
   const handleSend = async () => {
     if (!input.trim()) return;
     const messageText = input;
     setInput('');
-    
-    // Check if this is a planner message (case-insensitive, handles @planner, @Planner, planner, etc.)
-    const isPlannerMessage = messageText.toLowerCase().includes('@planner') || messageText.toLowerCase().startsWith('planner ');
-    
+
+    // Check if this is a planner message — explicit @planner mention OR active planner conversation
+    const isPlannerMessage = messageText.toLowerCase().includes('@planner') || messageText.toLowerCase().startsWith('planner ') || plannerActive;
+
     if (isPlannerMessage) {
       // Start streaming response
       setIsStreaming(true);
@@ -1672,7 +1677,7 @@ export function Session() {
             <div ref={chatInputRef} className="p-4 bg-background/95 backdrop-blur-md border-t border-white/10 flex gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <div className="relative flex-1">
                 <Input 
-                  placeholder="Discuss or ask @Planner..." 
+                  placeholder={plannerActive ? "Reply to @Planner..." : "Discuss or ask @Planner..."} 
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}

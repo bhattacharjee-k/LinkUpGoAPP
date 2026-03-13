@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/lib/context';
 import { Layout } from '@/components/layout';
+import { AdBanner } from '@/components/ad-banner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Plus, MapPin, ArrowRight, Lock, Shield, Copy, Check, Unlock, Clock } from 'lucide-react';
@@ -376,6 +377,13 @@ export function Home() {
           })()}
         </SheetContent>
       </Sheet>
+
+      {/* Banner ad at bottom */}
+      <div className="fixed bottom-16 left-0 right-0 z-40 flex justify-center">
+        <div className="max-w-md w-full">
+          <AdBanner />
+        </div>
+      </div>
     </Layout>
   );
 }
