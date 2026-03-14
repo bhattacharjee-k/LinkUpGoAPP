@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, Pressable, RefreshControl, Share, Alert,
+  View, Text, FlatList, Pressable, RefreshControl, Share, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Redirect } from 'expo-router';
 import { Button, Badge, Avatar } from 'react-native-paper';
-import { Plus, MapPin, ArrowRight, Lock, Copy, Check, Clock, Bell } from 'lucide-react-native';
+import { BannerAdSize } from 'react-native-google-mobile-ads';
+import { Plus, MapPin, ArrowRight, Lock, Copy, Check, Clock, Bell, Hourglass } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
@@ -14,7 +15,7 @@ import { useApp } from '../../src/lib/context';
 import { colors } from '../../src/theme';
 
 export default function HomeScreen() {
-  const { user, sessions, groups, isAdmin } = useApp();
+  const { user, sessions, groups, isAdmin, dataLoading } = useApp();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const { refreshGroups, refreshSessions } = useApp();
@@ -29,6 +30,23 @@ export default function HomeScreen() {
   }, []);
 
   if (!user) return <Redirect href="/(auth)/onboarding" />;
+
+  if (dataLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <View style={{ alignItems: 'center', marginBottom: 40 }}>
+          <Hourglass size={48} color={colors.primary} style={{ marginBottom: 16 }} />
+          <Text style={{ color: colors.text, fontSize: 20, fontWeight: '600', marginBottom: 8 }}>
+            Fetching your plans and teams...
+          </Text>
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
+        </View>
+        <View style={{ width: '100%', alignItems: 'center' }}>
+          <SafeBannerAd size={BannerAdSize.MEDIUM_RECTANGLE} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const activeSessions = sessions.filter(s => s.status !== 'locked');
   const pastSessions = sessions.filter(s => s.status === 'locked');

@@ -89,6 +89,7 @@ interface AppContextType {
   groups: Group[];
   sessions: PlanningSession[];
   isLoading: boolean;
+  dataLoading: boolean;
   setUser: (user: UserProfile) => void;
   register: (data: any) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
@@ -215,6 +216,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [groups, setGroups] = useState<Group[]>([]);
   const [sessions, setSessions] = useState<PlanningSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
 
   // Load initial data on mount
   useEffect(() => {
@@ -275,25 +277,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const result = await api.auth.register(data);
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
+    setUserState(result.user);
+    setDataLoading(true);
     try {
       await Promise.all([loadGroups(), loadSessions()]);
     } catch (e) {
       console.error('Failed to load data after register:', e);
+    } finally {
+      setDataLoading(false);
     }
-    setUserState(result.user);
   };
 
   const login = async (username: string, password: string) => {
     const result = await api.auth.login(username, password);
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
+    setUserState(result.user);
+    setDataLoading(true);
     try {
       await Promise.all([loadGroups(), loadSessions()]);
     } catch (e) {
       console.error('Failed to load data after login:', e);
-      Toast.show({ type: 'error', text1: 'Failed to load your data', text2: 'Pull to refresh on home screen' });
+      // Retry once
+      try {
+        await Promise.all([loadGroups(), loadSessions()]);
+      } catch {
+        console.error('Retry also failed');
+      }
+    } finally {
+      setDataLoading(false);
     }
-    setUserState(result.user);
   };
 
   const logout = async () => {
@@ -511,7 +524,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshSessions = loadSessions;
 
   const value: AppContextType = {
-    user, groups, sessions, isLoading,
+    user, groups, sessions, isLoading, dataLoading,
     setUser, register, login, logout,
     updateUserProfile, updateUserLocation,
     createGroup, startSession,
