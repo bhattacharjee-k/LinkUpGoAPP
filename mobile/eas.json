@@ -40,6 +40,13 @@
     }
   },
   "submit": {
+    "preview": {
+      "ios": {
+        "appleId": "kishorebh@yahoo.com",
+        "appleTeamId": "M6JJ36MP74",
+        "companyName": "CYDEXT LLC"
+      }
+    },
     "production": {
       "ios": {
         "appleId": "kishorebh@yahoo.com",

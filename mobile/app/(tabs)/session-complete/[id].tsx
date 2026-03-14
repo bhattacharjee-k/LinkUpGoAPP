@@ -30,7 +30,7 @@ const FEEDBACK_TAG_LABELS: Record<string, string> = {
 export default function SessionCompleteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getSession, refreshSession } = useApp();
+  const { user, getSession, refreshSession } = useApp();
 
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState('');
@@ -50,12 +50,17 @@ export default function SessionCompleteScreen() {
 
   const loadFeedback = async () => {
     try {
-      const fb = await api.feedback.get(id!);
-      if (fb) {
-        setExistingFeedback(fb);
-        setRating(fb.rating);
-        setReview(fb.review || '');
-        setSelectedTags(fb.tags || []);
+      const result = await api.feedback.get(id!);
+      if (result?.hasSubmitted && result.feedback) {
+        const userFb = Array.isArray(result.feedback)
+          ? result.feedback.find((f: any) => f.userId === user?.id)
+          : result.feedback;
+        if (userFb) {
+          setExistingFeedback(userFb);
+          setRating(userFb.rating);
+          setReview(userFb.review || '');
+          setSelectedTags(userFb.tags || []);
+        }
       }
     } catch {}
   };
