@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TextInput, Button, Chip } from 'react-native-paper';
 import { ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react-native';
 import Animated, { FadeIn, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+import { SafeBannerAd } from '../../src/components/SafeBannerAd';
 import { Redirect } from 'expo-router';
 import { useApp } from '../../src/lib/context';
 import { api } from '../../src/lib/api';
@@ -501,11 +501,7 @@ export default function Onboarding() {
 
       {/* Banner ad at bottom */}
       <View style={{ alignItems: 'center', paddingBottom: 4 }}>
-        <BannerAd
-          unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : 'ca-app-pub-7221066669944864/7069868704'}
-          size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-          onAdFailedToLoad={() => {}}
-        />
+        <SafeBannerAd />
       </View>
     </SafeAreaView>
   );

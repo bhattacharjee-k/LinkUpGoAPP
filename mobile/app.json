@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.linkupgo.app",
-      "buildNumber": "1",
+      "buildNumber": "4",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "LinkUpGo uses your location to find nearby venues and events.",
         "NSUserTrackingUsageDescription": "This allows us to show you relevant ads.",

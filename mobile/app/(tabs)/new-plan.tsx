@@ -13,7 +13,8 @@ import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 import { useApp } from '../../src/lib/context';
 import { api } from '../../src/lib/api';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+import { BannerAdSize } from 'react-native-google-mobile-ads';
+import { SafeBannerAd } from '../../src/components/SafeBannerAd';
 import { colors } from '../../src/theme';
 import { Budget, Energy, Category, BUDGETS, ENERGIES, CATEGORIES, NEIGHBORHOODS, type City } from '../../src/lib/store';
 
@@ -105,11 +106,7 @@ export default function NewPlanScreen() {
 
         {/* Banner ad during loading */}
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 }}>
-          <BannerAd
-            unitId={__DEV__ ? TestIds.ADAPTIVE_BANNER : 'ca-app-pub-7221066669944864/7069868704'}
-            size={BannerAdSize.MEDIUM_RECTANGLE}
-            onAdFailedToLoad={() => {}}
-          />
+          <SafeBannerAd size={BannerAdSize.MEDIUM_RECTANGLE} />
         </View>
       </SafeAreaView>
     );
