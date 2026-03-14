@@ -136,7 +136,7 @@ export default function ProfileScreen() {
               })) : undefined}
               disabled={!isEditing}
               style={{ backgroundColor: (isEditing ? editData.budget.includes(b) : user.budget.includes(b)) ? colors.primary : colors.surface }}
-              textStyle={{ color: colors.text }}
+              textStyle={{ color: (isEditing ? editData.budget.includes(b) : user.budget.includes(b)) ? colors.primaryForeground : colors.text }}
             >
               {b}
             </Chip>
@@ -153,7 +153,7 @@ export default function ProfileScreen() {
               onPress={isEditing ? () => setEditData(prev => ({ ...prev, energy: e })) : undefined}
               disabled={!isEditing}
               style={{ backgroundColor: (isEditing ? editData.energy === e : user.energy === e) ? colors.primary : colors.surface }}
-              textStyle={{ color: colors.text }}
+              textStyle={{ color: (isEditing ? editData.energy === e : user.energy === e) ? colors.primaryForeground : colors.text }}
             >
               {e}
             </Chip>
@@ -172,7 +172,7 @@ export default function ProfileScreen() {
               style={{
                 backgroundColor: (isEditing ? editData.categories.includes(cat) : user.categories.includes(cat)) ? colors.primary : colors.surface,
               }}
-              textStyle={{ color: colors.text, fontSize: 13 }}
+              textStyle={{ color: (isEditing ? editData.categories.includes(cat) : user.categories.includes(cat)) ? colors.primaryForeground : colors.text, fontSize: 13 }}
             >
               {cat}
             </Chip>

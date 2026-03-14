@@ -343,7 +343,7 @@ export default function Onboarding() {
                         budget: p.budget.includes(b) ? p.budget.filter(x => x !== b) : [...p.budget, b],
                       }))}
                       style={{ backgroundColor: formData.budget.includes(b) ? colors.primary : colors.surface }}
-                      textStyle={{ color: colors.text }}
+                      textStyle={{ color: formData.budget.includes(b) ? colors.primaryForeground : colors.text }}
                     >
                       {b}
                     </Chip>
@@ -358,7 +358,7 @@ export default function Onboarding() {
                       selected={formData.energy === e}
                       onPress={() => setFormData(p => ({ ...p, energy: e }))}
                       style={{ backgroundColor: formData.energy === e ? colors.primary : colors.surface }}
-                      textStyle={{ color: colors.text }}
+                      textStyle={{ color: formData.energy === e ? colors.primaryForeground : colors.text }}
                     >
                       {e}
                     </Chip>
@@ -382,7 +382,7 @@ export default function Onboarding() {
                       selected={formData.categories.includes(cat)}
                       onPress={() => toggleCategory(cat)}
                       style={{ backgroundColor: formData.categories.includes(cat) ? colors.primary : colors.surface }}
-                      textStyle={{ color: colors.text }}
+                      textStyle={{ color: formData.categories.includes(cat) ? colors.primaryForeground : colors.text }}
                     >
                       {cat}
                     </Chip>
@@ -406,7 +406,7 @@ export default function Onboarding() {
                       selected={formData.hardNos.includes(no)}
                       onPress={() => toggleHardNo(no)}
                       style={{ backgroundColor: formData.hardNos.includes(no) ? colors.error : colors.surface }}
-                      textStyle={{ color: colors.text }}
+                      textStyle={{ color: formData.hardNos.includes(no) ? '#fff' : colors.text }}
                     >
                       {no}
                     </Chip>
@@ -421,7 +421,7 @@ export default function Onboarding() {
                       selected={formData.discoveryStyle === ds}
                       onPress={() => setFormData(p => ({ ...p, discoveryStyle: ds }))}
                       style={{ backgroundColor: formData.discoveryStyle === ds ? colors.primary : colors.surface }}
-                      textStyle={{ color: colors.text }}
+                      textStyle={{ color: formData.discoveryStyle === ds ? colors.primaryForeground : colors.text }}
                     >
                       {ds === 'hidden_gems' ? 'Hidden Gems' : ds === 'popular' ? 'Popular Spots' : 'Mix of Both'}
                     </Chip>
@@ -436,7 +436,7 @@ export default function Onboarding() {
                       selected={formData.crowdPreference === cp}
                       onPress={() => setFormData(p => ({ ...p, crowdPreference: cp }))}
                       style={{ backgroundColor: formData.crowdPreference === cp ? colors.primary : colors.surface }}
-                      textStyle={{ color: colors.text }}
+                      textStyle={{ color: formData.crowdPreference === cp ? colors.primaryForeground : colors.text }}
                     >
                       {cp === 'quiet' ? 'Quiet' : cp === 'buzzing' ? 'Buzzing' : 'No Preference'}
                     </Chip>
@@ -460,7 +460,7 @@ export default function Onboarding() {
                       selected={formData.favoriteNeighborhoods.includes(n)}
                       onPress={() => toggleNeighborhood(n)}
                       style={{ backgroundColor: formData.favoriteNeighborhoods.includes(n) ? colors.primary : colors.surface }}
-                      textStyle={{ color: colors.text }}
+                      textStyle={{ color: formData.favoriteNeighborhoods.includes(n) ? colors.primaryForeground : colors.text }}
                     >
                       {n}
                     </Chip>

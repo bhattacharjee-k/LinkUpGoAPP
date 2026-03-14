@@ -275,7 +275,7 @@ export default function NewPlanScreen() {
                         borderColor: formData.locationScope === city ? colors.primary : colors.border,
                       }}
                     >
-                      <Text style={{ color: colors.text, fontSize: 15, fontWeight: '500' }}>{city}</Text>
+                      <Text style={{ color: formData.locationScope === city ? colors.primaryForeground : colors.text, fontSize: 15, fontWeight: '500' }}>{city}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -292,7 +292,7 @@ export default function NewPlanScreen() {
                             selected={formData.neighborhood === n}
                             onPress={() => setFormData(p => ({ ...p, neighborhood: p.neighborhood === n ? '' : n }))}
                             style={{ backgroundColor: formData.neighborhood === n ? colors.primary : colors.surface }}
-                            textStyle={{ color: colors.text, fontSize: 13 }}
+                            textStyle={{ color: formData.neighborhood === n ? colors.primaryForeground : colors.text, fontSize: 13 }}
                           >
                             {n}
                           </Chip>
@@ -339,7 +339,7 @@ export default function NewPlanScreen() {
                       selected={formData.energy === e}
                       onPress={() => setFormData(p => ({ ...p, energy: e }))}
                       style={{ backgroundColor: formData.energy === e ? colors.primary : colors.surface }}
-                      textStyle={{ color: colors.text }}
+                      textStyle={{ color: formData.energy === e ? colors.primaryForeground : colors.text }}
                     >
                       {e}
                     </Chip>
@@ -361,7 +361,7 @@ export default function NewPlanScreen() {
                         }));
                       }}
                       style={{ backgroundColor: formData.categories.includes(cat) ? colors.primary : colors.surface }}
-                      textStyle={{ color: colors.text, fontSize: 13 }}
+                      textStyle={{ color: formData.categories.includes(cat) ? colors.primaryForeground : colors.text, fontSize: 13 }}
                     >
                       {cat}
                     </Chip>

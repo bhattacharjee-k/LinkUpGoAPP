@@ -279,9 +279,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (username: string, password: string) => {
     const userData = await api.auth.login(username, password);
+    await Promise.all([loadGroups(), loadSessions()]);
     setUserState(userData);
-    await loadGroups();
-    await loadSessions();
   };
 
   const logout = async () => {

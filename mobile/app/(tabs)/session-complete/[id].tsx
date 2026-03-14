@@ -182,7 +182,7 @@ export default function SessionCompleteScreen() {
               }}
               disabled={!!existingFeedback}
               style={{ backgroundColor: selectedTags.includes(key) ? colors.primary : colors.surface }}
-              textStyle={{ color: colors.text, fontSize: 13 }}
+              textStyle={{ color: selectedTags.includes(key) ? colors.primaryForeground : colors.text, fontSize: 13 }}
             >
               {label}
             </Chip>

@@ -16,12 +16,13 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.linkupgo.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "LinkUpGo uses your location to find nearby venues and events.",
         "NSUserTrackingUsageDescription": "This allows us to show you relevant ads.",
+        "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
-          "NSAllowsLocalNetworking": true,
-          "NSAllowsArbitraryLoads": true
+          "NSAllowsLocalNetworking": true
         }
       }
     },
@@ -51,6 +52,13 @@
           "iosAppId": "ca-app-pub-7221066669944864~8463316783"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9d21934b-8928-42d3-8ea6-08e21a16e4d8"
+      }
+    },
+    "owner": "kishorebh01"
   }
 }

@@ -273,17 +273,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const register = async (data: any) => {
     const result = await api.auth.register(data);
     await setTokens(result.accessToken, result.refreshToken);
-    setUserState(result.user);
     connectWebSocket(result.accessToken);
     await Promise.all([loadGroups(), loadSessions()]);
+    setUserState(result.user);
   };
 
   const login = async (username: string, password: string) => {
     const result = await api.auth.login(username, password);
     await setTokens(result.accessToken, result.refreshToken);
-    setUserState(result.user);
     connectWebSocket(result.accessToken);
     await Promise.all([loadGroups(), loadSessions()]);
+    setUserState(result.user);
   };
 
   const logout = async () => {
