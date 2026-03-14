@@ -15,7 +15,7 @@ import { useApp } from '../../src/lib/context';
 import { colors } from '../../src/theme';
 
 export default function HomeScreen() {
-  const { user, sessions, groups, isAdmin, dataLoading } = useApp();
+  const { user, sessions, groups, isAdmin, dataReady } = useApp();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const { refreshGroups, refreshSessions } = useApp();
@@ -31,7 +31,7 @@ export default function HomeScreen() {
 
   if (!user) return <Redirect href="/(auth)/onboarding" />;
 
-  if (dataLoading) {
+  if (!dataReady) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <View style={{ alignItems: 'center', marginBottom: 40 }}>

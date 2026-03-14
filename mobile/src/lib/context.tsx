@@ -89,7 +89,7 @@ interface AppContextType {
   groups: Group[];
   sessions: PlanningSession[];
   isLoading: boolean;
-  dataLoading: boolean;
+  dataReady: boolean;
   setUser: (user: UserProfile) => void;
   register: (data: any) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
@@ -216,7 +216,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [groups, setGroups] = useState<Group[]>([]);
   const [sessions, setSessions] = useState<PlanningSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [dataLoading, setDataLoading] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
 
   // Load initial data on mount
   useEffect(() => {
@@ -232,8 +232,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         connectWebSocket(token);
         try {
           await Promise.all([loadGroups(), loadSessions()]);
+          setDataReady(true);
         } catch (e) {
           console.error('Failed to load data on mount:', e);
+          setDataReady(true); // still mark ready so user isn't stuck on loading
         }
       } catch {
         await clearTokens();
@@ -277,7 +279,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const result = await api.auth.register(data);
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
-    setDataLoading(true);
     setUserState(result.user);
     loadDataAfterAuth();
   };
@@ -286,10 +287,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const result = await api.auth.login(username, password);
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
-    setDataLoading(true);
     setUserState(result.user);
-    // Load data in background — don't await so login returns immediately
-    // and home screen shows the loading state
     loadDataAfterAuth();
   };
 
@@ -305,7 +303,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.error('Retry also failed');
       }
     } finally {
-      setDataLoading(false);
+      setDataReady(true);
     }
   };
 
@@ -318,6 +316,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUserState(null);
     setGroups([]);
     setSessions([]);
+    setDataReady(false);
   };
 
   const updateUserProfile = async (updates: any) => {
@@ -524,7 +523,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshSessions = loadSessions;
 
   const value: AppContextType = {
-    user, groups, sessions, isLoading, dataLoading,
+    user, groups, sessions, isLoading, dataReady,
     setUser, register, login, logout,
     updateUserProfile, updateUserLocation,
     createGroup, startSession,
