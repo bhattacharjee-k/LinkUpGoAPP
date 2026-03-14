@@ -277,27 +277,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const result = await api.auth.register(data);
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
-    setUserState(result.user);
     setDataLoading(true);
-    try {
-      await Promise.all([loadGroups(), loadSessions()]);
-    } catch (e) {
-      console.error('Failed to load data after register:', e);
-    } finally {
-      setDataLoading(false);
-    }
+    setUserState(result.user);
+    loadDataAfterAuth();
   };
 
   const login = async (username: string, password: string) => {
     const result = await api.auth.login(username, password);
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
-    setUserState(result.user);
     setDataLoading(true);
+    setUserState(result.user);
+    // Load data in background — don't await so login returns immediately
+    // and home screen shows the loading state
+    loadDataAfterAuth();
+  };
+
+  const loadDataAfterAuth = async () => {
     try {
       await Promise.all([loadGroups(), loadSessions()]);
     } catch (e) {
-      console.error('Failed to load data after login:', e);
+      console.error('Failed to load data:', e);
       // Retry once
       try {
         await Promise.all([loadGroups(), loadSessions()]);
