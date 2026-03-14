@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { api, getAccessToken, setTokens, clearTokens, getWebSocketUrl, fetchSSE } from './api';
+import Toast from 'react-native-toast-message';
 
 // Types matching web client
 export interface UserProfile {
@@ -227,7 +228,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const userData = await api.auth.me();
         setUserState(userData);
         connectWebSocket(token);
-        await Promise.all([loadGroups(), loadSessions()]);
+        try {
+          await Promise.all([loadGroups(), loadSessions()]);
+        } catch (e) {
+          console.error('Failed to load data on mount:', e);
+        }
       } catch {
         await clearTokens();
       } finally {
@@ -244,28 +249,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const token = await getAccessToken();
         connectWebSocket(token);
         // Refresh data on foreground
-        await Promise.all([loadGroups(), loadSessions()]);
+        try {
+          await Promise.all([loadGroups(), loadSessions()]);
+        } catch (e) {
+          console.error('Failed to refresh data on foreground:', e);
+        }
       }
     });
     return () => sub.remove();
   }, [user]);
 
   const loadGroups = async () => {
-    try {
-      const data = await api.groups.list();
-      setGroups(data);
-    } catch (e) {
-      console.error('Failed to load groups:', e);
-    }
+    const data = await api.groups.list();
+    setGroups(data);
   };
 
   const loadSessions = async () => {
-    try {
-      const data = await api.sessions.list();
-      setSessions(data);
-    } catch (e) {
-      console.error('Failed to load sessions:', e);
-    }
+    const data = await api.sessions.list();
+    setSessions(data);
   };
 
   const setUser = (newUser: UserProfile) => setUserState(newUser);
@@ -274,7 +275,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const result = await api.auth.register(data);
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
-    await Promise.all([loadGroups(), loadSessions()]);
+    try {
+      await Promise.all([loadGroups(), loadSessions()]);
+    } catch (e) {
+      console.error('Failed to load data after register:', e);
+    }
     setUserState(result.user);
   };
 
@@ -282,7 +287,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const result = await api.auth.login(username, password);
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
-    await Promise.all([loadGroups(), loadSessions()]);
+    try {
+      await Promise.all([loadGroups(), loadSessions()]);
+    } catch (e) {
+      console.error('Failed to load data after login:', e);
+      Toast.show({ type: 'error', text1: 'Failed to load your data', text2: 'Pull to refresh on home screen' });
+    }
     setUserState(result.user);
   };
 
@@ -369,7 +379,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       text: 'Planning session started. @Planner is listening.',
     });
 
-    await loadSessions();
+    await refreshSession(session.id);
     return session.id;
   };
 

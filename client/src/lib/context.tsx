@@ -438,7 +438,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       text: 'Planning session started. @Planner is listening.'
     });
 
-    await loadSessions();
+    await refreshSession(session.id);
     return session.id;
   };
 

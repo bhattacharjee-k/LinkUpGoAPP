@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, Pressable, Alert, RefreshControl,
+  View, Text, FlatList, Pressable, Alert, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -47,12 +47,40 @@ export default function SessionScreen() {
   const downvoteSheetRef = useRef<BottomSheet>(null);
 
   const session = getSession(id!);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  // Real-time subscriptions
+  // Real-time subscriptions + retry logic
   useEffect(() => {
     if (!id) return;
 
-    refreshSession(id);
+    let retryCount = 0;
+    let retryTimer: ReturnType<typeof setTimeout>;
+
+    const tryLoad = async () => {
+      try {
+        await refreshSession(id);
+      } catch (e) {
+        console.error('Failed to load session:', e);
+      }
+    };
+
+    tryLoad();
+
+    // Retry at 2s and 5s if session still not loaded
+    retryTimer = setTimeout(async () => {
+      if (!getSession(id)) {
+        await tryLoad();
+        retryTimer = setTimeout(async () => {
+          if (!getSession(id)) {
+            await tryLoad();
+            // After final retry, mark as failed
+            setTimeout(() => {
+              if (!getSession(id)) setLoadFailed(true);
+            }, 3000);
+          }
+        }, 3000);
+      }
+    }, 2000);
 
     const unsubs = [
       subscribeToSessionMessages(id, () => refreshSession(id)),
@@ -60,19 +88,40 @@ export default function SessionScreen() {
       subscribeToSessionUpdates(id, () => refreshSession(id)),
     ];
 
-    return () => unsubs.forEach(fn => fn());
+    return () => {
+      clearTimeout(retryTimer);
+      unsubs.forEach(fn => fn());
+    };
   }, [id]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    setLoadFailed(false);
     await refreshSession(id!);
     setRefreshing(false);
   }, [id]);
 
   if (!session || !user) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: colors.textMuted }}>Loading session...</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        {loadFailed ? (
+          <>
+            <Text style={{ color: colors.text, fontSize: 17, fontWeight: '600', marginBottom: 8 }}>
+              Session not found
+            </Text>
+            <Text style={{ color: colors.textMuted, textAlign: 'center', marginBottom: 20 }}>
+              This session may have been deleted or you may not have access.
+            </Text>
+            <Button mode="contained" onPress={() => router.back()} buttonColor={colors.primary} style={{ borderRadius: 12 }}>
+              Go Back
+            </Button>
+          </>
+        ) : (
+          <>
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 12 }} />
+            <Text style={{ color: colors.textMuted }}>Loading session...</Text>
+          </>
+        )}
       </SafeAreaView>
     );
   }
