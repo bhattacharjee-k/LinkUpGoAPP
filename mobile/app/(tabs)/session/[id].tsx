@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SegmentedButtons, Button } from 'react-native-paper';
-import { ChevronLeft, Lock, Settings, Share2, LogOut, MoreVertical } from 'lucide-react-native';
+import { ChevronLeft, Lock, Settings, Share2, LogOut, MoreVertical, RefreshCw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
@@ -35,12 +35,13 @@ export default function SessionScreen() {
     user, getSession, refreshSession,
     upvoteForSuggestion, downvoteForSuggestion,
     confirmPlan, addMessage, sendPlannerMessage,
-    leaveSession, deleteSession, isAdmin,
+    leaveSession, deleteSession, isAdmin, regenerateSuggestions,
   } = useApp();
 
   const [tab, setTab] = useState('suggestions');
   const [refreshing, setRefreshing] = useState(false);
   const [plannerStreaming, setPlannerStreaming] = useState('');
+  const [regenerating, setRegenerating] = useState(false);
   const [downvoteTarget, setDownvoteTarget] = useState<string | null>(null);
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const menuSheetRef = useRef<BottomSheet>(null);
@@ -282,16 +283,41 @@ export default function SessionScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
           }
           ListFooterComponent={
-            !isLocked && isGroupAdmin && topSuggestion ? (
-              <Button
-                mode="contained"
-                onPress={() => handleLockPlan(topSuggestion.id)}
-                icon={({ size, color }) => <Lock size={size} color={color} />}
-                style={{ borderRadius: 12, marginTop: 8 }}
-                buttonColor={colors.primary}
-              >
-                Lock In Top Pick
-              </Button>
+            !isLocked ? (
+              <View style={{ gap: 8, marginTop: 8 }}>
+                <Button
+                  mode="outlined"
+                  onPress={async () => {
+                    setRegenerating(true);
+                    try {
+                      await regenerateSuggestions(session.id);
+                      Toast.show({ type: 'success', text1: 'Suggestions regenerated' });
+                    } catch (err: any) {
+                      Toast.show({ type: 'error', text1: 'Regenerate failed', text2: err.message });
+                    } finally {
+                      setRegenerating(false);
+                    }
+                  }}
+                  loading={regenerating}
+                  disabled={regenerating}
+                  icon={({ size }) => <RefreshCw size={size} color={colors.primary} />}
+                  style={{ borderRadius: 12, borderColor: colors.primary }}
+                  textColor={colors.primary}
+                >
+                  Regenerate Options
+                </Button>
+                {isGroupAdmin && topSuggestion && (
+                  <Button
+                    mode="contained"
+                    onPress={() => handleLockPlan(topSuggestion.id)}
+                    icon={({ size, color }) => <Lock size={size} color={color} />}
+                    style={{ borderRadius: 12 }}
+                    buttonColor={colors.primary}
+                  >
+                    Lock In Top Pick
+                  </Button>
+                )}
+              </View>
             ) : null
           }
         />

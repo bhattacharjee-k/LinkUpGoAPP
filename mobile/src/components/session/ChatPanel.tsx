@@ -128,7 +128,7 @@ export function ChatPanel({ messages, userId, onSendMessage, onSendPlannerMessag
           borderBottomLeftRadius: isMe ? 16 : 4,
           padding: 12,
         }}>
-          <Text style={{ color: isMe ? '#fff' : colors.text, fontSize: 15, lineHeight: 21 }}>
+          <Text style={{ color: isMe ? colors.primaryForeground : colors.text, fontSize: 15, lineHeight: 21 }}>
             {item.text}
           </Text>
         </View>

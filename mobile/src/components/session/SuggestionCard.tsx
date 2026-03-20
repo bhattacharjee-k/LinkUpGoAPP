@@ -112,12 +112,16 @@ export function SuggestionCard({
 
         {/* Links */}
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-          {suggestion.detailUrl && (
-            <Pressable onPress={() => Linking.openURL(suggestion.detailUrl!)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <ExternalLink size={14} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontSize: 13, marginLeft: 4 }}>More Info</Text>
-            </Pressable>
-          )}
+          <Pressable
+            onPress={() => {
+              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(suggestion.name + (suggestion.venueName ? ' ' + suggestion.venueName : ''))}`;
+              Linking.openURL(mapsUrl);
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center' }}
+          >
+            <MapPin size={14} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontSize: 13, marginLeft: 4 }}>More Info</Text>
+          </Pressable>
           {suggestion.reservationUrl && (
             <Pressable onPress={() => Linking.openURL(suggestion.reservationUrl!)} style={{ flexDirection: 'row', alignItems: 'center' }}>
               <ExternalLink size={14} color={colors.success} />

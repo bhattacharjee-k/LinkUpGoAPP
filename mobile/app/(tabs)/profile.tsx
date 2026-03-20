@@ -129,6 +129,7 @@ export default function ProfileScreen() {
           {BUDGETS.map(b => (
             <Chip
               key={b}
+              showSelectedCheck={false}
               selected={isEditing ? editData.budget.includes(b) : user.budget.includes(b)}
               onPress={isEditing ? () => setEditData(prev => ({
                 ...prev,
@@ -149,6 +150,7 @@ export default function ProfileScreen() {
           {ENERGIES.map(e => (
             <Chip
               key={e}
+              showSelectedCheck={false}
               selected={isEditing ? editData.energy === e : user.energy === e}
               onPress={isEditing ? () => setEditData(prev => ({ ...prev, energy: e })) : undefined}
               disabled={!isEditing}
@@ -166,6 +168,7 @@ export default function ProfileScreen() {
           {CATEGORIES.map(cat => (
             <Chip
               key={cat}
+              showSelectedCheck={false}
               selected={isEditing ? editData.categories.includes(cat) : user.categories.includes(cat)}
               onPress={isEditing ? () => toggleCategory(cat) : undefined}
               disabled={!isEditing}

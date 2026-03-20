@@ -179,6 +179,7 @@ export default function SessionCompleteScreen() {
           {Object.entries(FEEDBACK_TAG_LABELS).map(([key, label]) => (
             <Chip
               key={key}
+              showSelectedCheck={false}
               selected={selectedTags.includes(key)}
               onPress={existingFeedback ? undefined : () => {
                 setSelectedTags(prev =>

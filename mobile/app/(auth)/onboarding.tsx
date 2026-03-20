@@ -337,6 +337,7 @@ export default function Onboarding() {
                   {BUDGETS.map(b => (
                     <Chip
                       key={b}
+                      showSelectedCheck={false}
                       selected={formData.budget.includes(b)}
                       onPress={() => setFormData(p => ({
                         ...p,
@@ -355,6 +356,7 @@ export default function Onboarding() {
                   {ENERGIES.map(e => (
                     <Chip
                       key={e}
+                      showSelectedCheck={false}
                       selected={formData.energy === e}
                       onPress={() => setFormData(p => ({ ...p, energy: e }))}
                       style={{ backgroundColor: formData.energy === e ? colors.primary : colors.surface }}
@@ -379,6 +381,7 @@ export default function Onboarding() {
                   {CATEGORIES.map(cat => (
                     <Chip
                       key={cat}
+                      showSelectedCheck={false}
                       selected={formData.categories.includes(cat)}
                       onPress={() => toggleCategory(cat)}
                       style={{ backgroundColor: formData.categories.includes(cat) ? colors.primary : colors.surface }}
@@ -403,6 +406,7 @@ export default function Onboarding() {
                   {HARD_NOS.map(no => (
                     <Chip
                       key={no}
+                      showSelectedCheck={false}
                       selected={formData.hardNos.includes(no)}
                       onPress={() => toggleHardNo(no)}
                       style={{ backgroundColor: formData.hardNos.includes(no) ? colors.error : colors.surface }}
@@ -418,6 +422,7 @@ export default function Onboarding() {
                   {(['hidden_gems', 'popular', 'mixed'] as DiscoveryStyle[]).map(ds => (
                     <Chip
                       key={ds}
+                      showSelectedCheck={false}
                       selected={formData.discoveryStyle === ds}
                       onPress={() => setFormData(p => ({ ...p, discoveryStyle: ds }))}
                       style={{ backgroundColor: formData.discoveryStyle === ds ? colors.primary : colors.surface }}
@@ -433,6 +438,7 @@ export default function Onboarding() {
                   {(['quiet', 'buzzing', 'no_preference'] as CrowdPreference[]).map(cp => (
                     <Chip
                       key={cp}
+                      showSelectedCheck={false}
                       selected={formData.crowdPreference === cp}
                       onPress={() => setFormData(p => ({ ...p, crowdPreference: cp }))}
                       style={{ backgroundColor: formData.crowdPreference === cp ? colors.primary : colors.surface }}
@@ -457,6 +463,7 @@ export default function Onboarding() {
                   {NEIGHBORHOODS[formData.city].map(n => (
                     <Chip
                       key={n}
+                      showSelectedCheck={false}
                       selected={formData.favoriteNeighborhoods.includes(n)}
                       onPress={() => toggleNeighborhood(n)}
                       style={{ backgroundColor: formData.favoriteNeighborhoods.includes(n) ? colors.primary : colors.surface }}

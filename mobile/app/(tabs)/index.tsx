@@ -187,15 +187,15 @@ export default function HomeScreen() {
         ListHeaderComponent={
           <View>
             {/* Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, overflow: 'visible' }}>
+              <View style={{ flex: 1 }}>
                 <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700' }}>
                   Hey, {user.name}
                 </Text>
               </View>
               <Pressable
                 onPress={() => router.push('/history')}
-                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginLeft: 12 }}
               >
                 <Clock size={20} color={colors.textSecondary} />
               </Pressable>

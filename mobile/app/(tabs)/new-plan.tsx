@@ -286,6 +286,7 @@ export default function NewPlanScreen() {
                         {NEIGHBORHOODS[formData.locationScope].map(n => (
                           <Chip
                             key={n}
+                            showSelectedCheck={false}
                             selected={formData.neighborhood === n}
                             onPress={() => setFormData(p => ({ ...p, neighborhood: p.neighborhood === n ? '' : n }))}
                             style={{ backgroundColor: formData.neighborhood === n ? colors.primary : colors.surface }}
@@ -333,6 +334,7 @@ export default function NewPlanScreen() {
                   {ENERGIES.map(e => (
                     <Chip
                       key={e}
+                      showSelectedCheck={false}
                       selected={formData.energy === e}
                       onPress={() => setFormData(p => ({ ...p, energy: e }))}
                       style={{ backgroundColor: formData.energy === e ? colors.primary : colors.surface }}
@@ -348,6 +350,7 @@ export default function NewPlanScreen() {
                   {CATEGORIES.map(cat => (
                     <Chip
                       key={cat}
+                      showSelectedCheck={false}
                       selected={formData.categories.includes(cat)}
                       onPress={() => {
                         setFormData(p => ({
