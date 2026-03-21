@@ -25,8 +25,13 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refreshGroups(), refreshSessions()]);
-    setRefreshing(false);
+    try {
+      await Promise.all([refreshGroups(), refreshSessions()]);
+    } catch (e) {
+      console.error('Failed to refresh:', e);
+    } finally {
+      setRefreshing(false);
+    }
   }, []);
 
   if (!user) return <Redirect href="/(auth)/onboarding" />;

@@ -280,7 +280,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
     setUserState(result.user);
-    loadDataAfterAuth();
   };
 
   const login = async (username: string, password: string) => {
@@ -288,24 +287,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
     setUserState(result.user);
-    loadDataAfterAuth();
   };
 
-  const loadDataAfterAuth = async () => {
-    try {
-      await Promise.all([loadGroups(), loadSessions()]);
-    } catch (e) {
-      console.error('Failed to load data:', e);
-      // Retry once
-      try {
-        await Promise.all([loadGroups(), loadSessions()]);
-      } catch {
-        console.error('Retry also failed');
-      }
-    } finally {
-      setDataReady(true);
+  // Trigger data loading after auth — runs AFTER render so loading screen always shows
+  const dataLoadTriggered = useRef(false);
+  useEffect(() => {
+    if (user && !dataReady && !isLoading && !dataLoadTriggered.current) {
+      dataLoadTriggered.current = true;
+      const load = async () => {
+        try {
+          await Promise.all([loadGroups(), loadSessions()]);
+        } catch (e) {
+          console.error('Failed to load data after auth:', e);
+          try {
+            await Promise.all([loadGroups(), loadSessions()]);
+          } catch {
+            console.error('Retry also failed');
+          }
+        } finally {
+          setDataReady(true);
+        }
+      };
+      load();
     }
-  };
+    if (!user) {
+      dataLoadTriggered.current = false;
+    }
+  }, [user, dataReady, isLoading]);
 
   const logout = async () => {
     await clearTokens();
