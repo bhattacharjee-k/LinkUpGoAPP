@@ -44,6 +44,7 @@ export default function SessionScreen() {
   const [regenerating, setRegenerating] = useState(false);
   const [downvoteTarget, setDownvoteTarget] = useState<string | null>(null);
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const menuSheetRef = useRef<BottomSheet>(null);
   const downvoteSheetRef = useRef<BottomSheet>(null);
 
@@ -54,12 +55,15 @@ export default function SessionScreen() {
   useEffect(() => {
     if (!id) return;
 
-    let retryCount = 0;
+    setInitialLoading(true);
+    setLoadFailed(false);
+
     let retryTimer: ReturnType<typeof setTimeout>;
 
     const tryLoad = async () => {
       try {
         await refreshSession(id);
+        setInitialLoading(false);
       } catch (e) {
         console.error('Failed to load session:', e);
       }
@@ -77,6 +81,7 @@ export default function SessionScreen() {
             // After final retry, mark as failed
             setTimeout(() => {
               if (!getSession(id)) setLoadFailed(true);
+              setInitialLoading(false);
             }, 3000);
           }
         }, 3000);
@@ -289,8 +294,16 @@ export default function SessionScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
           }
+          ListEmptyComponent={
+            initialLoading ? (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 12 }} />
+                <Text style={{ color: colors.textMuted, fontSize: 15 }}>Loading suggestions...</Text>
+              </View>
+            ) : null
+          }
           ListFooterComponent={
-            !isLocked ? (
+            !isLocked && !initialLoading ? (
               <View style={{ gap: 8, marginTop: 8 }}>
                 <Button
                   mode="contained"

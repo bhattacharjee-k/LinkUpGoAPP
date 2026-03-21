@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, Pressable, ActivityIndicator,
   KeyboardAvoidingView, Platform, TextInput as RNTextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Button, Chip, TextInput } from 'react-native-paper';
 import { ChevronRight, ChevronLeft, X, Search, Star, MapPin, Sparkles, Navigation, Compass, LocateFixed } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -49,6 +49,30 @@ export default function NewPlanScreen() {
     vibeDescription: '',
     locationMode: 'near_me' as 'near_me' | 'explore_anywhere' | 'meet_in_the_middle',
   });
+
+  // Reset all state when screen gains focus (tab screens are cached by Expo Router)
+  useFocusEffect(
+    useCallback(() => {
+      setStep(1);
+      setIsCreating(false);
+      setLoadingStep(0);
+      setShowDatePicker(false);
+      setSelectedGroupId(params.groupId || null);
+      setFormData({
+        name: '',
+        date: new Date(),
+        timeStart: '19:00',
+        timeEnd: '22:00',
+        locationScope: (user?.city || 'NYC') as City,
+        neighborhood: '',
+        budget: '$$' as Budget,
+        energy: (user?.energy || 'Vibey') as Energy,
+        categories: [] as Category[],
+        vibeDescription: '',
+        locationMode: 'near_me' as 'near_me' | 'explore_anywhere' | 'meet_in_the_middle',
+      });
+    }, [params.groupId])
+  );
 
   useEffect(() => {
     if (!isCreating) {
