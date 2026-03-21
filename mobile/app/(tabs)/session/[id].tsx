@@ -262,6 +262,13 @@ export default function SessionScreen() {
 
       {/* Content */}
       {tab === 'suggestions' ? (
+        <>
+        {regenerating && (
+          <View style={{ backgroundColor: 'rgba(99,102,241,0.08)', padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '500' }}>Finding new suggestions...</Text>
+          </View>
+        )}
         <FlatList
           data={sortedSuggestions}
           keyExtractor={(item) => item.id}
@@ -286,7 +293,7 @@ export default function SessionScreen() {
             !isLocked ? (
               <View style={{ gap: 8, marginTop: 8 }}>
                 <Button
-                  mode="outlined"
+                  mode="contained"
                   onPress={async () => {
                     setRegenerating(true);
                     try {
@@ -300,11 +307,12 @@ export default function SessionScreen() {
                   }}
                   loading={regenerating}
                   disabled={regenerating}
-                  icon={({ size }) => <RefreshCw size={size} color={colors.primary} />}
-                  style={{ borderRadius: 12, borderColor: colors.primary }}
-                  textColor={colors.primary}
+                  icon={({ size }) => <RefreshCw size={size} color={colors.primaryForeground} />}
+                  style={{ borderRadius: 12 }}
+                  buttonColor={colors.primary}
+                  textColor={colors.primaryForeground}
                 >
-                  Regenerate Options
+                  {regenerating ? 'Regenerating...' : 'Regenerate Options'}
                 </Button>
                 {isGroupAdmin && topSuggestion && (
                   <Button
@@ -321,6 +329,7 @@ export default function SessionScreen() {
             ) : null
           }
         />
+        </>
       ) : (
         <ChatPanel
           messages={session.messages || []}

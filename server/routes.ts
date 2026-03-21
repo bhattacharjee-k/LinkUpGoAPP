@@ -1383,12 +1383,19 @@ export async function registerRoutes(
       if (!userId) {
         return res.status(401).json({ message: "Not authenticated" });
       }
-      
+
       const { suggestionId } = req.params;
-      // Delete vote by calling vote with empty (will be handled in storage or just delete)
       const { eq, and } = await import('drizzle-orm');
-      const db = (await import('./storage')).storage;
-      // Just delete directly through a new method or inline
+      const { db } = await import('./storage');
+      const { votes } = await import('../shared/schema');
+
+      await db.delete(votes).where(
+        and(
+          eq(votes.suggestionId, suggestionId),
+          eq(votes.userId, userId)
+        )
+      );
+
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });

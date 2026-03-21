@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, FlatList, TextInput, Pressable,
-  KeyboardAvoidingView, Platform, Animated,
+  KeyboardAvoidingView, Platform, Animated, Keyboard,
 } from 'react-native';
 import { Send } from 'lucide-react-native';
 import { colors } from '../../theme';
@@ -87,6 +87,7 @@ export function ChatPanel({ messages, userId, onSendMessage, onSendPlannerMessag
     if (!text.trim()) return;
     const msg = text.trim();
     setText('');
+    Keyboard.dismiss();
 
     const explicitPlanner = msg.toLowerCase().includes('@planner') || msg.toLowerCase().startsWith('planner ');
 
@@ -191,7 +192,7 @@ export function ChatPanel({ messages, userId, onSendMessage, onSendPlannerMessag
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Send size={18} color={text.trim() ? '#fff' : colors.textMuted} />
+          <Send size={18} color={text.trim() ? colors.primaryForeground : colors.textMuted} />
         </Pressable>
       </View>
     </KeyboardAvoidingView>

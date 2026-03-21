@@ -324,7 +324,7 @@ export default function NewPlanScreen() {
                         borderColor: formData.budget === b ? colors.primary : colors.border,
                       }}
                     >
-                      <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}>{b}</Text>
+                      <Text style={{ color: formData.budget === b ? colors.primaryForeground : colors.text, fontSize: 16, fontWeight: '600' }}>{b}</Text>
                     </Pressable>
                   ))}
                 </View>
