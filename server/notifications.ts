@@ -1,5 +1,6 @@
 import { storage } from './storage';
 import type { InsertNotification, Notification, NotificationType } from '@shared/schema';
+import { sendPushToUser, sendPushToUsers } from './push';
 
 interface CalendarEventParams {
   title: string;
@@ -61,7 +62,7 @@ interface CreateNotificationParams {
 
 export async function createNotification(params: CreateNotificationParams): Promise<Notification> {
   const { userId, type, title, body, url, sendEmail = true } = params;
-  
+
   const notification = await storage.createNotification({
     userId,
     type,
@@ -70,10 +71,15 @@ export async function createNotification(params: CreateNotificationParams): Prom
     url,
   });
 
+  // Send push notification
+  sendPushToUser({ userId, title, body, url }).catch(err => {
+    console.error('[Push] Failed to send push for notification:', err);
+  });
+
   if (sendEmail) {
     const prefs = await storage.getNotificationPrefs(userId);
     const emailEnabled = prefs?.emailEnabled ?? true;
-    
+
     const emailTypes = ['INVITE', 'AVAILABILITY_NUDGE', 'PLAN_LOCKED'];
     if (emailEnabled && emailTypes.includes(type)) {
       await sendEmailNotification({ userId, type, title, body, url });

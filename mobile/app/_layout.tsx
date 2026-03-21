@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -14,6 +14,7 @@ import mobileAds from 'react-native-google-mobile-ads';
 import { AppProvider, useApp } from '../src/lib/context';
 import { theme, colors } from '../src/theme';
 import { preloadAd } from '../src/lib/ads';
+import { registerForPushNotifications, setupNotificationHandler, setupNotificationChannel } from '../src/lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -41,13 +42,34 @@ const queryClient = new QueryClient({
 
 function RootNavigator() {
   const { user, isLoading } = useApp();
+  const router = useRouter();
 
   useEffect(() => {
     if (!isLoading) {
       SplashScreen.hideAsync();
       initializeAds();
+      setupNotificationChannel();
     }
   }, [isLoading]);
+
+  // Register for push notifications when user is logged in
+  useEffect(() => {
+    if (user) {
+      registerForPushNotifications().catch(err =>
+        console.warn('[Push] Registration failed:', err)
+      );
+    }
+  }, [user]);
+
+  // Handle notification taps for deep linking
+  useEffect(() => {
+    const cleanup = setupNotificationHandler((url) => {
+      // Convert server URL paths to Expo Router paths
+      // e.g. /session/abc123 → /session/abc123
+      router.push(url as any);
+    });
+    return cleanup;
+  }, []);
 
   if (isLoading) return null;
 

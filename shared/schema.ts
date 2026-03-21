@@ -11,7 +11,7 @@ export type { DownvoteReason as DownvoteReasonType, NotificationType as Notifica
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"), // Nullable for social login users
   name: text("name").notNull(),
   email: text("email"), // Optional email for notifications
   city: text("city").notNull(), // 'NYC' | 'Chicago'
@@ -27,6 +27,12 @@ export const users = pgTable("users", {
   lastLocationTimestamp: timestamp("last_location_timestamp"),
   locationPermission: text("location_permission").default('pending'), // 'pending' | 'granted' | 'denied'
   transportationMode: text("transportation_mode").default('car'), // 'car' | 'walk' | 'transit'
+  // Social login fields
+  authProvider: text("auth_provider").default('password'), // 'password' | 'facebook'
+  facebookId: text("facebook_id").unique(),
+  avatarUrl: text("avatar_url"),
+  // Push notification token
+  pushToken: text("push_token"),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
@@ -184,6 +190,7 @@ export const notificationPrefs = pgTable("notification_prefs", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
   emailEnabled: boolean("email_enabled").notNull().default(true),
+  pushEnabled: boolean("push_enabled").notNull().default(true),
 });
 
 export const insertNotificationPrefsSchema = createInsertSchema(notificationPrefs).omit({ id: true });

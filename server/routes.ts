@@ -7,7 +7,8 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { getSuggestions, getOrchestratedSuggestions, SuggestionOption, generateWhyExplanation, GroupPreferenceSummary } from "./suggestions";
 import { computeMidpoint, getNeighborhoodCenter, LatLng } from "./geo";
-import { notifyPlanJoined, notifyPlanLocked } from "./notifications";
+import { notifyPlanJoined, notifyPlanLocked, notifyVotingOpen } from "./notifications";
+import { sendPushToUsers } from "./push";
 import { requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant, requireSessionNotLocked } from "./middleware/auth";
 import { signAccessToken, signRefreshToken, storeRefreshToken, validateAndRotateRefreshToken, revokeAllRefreshTokens, extractBearerToken, verifyToken } from "./middleware/jwt-auth";
 import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from "./middleware/error-handler";
@@ -277,13 +278,16 @@ export async function registerRoutes(
       };
       
       const data = insertUserSchema.parse(mappedData);
+      if (!data.password) {
+        return res.status(400).json({ message: "Password is required" });
+      }
       const hashedPassword = await bcrypt.hash(data.password, 10);
-      
+
       const user = await storage.createUser({
         ...data,
         password: hashedPassword
       });
-      
+
       // @ts-ignore - session is added by express-session
       req.session.userId = user.id;
       
@@ -300,7 +304,7 @@ export async function registerRoutes(
       const { username, password } = req.body;
       const user = await storage.getUserByUsername(username);
       
-      if (!user || !await bcrypt.compare(password, user.password)) {
+      if (!user || !user.password || !await bcrypt.compare(password, user.password)) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
@@ -352,6 +356,9 @@ export async function registerRoutes(
       const mappedData = { ...rest, hardNos: hardNos || [] };
 
       const data = insertUserSchema.parse(mappedData);
+      if (!data.password) {
+        return res.status(400).json({ message: "Password is required" });
+      }
       const hashedPassword = await bcrypt.hash(data.password, 10);
 
       const user = await storage.createUser({ ...data, password: hashedPassword });
@@ -372,7 +379,7 @@ export async function registerRoutes(
       const { username, password } = req.body;
       const user = await storage.getUserByUsername(username);
 
-      if (!user || !await bcrypt.compare(password, user.password)) {
+      if (!user || !user.password || !await bcrypt.compare(password, user.password)) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
@@ -566,6 +573,109 @@ export async function registerRoutes(
       const { password, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
     } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Push token registration
+  app.post("/api/users/push-token", requireAuth, async (req, res) => {
+    try {
+      const userId = req.userId!;
+      const { pushToken } = req.body;
+
+      if (!pushToken || typeof pushToken !== 'string') {
+        return res.status(400).json({ message: "pushToken is required" });
+      }
+
+      const user = await storage.updateUser(userId, { pushToken });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Facebook login (mobile)
+  app.post("/api/auth/mobile/facebook", rateLimit(10, 15 * 60 * 1000), async (req, res) => {
+    try {
+      const { accessToken: fbToken } = req.body;
+      if (!fbToken) {
+        return res.status(400).json({ message: "Facebook access token required" });
+      }
+
+      // Verify token with Facebook Graph API
+      const fbResponse = await fetch(
+        `https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token=${encodeURIComponent(fbToken)}`
+      );
+
+      if (!fbResponse.ok) {
+        return res.status(401).json({ message: "Invalid Facebook token" });
+      }
+
+      const fbUser = await fbResponse.json();
+      if (!fbUser.id) {
+        return res.status(401).json({ message: "Could not verify Facebook identity" });
+      }
+
+      // Look up existing user by facebookId
+      let user = await storage.getUserByFacebookId(fbUser.id);
+      let isNewUser = false;
+
+      if (!user) {
+        // Check if email matches existing user (account linking)
+        if (fbUser.email) {
+          const existingByEmail = await storage.getUserByEmail(fbUser.email);
+          if (existingByEmail) {
+            // Link Facebook to existing account
+            user = await storage.updateUser(existingByEmail.id, {
+              facebookId: fbUser.id,
+              authProvider: 'facebook',
+              avatarUrl: fbUser.picture?.data?.url || null,
+            });
+          }
+        }
+
+        if (!user) {
+          // Create new user with defaults — client will complete profile setup
+          const username = `${fbUser.name.toLowerCase().replace(/\s+/g, '_')}_${Math.random().toString(36).substring(2, 6)}`;
+          user = await storage.createUser({
+            username,
+            password: null,
+            name: fbUser.name,
+            email: fbUser.email || null,
+            city: 'NYC',
+            budget: ['$$'],
+            energy: 'Vibey',
+            categories: ['Drinks'],
+            hardNos: [],
+            authProvider: 'facebook',
+            facebookId: fbUser.id,
+            avatarUrl: fbUser.picture?.data?.url || null,
+          });
+          isNewUser = true;
+        }
+      }
+
+      if (!user) {
+        return res.status(500).json({ message: "Failed to create or find user" });
+      }
+
+      const jwtAccessToken = signAccessToken(user.id);
+      const jwtRefreshToken = signRefreshToken(user.id);
+      await storeRefreshToken(user.id, jwtRefreshToken);
+
+      const { password, ...userWithoutPassword } = user;
+      res.json({
+        user: userWithoutPassword,
+        accessToken: jwtAccessToken,
+        refreshToken: jwtRefreshToken,
+        isNewUser,
+      });
+    } catch (error: any) {
+      console.error('[Facebook Auth] Error:', error);
       res.status(400).json({ message: error.message });
     }
   });
@@ -866,7 +976,19 @@ export async function registerRoutes(
           // Ignore if already a participant
         }
       }
-      
+
+      // Push notification to group members about new plan
+      const creator = await storage.getUser(userId);
+      const creatorName = creator?.name || 'Someone';
+      const planName = name || 'a new plan';
+      sendPushToUsers({
+        userIds: groupMembers,
+        title: 'New Plan Started',
+        body: `${creatorName} started ${planName}. Check out the suggestions!`,
+        url: `/session/${session.id}`,
+        excludeUserId: userId,
+      }).catch(err => console.error('[Push] Session created notification failed:', err));
+
       res.json(session);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -1368,6 +1490,17 @@ export async function registerRoutes(
           type: 'new_message',
           message: systemMessage,
         });
+
+        // Push notification for vote
+        const participants = await storage.getSessionParticipants(sessionId);
+        const participantIds = participants.map(p => p.userId);
+        sendPushToUsers({
+          userIds: participantIds,
+          title: 'New Vote',
+          body: `${voterName} ${action} ${suggestion.name}`,
+          url: `/session/${sessionId}`,
+          excludeUserId: userId,
+        }).catch(err => console.error('[Push] Vote notification failed:', err));
       }
       
       res.json({ success: true });

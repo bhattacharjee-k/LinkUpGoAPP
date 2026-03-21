@@ -7,11 +7,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TextInput, Button, Chip } from 'react-native-paper';
 import { ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react-native';
 import Animated, { FadeIn, SlideInRight, SlideOutLeft } from 'react-native-reanimated';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 import { SafeBannerAd } from '../../src/components/SafeBannerAd';
 import { Redirect } from 'expo-router';
 import { useApp } from '../../src/lib/context';
 import { api } from '../../src/lib/api';
 import { colors } from '../../src/theme';
+
+WebBrowser.maybeCompleteAuthSession();
 import {
   City, Budget, Energy, Category, HardNo, DiscoveryStyle, CrowdPreference,
   CITIES, BUDGETS, ENERGIES, CATEGORIES, HARD_NOS, NEIGHBORHOODS,
@@ -37,14 +41,63 @@ function Logo() {
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error';
 
+const FACEBOOK_APP_ID = process.env.EXPO_PUBLIC_FACEBOOK_APP_ID || '';
+
 export default function Onboarding() {
-  const { user, register, login } = useApp();
+  const { user, register, login, loginWithFacebook } = useApp();
   const [step, setStep] = useState(1);
   const [isLoginMode, setIsLoginMode] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle');
+  const [fbLoading, setFbLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Facebook OAuth
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'linkupgo' });
+  const [, fbResponse, promptFacebookLogin] = AuthSession.useAuthRequest(
+    {
+      clientId: FACEBOOK_APP_ID,
+      redirectUri,
+      responseType: AuthSession.ResponseType.Token,
+      scopes: ['public_profile', 'email'],
+    },
+    { authorizationEndpoint: 'https://www.facebook.com/v19.0/dialog/oauth' }
+  );
+
+  // Handle Facebook OAuth response
+  React.useEffect(() => {
+    if (fbResponse?.type === 'success' && fbResponse.authentication?.accessToken) {
+      handleFacebookToken(fbResponse.authentication.accessToken);
+    } else if (fbResponse?.type === 'error') {
+      setError('Facebook login failed. Please try again.');
+      setFbLoading(false);
+    } else if (fbResponse?.type === 'dismiss') {
+      setFbLoading(false);
+    }
+  }, [fbResponse]);
+
+  const handleFacebookLogin = async () => {
+    setError('');
+    setFbLoading(true);
+    await promptFacebookLogin();
+  };
+
+  const handleFacebookToken = async (fbToken: string) => {
+    try {
+      const { isNewUser } = await loginWithFacebook(fbToken);
+      if (isNewUser) {
+        // New Facebook user — skip to step 2 (city selection) for profile setup
+        setStep(2);
+        setIsLoginMode(false);
+      }
+      // Existing user will be redirected automatically via `if (user) return <Redirect>`
+    } catch (err: any) {
+      setError(err.message || 'Facebook login failed');
+    } finally {
+      setFbLoading(false);
+    }
+  };
 
   const [formData, setFormData] = useState({
     username: '',
@@ -207,6 +260,27 @@ export default function Onboarding() {
                 buttonColor={colors.primary}
               >
                 Sign In
+              </Button>
+
+              {/* Divider */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 24 }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                <Text style={{ color: colors.textMuted, marginHorizontal: 12, fontSize: 13 }}>or</Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              </View>
+
+              {/* Facebook Login */}
+              <Button
+                mode="contained"
+                onPress={handleFacebookLogin}
+                loading={fbLoading}
+                disabled={fbLoading}
+                icon="facebook"
+                style={{ borderRadius: 12, paddingVertical: 4 }}
+                buttonColor="#1877F2"
+                textColor="#fff"
+              >
+                Continue with Facebook
               </Button>
 
               <Pressable onPress={() => { setIsLoginMode(false); setError(''); }} style={{ marginTop: 24, alignItems: 'center' }}>
@@ -499,9 +573,32 @@ export default function Onboarding() {
           </Button>
 
           {step === 1 && (
-            <Pressable onPress={() => { setIsLoginMode(true); setError(''); }} style={{ marginTop: 16, alignItems: 'center' }}>
-              <Text style={{ color: colors.primary }}>Already have an account? Sign in</Text>
-            </Pressable>
+            <>
+              {/* Divider */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 16 }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                <Text style={{ color: colors.textMuted, marginHorizontal: 12, fontSize: 13 }}>or</Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              </View>
+
+              <Button
+                mode="contained"
+                onPress={handleFacebookLogin}
+                loading={fbLoading}
+                disabled={fbLoading}
+                icon="facebook"
+                contentStyle={{ paddingVertical: 4 }}
+                style={{ borderRadius: 12 }}
+                buttonColor="#1877F2"
+                textColor="#fff"
+              >
+                Continue with Facebook
+              </Button>
+
+              <Pressable onPress={() => { setIsLoginMode(true); setError(''); }} style={{ marginTop: 16, alignItems: 'center' }}>
+                <Text style={{ color: colors.primary }}>Already have an account? Sign in</Text>
+              </Pressable>
+            </>
           )}
         </View>
       </KeyboardAvoidingView>

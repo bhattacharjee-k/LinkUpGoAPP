@@ -134,6 +134,10 @@ export const api = {
     updateMe: (data: any) => fetchAPI('/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
     updateLocation: (lat: string, lng: string, permission: string) =>
       fetchAPI('/users/me/location', { method: 'PATCH', body: JSON.stringify({ lat, lng, permission }) }),
+    registerPushToken: (pushToken: string) =>
+      fetchAPI('/users/push-token', { method: 'POST', body: JSON.stringify({ pushToken }) }),
+    facebookLogin: (accessToken: string) =>
+      fetchAPI('/auth/mobile/facebook', { method: 'POST', body: JSON.stringify({ accessToken }) }),
   },
 
   // Groups

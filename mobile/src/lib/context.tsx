@@ -93,6 +93,7 @@ interface AppContextType {
   setUser: (user: UserProfile) => void;
   register: (data: any) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
+  loginWithFacebook: (fbAccessToken: string) => Promise<{ isNewUser: boolean }>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: any) => Promise<void>;
   updateUserLocation: (lat: string, lng: string, permission: string) => Promise<void>;
@@ -287,6 +288,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await setTokens(result.accessToken, result.refreshToken);
     connectWebSocket(result.accessToken);
     setUserState(result.user);
+  };
+
+  const loginWithFacebook = async (fbAccessToken: string): Promise<{ isNewUser: boolean }> => {
+    const result = await api.users.facebookLogin(fbAccessToken);
+    await setTokens(result.accessToken, result.refreshToken);
+    connectWebSocket(result.accessToken);
+    setUserState(result.user);
+    return { isNewUser: result.isNewUser };
   };
 
   // Trigger data loading after auth — runs AFTER render so loading screen always shows
@@ -532,7 +541,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value: AppContextType = {
     user, groups, sessions, isLoading, dataReady,
-    setUser, register, login, logout,
+    setUser, register, login, loginWithFacebook, logout,
     updateUserProfile, updateUserLocation,
     createGroup, startSession,
     getSession, refreshSession,
