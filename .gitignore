@@ -6,3 +6,8 @@ vite.config.ts.*
 *.tar.gz
 .env
 scripts/deploy.sh
+# Per-user editor / agent configs
+.claude/settings.local.json
+
+# .env backup files from in-place edits
+.env.bak*

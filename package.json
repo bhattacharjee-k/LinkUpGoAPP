@@ -18,9 +18,16 @@
     "db:neon:setup": "node --env-file=.env ./node_modules/.bin/tsx scripts/neon-setup.ts",
     "db:neon:push:dev": "NEON_SCHEMA=dev node --env-file=.env ./node_modules/.bin/tsx scripts/neon-push.ts",
     "db:neon:push:prod": "NEON_SCHEMA=prod node --env-file=.env ./node_modules/.bin/tsx scripts/neon-push.ts",
-    "db:neon:seed:dev": "NEON_SCHEMA=dev node --env-file=.env ./node_modules/.bin/tsx scripts/neon-seed.ts"
+    "db:neon:seed:dev": "NEON_SCHEMA=dev node --env-file=.env ./node_modules/.bin/tsx scripts/neon-seed.ts",
+    "eval:build-golden": "node --env-file=.env ./node_modules/.bin/tsx server/eval/build_golden_set.ts",
+    "eval:replay": "node --env-file=.env ./node_modules/.bin/tsx server/eval/replay.ts",
+    "eval:set-baseline": "node --env-file=.env ./node_modules/.bin/tsx server/eval/set_baseline.ts",
+    "eval:judge-calibrate": "node --env-file=.env ./node_modules/.bin/tsx server/eval/judge.ts",
+    "eval:shadow-compare": "node --env-file=.env ./node_modules/.bin/tsx server/orchestrator/shadow_compare.ts",
+    "eval:check-polygons": "node --env-file=.env ./node_modules/.bin/tsx server/geo/check_polygons.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -66,6 +73,7 @@
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "framer-motion": "^12.23.24",
+    "h3-js": "^4.4.0",
     "input-otp": "^1.4.2",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.545.0",

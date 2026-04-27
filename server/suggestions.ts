@@ -61,13 +61,13 @@ const TRANSPORT_MAX_DISTANCE: Record<string, number> = {
   car: 15,
 };
 
-function getMaxDistanceMiles(transportationModes?: string[]): number {
+export function getMaxDistanceMiles(transportationModes?: string[]): number {
   if (!transportationModes || transportationModes.length === 0) return 15; // default: car
   // Use the most restrictive (smallest) distance among all participants
   return Math.min(...transportationModes.map(m => TRANSPORT_MAX_DISTANCE[m] || 15));
 }
 
-interface SuggestMeta {
+export interface SuggestMeta {
   city: string;
   centerLatLng: LatLng;
   radiusMeters: number;
@@ -79,6 +79,15 @@ interface SuggestMeta {
     wildcard: number;
   };
   dedupedCount?: number;
+  // V2 categories array for downstream eval/replay metadata
+  categories?: string[];
+}
+
+export interface SuggestResult {
+  options: SuggestionOption[];
+  meta: SuggestMeta;
+  referenceProfile?: ReferenceProfile;
+  brief?: OrchestratorBrief;
 }
 
 // Downvote reason learning - stored per session for influencing generation
@@ -861,7 +870,7 @@ export async function getSuggestions(
   };
 }
 
-async function fetchGooglePlaces(center: LatLng, radiusMeters: number, types: string[], city: string): Promise<SuggestionOption[]> {
+export async function fetchGooglePlaces(center: LatLng, radiusMeters: number, types: string[], city: string): Promise<SuggestionOption[]> {
   if (!GOOGLE_PLACES_API_KEY) {
     console.warn('GOOGLE_PLACES_API_KEY not set');
     return [];
@@ -976,7 +985,7 @@ function scoreAndRank(options: SuggestionOption[], req: SuggestRequest, center: 
   return options.sort((a, b) => (b.score || 0) - (a.score || 0));
 }
 
-async function fetchGooglePlacesByName(center: LatLng, radiusMeters: number, venueNames: string[], city: string): Promise<SuggestionOption[]> {
+export async function fetchGooglePlacesByName(center: LatLng, radiusMeters: number, venueNames: string[], city: string): Promise<SuggestionOption[]> {
   if (!GOOGLE_PLACES_API_KEY || venueNames.length === 0) return [];
 
   const results: SuggestionOption[] = [];
@@ -1258,8 +1267,19 @@ export async function getOrchestratedSuggestions(
   groupPrefs?: GroupPreferenceSummary,
   feedbackHistory?: Array<{ venueName: string; rating: number; tags?: string[] | null; review?: string | null }>,
 ): Promise<{ options: SuggestionOption[]; meta: SuggestMeta; referenceProfile?: ReferenceProfile; brief?: OrchestratorBrief }> {
+  // Feature flag: route to v2 pipeline when SUGGESTIONS_PIPELINE=v2.
+  // Shadow mode (dual-run) lives in server/orchestrator/shadow.ts.
+  if (process.env.SUGGESTIONS_PIPELINE === 'v2') {
+    const { getOrchestratedSuggestionsV2 } = await import('./orchestrator/v2');
+    return getOrchestratedSuggestionsV2(req, downvoteReasons, referenceVenues, groupPrefs, feedbackHistory);
+  }
+  if (process.env.SUGGESTIONS_PIPELINE === 'shadow') {
+    const { runShadow } = await import('./orchestrator/shadow');
+    return runShadow(req, downvoteReasons, referenceVenues, groupPrefs, feedbackHistory);
+  }
+
   const startTime = Date.now();
-  
+
   console.log(`[Orchestrator] Starting orchestrated suggestion pipeline for ${req.city}`);
 
   let brief: OrchestratorBrief;

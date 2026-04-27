@@ -188,6 +188,14 @@ export function buildSuggestionsCacheKey(params: {
   energy?: string;
   timeWindow?: string;
   specificDate?: string;
+  // Personalization signals — included to prevent two different users sharing
+  // results just because their non-personal filters match. Per the rebuild
+  // brief §1.7. Pass `userId` (or a hash of the personalization-relevant user
+  // profile) to ensure cache entries are user-scoped.
+  userId?: string;
+  discoveryStyle?: string;
+  crowdPreference?: string;
+  favoriteNeighborhoods?: string[];
 }): string {
   return `suggestions:${normalizeKey(params)}`;
 }

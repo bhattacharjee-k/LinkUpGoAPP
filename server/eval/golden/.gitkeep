@@ -1,0 +1,2 @@
+# Golden sets live here (jsonl). Tier 1 is generated; Tier 2 is hand-labeled.
+# tier1.jsonl, tier1_holdout.jsonl, tier2.jsonl, baseline.json
