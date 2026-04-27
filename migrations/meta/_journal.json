@@ -15,6 +15,13 @@
       "when": 1772830600483,
       "tag": "0001_daffy_norman_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777243956824,
+      "tag": "0002_flawless_living_mummy",
+      "breakpoints": true
     }
   ]
 }

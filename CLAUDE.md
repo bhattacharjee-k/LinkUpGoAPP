@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Context
+
+For project status, ownership, and current priorities (the suggestions-algorithm rebuild), read `docs/PROJECT-CONTEXT.md` first.
+
 ## Build & Dev Commands
 
 ```bash
