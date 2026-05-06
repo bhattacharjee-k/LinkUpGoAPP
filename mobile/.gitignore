@@ -33,6 +33,10 @@ yarn-error.*
 # local env files
 .env*.local
 
+# EAS submission config — contains personal Apple ID + Team ID.
+# Copy eas.json.example to eas.json and fill in your own values.
+eas.json
+
 # typescript
 *.tsbuildinfo
 

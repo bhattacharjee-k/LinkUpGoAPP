@@ -26,7 +26,7 @@
         "resourceClass": "m-medium"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://linkupgoapp.com"
+        "EXPO_PUBLIC_API_URL": "https://your-api.example.com"
       }
     },
     "production": {
@@ -35,23 +35,23 @@
         "resourceClass": "m-medium"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://linkupgoapp.com"
+        "EXPO_PUBLIC_API_URL": "https://your-api.example.com"
       }
     }
   },
   "submit": {
     "preview": {
       "ios": {
-        "appleId": "kishorebh@yahoo.com",
-        "appleTeamId": "M6JJ36MP74",
-        "companyName": "CYDEXT LLC"
+        "appleId": "your-apple-id@example.com",
+        "appleTeamId": "YOUR_APPLE_TEAM_ID",
+        "companyName": "Your Company"
       }
     },
     "production": {
       "ios": {
-        "appleId": "kishorebh@yahoo.com",
-        "appleTeamId": "M6JJ36MP74",
-        "companyName": "CYDEXT LLC"
+        "appleId": "your-apple-id@example.com",
+        "appleTeamId": "YOUR_APPLE_TEAM_ID",
+        "companyName": "Your Company"
       }
     }
   }
