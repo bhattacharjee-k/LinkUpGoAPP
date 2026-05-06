@@ -142,7 +142,7 @@ async function regenerateSuggestionsForSession(sessionId: string, session: any, 
       // Subsequent attempts: remove transport filter entirely
       delete enrichedData.transportationModes;
     }
-    console.log(`[Session] Auto-widen attempt ${widenAttempt}/${maxWidenAttempts} for session ${sessionId}`);
+    logger.debug({ sessionId, widenAttempt, maxWidenAttempts }, '[Session] Auto-widen attempt');
     result = await getOrchestratedSuggestions(
       enrichedData, undefined, filters.referenceVenues, mergedGroupPrefs
     );
@@ -181,7 +181,7 @@ async function regenerateSuggestionsForSession(sessionId: string, session: any, 
   if (updatedSession) {
     broadcastToSession(sessionId, { type: 'session_update', session: updatedSession.session });
   }
-  console.log(`[Session] Regenerated suggestions for session ${sessionId} with ${validUsers.length} participants`);
+  logger.info({ sessionId, participantCount: validUsers.length }, '[Session] Regenerated suggestions');
 }
 
 function removeSocketFromSession(ws: WebSocket) {
@@ -469,7 +469,7 @@ export async function registerRoutes(
 
       res.json({ places });
     } catch (error) {
-      console.error('Places autocomplete error:', error);
+      logger.error({ err: error instanceof Error ? error.message : String(error) }, '[Places] Autocomplete error');
       res.json({ places: [] });
     }
   }));
@@ -675,7 +675,7 @@ export async function registerRoutes(
         isNewUser,
       });
     } catch (error: any) {
-      console.error('[Facebook Auth] Error:', error);
+      logger.error({ err: error instanceof Error ? error.message : String(error) }, '[Facebook Auth] Error');
       res.status(400).json({ message: error.message });
     }
   });
@@ -787,7 +787,7 @@ export async function registerRoutes(
             broadcastToSession(session.id, { type: 'session_update', session: { ...session, id: session.id } });
             // Trigger suggestion regeneration with auto-widen
             regenerateSuggestionsForSession(session.id, session, 4).catch(err =>
-              console.error('[Group Join] Failed to regenerate suggestions:', err)
+              logger.error({ err: err instanceof Error ? err.message : String(err) }, '[Group Join] Failed to regenerate suggestions')
             );
           } catch (e) {
             // Ignore if already a participant
@@ -810,17 +810,17 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Not authenticated" });
       }
       
-      console.log(`[Join] Looking up session with inviteCode=${req.params.inviteCode} for userId=${userId}`);
+      logger.debug({ inviteCode: req.params.inviteCode, userId }, '[Join] Looking up session');
       const session = await storage.getSessionByInviteCode(req.params.inviteCode);
       if (!session) {
-        console.log(`[Join] No session found for inviteCode=${req.params.inviteCode}`);
+        logger.debug({ inviteCode: req.params.inviteCode }, '[Join] No session found');
         return res.status(404).json({ message: "Invalid session invite code" });
       }
       
-      console.log(`[Join] Found session id=${session.id} status=${session.status} inviteCode=${session.inviteCode}`);
+      logger.debug({ sessionId: session.id, status: session.status, inviteCode: session.inviteCode }, '[Join] Found session');
       
       if (session.deletedAt) {
-        console.log(`[Join] Session ${session.id} is deleted`);
+        logger.warn({ sessionId: session.id }, '[Join] Session is deleted');
         return res.status(404).json({ message: "This plan no longer exists" });
       }
       
@@ -855,7 +855,7 @@ export async function registerRoutes(
           joinerId: userId,
           joinerName,
           adminId: group.adminId,
-        }).catch(err => console.error('[Notify] Error sending join notification:', err));
+        }).catch(err => logger.error({ err: err instanceof Error ? err.message : String(err) }, '[Notify] Error sending join notification'));
 
         // Broadcast real-time update to session participants
         const joinMsg = await storage.createMessage({
@@ -870,7 +870,7 @@ export async function registerRoutes(
         // Trigger suggestion regeneration in background
         if (session.status !== 'locked') {
           regenerateSuggestionsForSession(session.id, session, 4).catch(err =>
-            console.error('[Join] Failed to regenerate suggestions:', err)
+            logger.error({ err: err instanceof Error ? err.message : String(err) }, '[Join] Failed to regenerate suggestions')
           );
         }
       } catch (e) {
@@ -953,7 +953,7 @@ export async function registerRoutes(
       const { groupId, name, filters, guardrails, referenceVenues } = req.body;
       
       const inviteCode = filters?.inviteCode || Math.random().toString(36).substr(2, 6).toUpperCase();
-      console.log(`[Session] Creating session for group ${groupId} with inviteCode=${inviteCode}`);
+      logger.debug({ groupId, inviteCode }, '[Session] Creating session');
       
       const session = await storage.createSession({
         groupId,
@@ -965,7 +965,7 @@ export async function registerRoutes(
         referenceVenues: referenceVenues || null
       });
       
-      console.log(`[Session] Created session id=${session.id} inviteCode=${session.inviteCode}`);
+      logger.info({ sessionId: session.id, inviteCode: session.inviteCode }, '[Session] Created session');
       
       // Add all group members as participants (including creator)
       const groupMembers = await storage.getGroupMembers(groupId);
@@ -987,7 +987,7 @@ export async function registerRoutes(
         body: `${creatorName} started ${planName}. Check out the suggestions!`,
         url: `/session/${session.id}`,
         excludeUserId: userId,
-      }).catch(err => console.error('[Push] Session created notification failed:', err));
+      }).catch(err => logger.error({ err: err instanceof Error ? err.message : String(err) }, '[Push] Session created notification failed'));
 
       res.json(session);
     } catch (error: any) {
@@ -1088,8 +1088,8 @@ export async function registerRoutes(
         // Build event details for calendar invite
         let eventDetails: { location: string; startDate: Date; description?: string } | undefined;
         
-        // Get the confirmed date from the session or use a proposed time
-        const confirmedDate = updated?.confirmedDate || req.body.confirmedDate;
+        // Get the confirmed date from the request body (sessions schema has no confirmedDate column).
+        const confirmedDate = req.body.confirmedDate;
         if (confirmedDate && winningSuggestion) {
           const parsedDate = new Date(confirmedDate);
           // Only include event details if the date is valid
@@ -1108,7 +1108,7 @@ export async function registerRoutes(
           winningOption,
           participantIds,
           eventDetails,
-        }).catch(err => console.error('[Notify] Error sending lock notification:', err));
+        }).catch(err => logger.error({ err: err instanceof Error ? err.message : String(err) }, '[Notify] Error sending lock notification'));
         
         const locker = await storage.getUser(userId);
         const lockerName = locker?.name || locker?.username || 'Someone';
@@ -1183,7 +1183,7 @@ export async function registerRoutes(
 
       if (session.status !== 'locked') {
         regenerateSuggestionsForSession(req.params.id, session).catch(err =>
-          console.error('[Session] Failed to regenerate suggestions after participant added:', err)
+          logger.error({ err: err instanceof Error ? err.message : String(err) }, '[Session] Failed to regenerate suggestions after participant added')
         );
       }
     } catch (error: any) {
@@ -1374,7 +1374,7 @@ export async function registerRoutes(
       
       res.json({ newSuggestion: created });
     } catch (error: any) {
-      console.error('[Replace Suggestion Error]', error);
+      logger.error({ err: error instanceof Error ? error.message : String(error) }, '[Replace Suggestion] Error');
       res.status(400).json({ message: error.message });
     }
   });
@@ -1500,7 +1500,7 @@ export async function registerRoutes(
           body: `${voterName} ${action} ${suggestion.name}`,
           url: `/session/${sessionId}`,
           excludeUserId: userId,
-        }).catch(err => console.error('[Push] Vote notification failed:', err));
+        }).catch(err => logger.error({ err: err instanceof Error ? err.message : String(err) }, '[Push] Vote notification failed'));
       }
       
       res.json({ success: true });
@@ -1674,12 +1674,12 @@ export async function registerRoutes(
         })}\n\n`);
         res.end();
       } catch (streamError: any) {
-        console.error('[Planner] Stream error:', streamError);
+        logger.error({ err: streamError instanceof Error ? streamError.message : String(streamError) }, '[Planner] Stream error');
         res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
         res.end();
       }
     } catch (error: any) {
-      console.error('[Planner] Error:', error);
+      logger.error({ err: error instanceof Error ? error.message : String(error) }, '[Planner] Error');
       if (res.headersSent) {
         res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
         res.end();

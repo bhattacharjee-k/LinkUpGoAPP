@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { Session, Message, User, Suggestion, InsertSuggestion } from "@shared/schema";
-import { getSuggestions, getOrchestratedSuggestions, generateWhyExplanation, GroupPreferenceSummary } from "./suggestions";
+import { getSuggestions, getOrchestratedSuggestions, generateWhyExplanation, GroupPreferenceSummary, SuggestionOption } from "./suggestions";
 import { aggregateGroupPreferences } from "./group-preferences";
 import { storage } from "./storage";
 
@@ -428,15 +428,18 @@ async function executeToolCall(
       }
       
       // Create option object for whyExplanation generation
-      const addedOption = {
+      const addedOption: SuggestionOption = {
+        optionType: 'place',
         title: args.name,
         description: args.description || '',
+        address: '',
+        city,
+        source: 'Web',
         priceLevel: args.budget || '$$',
         tags: args.tags || [],
-        optionType: args.kind || 'venue',
-        generationType: 'safe' as const,
+        generationType: 'safe',
       };
-      
+
       const whyExplanation = generateWhyExplanation(addedOption, groupPrefs);
       
       const suggestion = await storage.createSuggestion({

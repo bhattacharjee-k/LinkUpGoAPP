@@ -16,7 +16,13 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { devLog } from '../logger';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Cross-mode __dirname: works in ESM dev (tsx) via import.meta.url and in the
+// production CJS bundle (esbuild output) where import.meta.url is empty but
+// Node's CJS wrapper provides __filename natively.
+const moduleFilename: string = typeof __filename === 'string' && __filename
+  ? __filename
+  : fileURLToPath(import.meta.url);
+const __dirname = path.dirname(moduleFilename);
 import type { SuggestRequest, SuggestResult, GroupPreferenceSummary, DownvoteReasonAggregates } from '../suggestions';
 import type { ReferenceVenue } from '@shared/schema';
 

@@ -18,14 +18,14 @@ export function History() {
 
   const pastSessions = sessions
     .filter(s => s.status === 'locked')
-    .sort((a, b) => (b.lockedAt || 0) - (a.lockedAt || 0));
+    .sort((a, b) => (b.lockedAt?.getTime() || 0) - (a.lockedAt?.getTime() || 0));
 
   const getWinningSuggestion = (session: typeof sessions[0]) => {
     if (!session.winningOptionId || !session.suggestions) return null;
     return session.suggestions.find(s => s.id === session.winningOptionId) || null;
   };
 
-  const formatLockedDate = (lockedAt?: string | number | null) => {
+  const formatLockedDate = (lockedAt?: string | number | Date | null) => {
     if (!lockedAt) return '';
     const d = new Date(lockedAt);
     if (isNaN(d.getTime())) return '';

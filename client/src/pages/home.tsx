@@ -57,7 +57,7 @@ export function Home() {
     return session.suggestions.find(s => s.id === session.winningOptionId) || null;
   };
 
-  const formatLockedDate = (lockedAt?: string | number | null) => {
+  const formatLockedDate = (lockedAt?: string | number | Date | null) => {
     if (!lockedAt) return '';
     const d = new Date(lockedAt);
     if (isNaN(d.getTime())) return '';

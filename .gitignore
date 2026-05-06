@@ -5,6 +5,8 @@ server/public
 vite.config.ts.*
 *.tar.gz
 .env
+.env.local
+.env.*.local
 scripts/deploy.sh
 # Per-user editor / agent configs
 .claude/settings.local.json

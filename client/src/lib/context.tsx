@@ -156,12 +156,15 @@ export interface Suggestion {
   id: string;
   name: string;
   source: string;
+  city?: string;
   rating: string;
   turnout: string;
   distance: string;
   budget: string;
   description: string;
   tags: string[];
+  reservationUrl?: string | null;
+  whyExplanation?: string | null;
   votes: Record<string, { voteType: string; reasons?: string[] | null; note?: string | null }>;
 }
 

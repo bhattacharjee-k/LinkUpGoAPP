@@ -1,4 +1,4 @@
-import { devLog } from './logger';
+import { devLog, logger } from './logger';
 import { LRUCache } from './cache';
 
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
@@ -79,8 +79,7 @@ export async function searchPerplexity(query: string): Promise<PerplexitySearchR
     });
 
     if (!response.ok) {
-      const errBody = await response.text().catch(() => 'no body');
-      console.error(`[Perplexity] API error ${response.status}: ${errBody}`);
+      logger.warn({ service: 'perplexity', statusCode: response.status, statusText: response.statusText }, '[Perplexity] API error');
       return null;
     }
 

@@ -123,7 +123,7 @@ export function SessionComplete() {
       await api.feedback.submit(session.id, {
         suggestionId: winningSuggestion?.id,
         rating,
-        review: review.trim() || null,
+        review: review.trim() || undefined,
         tags: selectedTags,
         wouldRecommend: selectedTags.includes('would_return'),
       });

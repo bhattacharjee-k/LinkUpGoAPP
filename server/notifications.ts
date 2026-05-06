@@ -1,6 +1,7 @@
 import { storage } from './storage';
 import type { InsertNotification, Notification, NotificationType } from '@shared/schema';
 import { sendPushToUser, sendPushToUsers } from './push';
+import { logger } from './logger';
 
 interface CalendarEventParams {
   title: string;
@@ -164,9 +165,9 @@ async function sendEmailNotification(params: {
     });
 
     if (!response.ok) {
-      console.error('[Email] Failed to send:', await response.text());
+      logger.warn({ service: 'resend', endpoint: 'email', statusCode: response.status, statusText: response.statusText, userId }, '[Email] Failed to send');
     } else {
-      console.log('[Email] Sent successfully to user:', userId);
+      logger.info({ userId }, '[Email] Sent successfully');
     }
   } catch (error) {
     console.error('[Email] Error sending notification email:', error);
@@ -359,9 +360,9 @@ async function sendCalendarInviteEmails(params: {
       });
 
       if (!response.ok) {
-        console.error('[Calendar Email] Failed:', await response.text());
+        logger.warn({ service: 'resend', endpoint: 'calendar-email', statusCode: response.status, statusText: response.statusText, userId: user.id }, '[Calendar Email] Failed');
       } else {
-        console.log('[Calendar Email] Sent to:', user.email);
+        logger.info({ userId: user.id }, '[Calendar Email] Sent');
       }
     } catch (error) {
       console.error('[Calendar Email] Error:', error);

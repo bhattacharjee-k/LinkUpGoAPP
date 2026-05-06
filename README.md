@@ -57,7 +57,6 @@ Open http://localhost:5003. Test accounts after seeding: `alice`, `bob`, `carla`
 | `SESSION_SECRET` | Yes | Express session secret |
 | `AI_INTEGRATIONS_OPENAI_API_KEY` | For AI features | OpenAI API key |
 | `GOOGLE_PLACES_API_KEY` | For venue data | Google Places API key |
-| `TICKETMASTER_API_KEY` | No | Ticketmaster API key (live events) |
 | `PERPLEXITY_API_KEY` | No | Perplexity API key (web search) |
 | `RESEND_API_KEY` | No | Resend API key (email notifications) |
 
