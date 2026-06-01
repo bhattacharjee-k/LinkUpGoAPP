@@ -1,6 +1,6 @@
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import * as schema from "../shared/schema.js";
 
@@ -337,6 +337,88 @@ await db.insert(schema.notifications).values([
     url: `/groups/${chiGroup.id}`,
   },
 ]);
+
+// --- Squad history: completed (locked) plans + outcomes for the NYC crew ---
+// Gives the squad a discernible taste for Phase 3 learning + the eval golden set:
+// intimate cocktail/wine/live-music spots in the East Village area ($$-$$$),
+// consistently downvoting big/loud/pricey venues.
+console.log("Creating squad history (locked plans + votes + feedback)...");
+
+const nycHistory = [
+  {
+    name: "Alice's Birthday Cocktails", date: new Date("2026-01-10T20:00:00Z"),
+    neighborhood: "East Village", category: ["Cocktail Bars"],
+    winner: { name: "Attaboy", budget: "$$$", rating: "4.8", tags: ["Cocktails", "Speakeasy", "Intimate"], description: "Made-to-order cocktails in an intimate LES speakeasy." },
+    alsoRan: [{ name: "Le Bain", budget: "$$$$", rating: "4.2", tags: ["Club", "Rooftop", "Loud"], description: "Sceney rooftop club.", downReasons: ["TOO_EXPENSIVE", "NOT_MY_VIBE"] }],
+    feedback: { rating: 5, tags: ["great_vibe", "perfect_size"], wouldRecommend: true, review: "Exactly our speed — intimate and buzzing." },
+  },
+  {
+    name: "Casual Catch-up", date: new Date("2026-01-24T19:30:00Z"),
+    neighborhood: "West Village", category: ["Dive Bars"],
+    winner: { name: "Corner Bistro", budget: "$", rating: "4.3", tags: ["Dive Bar", "Burgers", "Casual"], description: "No-frills neighborhood pub with legendary burgers." },
+    alsoRan: [{ name: "Beauty & Essex", budget: "$$$$", rating: "4.4", tags: ["Trendy", "Loud", "Scene"], description: "Glitzy multi-level lounge.", downReasons: ["TOO_EXPENSIVE"] }],
+    feedback: { rating: 4, tags: ["good_value", "chill"], wouldRecommend: true, review: "Cheap, easy, no fuss." },
+  },
+  {
+    name: "Friday Drinks", date: new Date("2026-02-07T20:00:00Z"),
+    neighborhood: "Lower East Side", category: ["Wine Bars"],
+    winner: { name: "Ruffian", budget: "$$", rating: "4.6", tags: ["Wine Bar", "Intimate", "Hidden Gem"], description: "Tiny natural-wine bar with a cult following." },
+    alsoRan: [{ name: "Marquee", budget: "$$$$", rating: "4.0", tags: ["Club", "Loud", "Bottle Service"], description: "Big-room nightclub.", downReasons: ["NOT_MY_VIBE"] }],
+    feedback: { rating: 5, tags: ["great_vibe", "hidden_gem"], wouldRecommend: true, review: "Our kind of place — small and special." },
+  },
+  {
+    name: "Live Music Night", date: new Date("2026-02-21T20:30:00Z"),
+    neighborhood: "East Village", category: ["Live Music"],
+    winner: { name: "Rockwood Music Hall", budget: "$$", rating: "4.5", tags: ["Live Music", "Intimate", "Local"], description: "Intimate multi-stage live music room." },
+    alsoRan: [{ name: "Webster Hall", budget: "$$$", rating: "4.1", tags: ["Big Venue", "Loud", "Crowded"], description: "Large concert hall and club.", downReasons: ["NOT_MY_VIBE"] }],
+    feedback: { rating: 4, tags: ["great_music", "good_vibe"], wouldRecommend: true, review: "Loved the up-close sets." },
+  },
+];
+
+for (const plan of nycHistory) {
+  const [sess] = await db.insert(schema.sessions).values({
+    name: plan.name, groupId: nycGroup.id, status: "locked",
+    lockedByUserId: alice.id, lockedAt: plan.date, createdAt: plan.date,
+    filters: { city: "NYC", category: plan.category, energy: "Vibey", budget: ["$$", "$$$"], locationMode: "near_me" },
+    guardrails: { maxDistance: "2 miles", hardNos: ["Clubbing"] },
+    neighborhood: plan.neighborhood,
+  }).returning();
+
+  await db.insert(schema.sessionParticipants).values([
+    { sessionId: sess.id, userId: alice.id, status: "active", startingNeighborhood: "East Village", transportMode: "transit", travelToleranceMin: 30 },
+    { sessionId: sess.id, userId: bob.id, status: "active", startingNeighborhood: "West Village", transportMode: "walk", travelToleranceMin: 20 },
+  ]);
+
+  const [winnerSug] = await db.insert(schema.suggestions).values({
+    sessionId: sess.id, name: plan.winner.name, city: "NYC", source: "Web", kind: "venue",
+    rating: plan.winner.rating, turnout: "Medium", distance: "0.4 mi", budget: plan.winner.budget,
+    description: plan.winner.description, tags: plan.winner.tags,
+  }).returning();
+
+  await db.update(schema.sessions).set({ winningOptionId: winnerSug.id }).where(eq(schema.sessions.id, sess.id));
+
+  await db.insert(schema.votes).values([
+    { suggestionId: winnerSug.id, userId: alice.id, voteType: "up" },
+    { suggestionId: winnerSug.id, userId: bob.id, voteType: "up" },
+  ]);
+
+  for (const ar of plan.alsoRan) {
+    const [arSug] = await db.insert(schema.suggestions).values({
+      sessionId: sess.id, name: ar.name, city: "NYC", source: "Web", kind: "venue",
+      rating: ar.rating, turnout: "High", distance: "0.8 mi", budget: ar.budget,
+      description: ar.description, tags: ar.tags,
+    }).returning();
+    await db.insert(schema.votes).values([
+      { suggestionId: arSug.id, userId: alice.id, voteType: "down", reasons: ar.downReasons },
+      { suggestionId: arSug.id, userId: bob.id, voteType: "down", reasons: ar.downReasons },
+    ]);
+  }
+
+  await db.insert(schema.eventFeedback).values([
+    { sessionId: sess.id, userId: alice.id, suggestionId: winnerSug.id, rating: plan.feedback.rating, tags: plan.feedback.tags, wouldRecommend: plan.feedback.wouldRecommend, review: plan.feedback.review },
+    { sessionId: sess.id, userId: bob.id, suggestionId: winnerSug.id, rating: Math.max(3, plan.feedback.rating - 1), tags: plan.feedback.tags, wouldRecommend: plan.feedback.wouldRecommend },
+  ]);
+}
 
 console.log("Seed complete!");
 console.log(`  Users: ${[alice, bob, carla, dave].map((u) => u.username).join(", ")}`);

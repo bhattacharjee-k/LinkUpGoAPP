@@ -16,6 +16,7 @@ import { LoginRequestSchema, RegisterRequestSchema, SuggestRequestSchema, Create
 import { logger } from "./logger";
 import { aggregateEnergy, toEnergyLevel } from "@shared/energy";
 import { buildParticipantTravel } from "./participant-travel";
+import { summarizeSquadHistory } from "./squad-history";
 
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -105,6 +106,10 @@ async function regenerateSuggestionsForSession(sessionId: string, session: any, 
   };
 
   await storage.deleteSessionSuggestions(sessionId);
+  const squadHistory = await summarizeSquadHistory(session.groupId).catch(error => {
+    logger.warn({ sessionId, groupId: session.groupId, error }, '[Session] Failed to summarize squad history');
+    return { text: '', categoryHistogram: {} };
+  });
 
   const enrichedData: any = {
     city: filters.locationScope || validUsers[0]?.city || 'NYC',
@@ -124,6 +129,7 @@ async function regenerateSuggestionsForSession(sessionId: string, session: any, 
     favoriteNeighborhoods: mergedGroupPrefs.favoriteNeighborhoods,
     transportationModes: validUsers.map((u: any) => u.transportationMode || 'car'),
     participantTravel: buildParticipantTravel(activeParticipants, validUsers),
+    squadHistory,
   };
 
   let result = await getOrchestratedSuggestions(
