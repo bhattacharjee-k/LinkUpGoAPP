@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LinkUpGo — Squad Experience Prototype</title>
+<style>
+  :root{
+    --bg:#0a0a0b; --surface:rgba(255,255,255,.05); --surface2:rgba(255,255,255,.08);
+    --border:rgba(255,255,255,.10); --text:#f5f5f7; --muted:#9a9aa2;
+    --primary:#b9f24d; --ink:#0a0a0b; --accent:#7c5cff;
+    --green:#22c55e; --red:#ef4444; --blue:#3b82f6; --amber:#f5c451;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 50% -10%, #14140f 0%, #0a0a0b 55%);
+    color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:28px 16px 60px;
+  }
+  .title{font-weight:800; font-size:18px; letter-spacing:-.3px; margin-bottom:2px}
+  .subtitle{color:var(--muted); font-size:13px; margin-bottom:20px; text-align:center}
+  .subtitle b{color:var(--primary)}
+
+  .phone{
+    width:392px; max-width:100%; height:760px; background:var(--bg);
+    border-radius:42px; border:1px solid var(--border);
+    box-shadow:0 0 0 10px #161617, 0 30px 80px rgba(0,0,0,.6);
+    overflow:hidden; position:relative; display:flex; flex-direction:column;
+  }
+  .notch{position:absolute; top:0; left:50%; transform:translateX(-50%); width:140px; height:26px;
+    background:#161617; border-radius:0 0 16px 16px; z-index:50}
+
+  .screen{display:none; flex-direction:column; height:100%; overflow-y:auto; padding:46px 22px 22px}
+  .screen.active{display:flex; animation:fade .35s ease}
+  .screen::-webkit-scrollbar{display:none}
+  @keyframes fade{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+
+  .bg-glow{position:absolute; width:240px; height:240px; border-radius:50%;
+    background:rgba(185,242,77,.10); filter:blur(90px); top:-40px; left:-40px; pointer-events:none}
+
+  h1{font-size:30px; font-weight:800; letter-spacing:-.6px; line-height:1.1}
+  h2{font-size:21px; font-weight:800; letter-spacing:-.3px}
+  .lead{color:var(--muted); font-size:14px; line-height:1.5; margin-top:8px}
+  .eyebrow{color:var(--primary); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1.4px}
+
+  .btn{display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+    height:54px; border:none; border-radius:16px; font-size:16px; font-weight:800; cursor:pointer;
+    background:var(--primary); color:var(--ink); transition:transform .08s, filter .2s}
+  .btn:active{transform:scale(.985)}
+  .btn.secondary{background:var(--surface); color:var(--text); border:1px solid var(--border); font-weight:700}
+  .btn.ghost{background:transparent; color:var(--muted); height:46px; font-weight:600; font-size:14px}
+  .btn.sm{height:38px; font-size:13px; width:auto; padding:0 16px; border-radius:11px}
+
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:16px}
+  .row{display:flex; gap:8px}
+  .col{display:flex; flex-direction:column; gap:8px}
+  .spacer{flex:1}
+  .mt{margin-top:18px}.mt-s{margin-top:10px}.mt-l{margin-top:26px}
+  .center{text-align:center}
+  .muted{color:var(--muted)} .small{font-size:12px} .xs{font-size:11px}
+
+  .chip{display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:999px;
+    background:var(--surface); border:1px solid var(--border); font-size:13px; font-weight:600; cursor:pointer}
+  .chip.on{background:var(--primary); color:var(--ink); border-color:var(--primary)}
+  .chip.green{background:rgba(34,197,94,.14); color:#7ee29a; border-color:rgba(34,197,94,.3)}
+  .chip.dim{background:rgba(255,255,255,.03); color:var(--muted)}
+  .wrap{display:flex; flex-wrap:wrap; gap:8px}
+
+  .avatars{display:flex}
+  .av{width:34px; height:34px; border-radius:50%; border:2px solid var(--bg); margin-left:-8px;
+    display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:var(--ink)}
+  .av:first-child{margin-left:0}
+  .a1{background:linear-gradient(135deg,#b9f24d,#22c55e)} .a2{background:linear-gradient(135deg,#7c5cff,#3b82f6)}
+  .a3{background:linear-gradient(135deg,#f5c451,#f59e0b)} .a4{background:linear-gradient(135deg,#ff7ab6,#ef4444)}
+  .a5{background:linear-gradient(135deg,#34d3c0,#3b82f6)}
+
+  .topbar{display:flex; align-items:center; gap:12px; margin-bottom:8px}
+  .back{width:34px; height:34px; border-radius:10px; background:var(--surface); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:16px; flex:none}
+
+  .seg{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
+  .seg .opt{height:44px; border-radius:11px; background:var(--surface); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; cursor:pointer}
+  .seg .opt.on{background:var(--primary); color:var(--ink); border-color:var(--primary)}
+
+  .nii{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px}
+  .nii-head{display:flex; align-items:center; gap:10px}
+  .nii-emoji{font-size:24px}
+  .nii-name{font-weight:800; font-size:15px}
+  .nii-anchor{font-size:11.5px; color:var(--muted); line-height:1.35}
+  .nii-band{margin-left:auto; font-size:10.5px; font-weight:800; color:var(--ink); background:var(--primary); padding:3px 8px; border-radius:999px; white-space:nowrap}
+  .slider{-webkit-appearance:none; appearance:none; width:100%; height:8px; border-radius:999px; outline:none; margin:16px 0 9px;
+    background:linear-gradient(90deg,#7c5cff 0%, #3b82f6 33%, #f5c451 66%, #b9f24d 100%)}
+  .slider::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:24px; height:24px; border-radius:50%;
+    background:#fff; border:3px solid var(--primary); cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  .nii-ticks{display:flex; justify-content:space-between; font-size:10px; color:var(--muted)}
+  .nii-ticks span{flex:1; text-align:center}
+  .nii-ticks span:first-child{text-align:left} .nii-ticks span:last-child{text-align:right}
+  .meter{height:6px; border-radius:999px; background:rgba(255,255,255,.08); position:relative; margin-top:4px; overflow:hidden}
+  .meter i{position:absolute; top:0; bottom:0; left:0; border-radius:999px; background:linear-gradient(90deg,#3b82f6,#b9f24d)}
+
+  .input{width:100%; background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:13px 14px; color:var(--text); font-size:15px; font-family:inherit}
+  .input::placeholder{color:#6b6b73}
+  textarea.input{resize:none; line-height:1.45}
+
+  .label{font-size:12px; color:var(--muted); font-weight:600; margin-bottom:8px; display:block}
+  .divider{height:1px; background:var(--border); margin:18px 0}
+
+  .pill{display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:999px; font-size:10.5px; font-weight:800; letter-spacing:.3px}
+  .pill.gem{background:rgba(124,92,255,.16); color:#b9a6ff; border:1px solid rgba(124,92,255,.34)}
+  .pill.new{background:rgba(245,196,81,.16); color:var(--amber); border:1px solid rgba(245,196,81,.34)}
+  .pill.fit{background:rgba(34,197,94,.14); color:#7ee29a; border:1px solid rgba(34,197,94,.3)}
+  .pill.stretch{background:rgba(59,130,246,.14); color:#9ec5ff; border:1px solid rgba(59,130,246,.3)}
+  .strain{display:flex; align-items:center; gap:10px; margin:2px 0}
+  .snm{font-size:12px; width:38px; flex:none; font-weight:600}
+  .sbar{flex:1; height:7px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden}
+  .sbar i{display:block; height:100%; border-radius:999px; background:var(--primary)}
+  .sval{font-size:11px; color:var(--muted); width:60px; text-align:right; flex:none}
+  .pill.rate{background:var(--primary); color:var(--ink)}
+
+  .why{background:rgba(185,242,77,.08); border:1px solid rgba(185,242,77,.22); border-radius:12px;
+    padding:10px 12px; font-size:12.5px; color:#d7f5a6; line-height:1.45}
+
+  .venue-img{height:96px; border-radius:14px 14px 0 0; position:relative; display:flex; align-items:flex-end; padding:12px;
+    background:linear-gradient(120deg,#2a2438,#16202b)}
+  .venue-img.b{background:linear-gradient(120deg,#2d2a18,#142420)}
+  .venue-img.c{background:linear-gradient(120deg,#231a2e,#1a2730)}
+  .venue-name{font-size:18px; font-weight:800; text-shadow:0 2px 8px rgba(0,0,0,.5)}
+
+  .metabar{display:flex; gap:6px; flex-wrap:wrap}
+  .meta{display:inline-flex; align-items:center; gap:5px; padding:5px 9px; border-radius:8px;
+    background:var(--surface); border:1px solid var(--border); font-size:11.5px; color:var(--muted)}
+
+  .vote{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px}
+  .vbtn{height:44px; border-radius:11px; background:var(--surface); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; gap:8px; font-weight:700; font-size:13px; cursor:pointer; color:var(--text)}
+  .vbtn.up.on{background:var(--primary); color:var(--ink); border-color:var(--primary)}
+
+  .status{display:flex; align-items:center; justify-content:space-between; padding:11px 13px;
+    background:var(--surface); border:1px solid var(--border); border-radius:12px; font-size:13px}
+  .dot{width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:7px}
+  .dot.ok{background:var(--green)} .dot.wait{background:var(--amber)}
+
+  .splitbar{height:30px; border-radius:9px; overflow:hidden; display:flex; font-size:11px; font-weight:800}
+  .splitbar .out{background:var(--primary); color:var(--ink); display:flex; align-items:center; justify-content:center}
+  .splitbar .chill{background:rgba(124,92,255,.5); color:#fff; display:flex; align-items:center; justify-content:center}
+
+  .note{width:392px; max-width:100%; margin-top:14px; background:rgba(124,92,255,.08);
+    border:1px solid rgba(124,92,255,.28); border-radius:14px; padding:12px 14px; font-size:12.5px; line-height:1.5; color:#cbbcff}
+  .note b{color:#fff}
+  .dots{display:flex; gap:6px; justify-content:center; margin-top:14px}
+  .dots i{width:7px; height:7px; border-radius:50%; background:var(--border); cursor:pointer; transition:.2s}
+  .dots i.on{background:var(--primary); width:20px; border-radius:999px}
+  .navbtns{display:flex; gap:10px; width:392px; max-width:100%; margin-top:12px}
+</style>
+</head>
+<body>
+
+  <div class="title">LinkUpGo · New Experience Prototype</div>
+  <div class="subtitle">Squad-first planning with <b>learned crew taste</b>. Click through →</div>
+
+  <div class="phone">
+    <div class="notch"></div>
+
+    <!-- 0 · ENTRY -->
+    <section class="screen active" data-i="0">
+      <div class="bg-glow"></div>
+      <div class="spacer"></div>
+      <div class="eyebrow">LinkUpGo</div>
+      <h1 class="mt-s">Plan nights out<br>with your crew.</h1>
+      <p class="lead">Make a squad once. Plan inside it forever. The more you go out together, the smarter your picks get.</p>
+      <div class="spacer"></div>
+      <button class="btn" onclick="go(1)">＋ Start a squad</button>
+      <button class="btn ghost mt-s" onclick="go(3)">Just me →</button>
+    </section>
+
+    <!-- 1 · CREATE SQUAD -->
+    <section class="screen" data-i="1">
+      <div class="topbar"><div class="back" onclick="go(0)">←</div><div class="eyebrow">New squad</div></div>
+      <h2>Who's your crew?</h2>
+      <p class="lead">A squad is the people you actually go out with. You'll plan lots of nights inside it.</p>
+      <div class="mt">
+        <span class="label">Squad name</span>
+        <input class="input" value="The Usual Suspects" />
+      </div>
+      <div class="mt">
+        <span class="label">Members</span>
+        <div class="wrap">
+          <div class="chip on">You</div>
+          <div class="chip">Maya </div>
+          <div class="chip">Dev </div>
+          <div class="chip">Sam </div>
+          <div class="chip dim">＋ Add</div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn" onclick="go(2)">Create squad</button>
+    </section>
+
+    <!-- 2 · SQUAD HOME -->
+    <section class="screen" data-i="2">
+      <div class="topbar">
+        <div class="back" onclick="go(1)">←</div>
+        <div style="flex:1">
+          <div style="font-weight:800; font-size:17px">The Usual Suspects</div>
+          <div class="muted xs">4 in the crew</div>
+        </div>
+        <div class="avatars">
+          <div class="av a1">ME</div><div class="av a2">MA</div><div class="av a3">DE</div><div class="av a4">SA</div>
+        </div>
+      </div>
+
+      <div class="card mt-s" style="background:linear-gradient(135deg,rgba(124,92,255,.12),rgba(185,242,77,.06)); border-color:rgba(124,92,255,.3)">
+        <div class="row" style="align-items:center; justify-content:space-between">
+          <div class="eyebrow" style="color:#b9a6ff">This crew's taste</div>
+          <div class="xs muted">learned from 6 nights</div>
+        </div>
+        <div class="wrap mt-s">
+          <span class="chip dim">Easy on the wallet ($$)</span>
+          <span class="chip dim">Cocktail-forward</span>
+          <span class="chip dim">Brooklyn-leaning</span>
+          <span class="chip dim">Gems &gt; hotspots</span>
+          <span class="chip dim">Out ~2×/month</span>
+          <span class="chip dim">Avoids big-scene clubs</span>
+        </div>
+      </div>
+
+      <button class="btn mt" onclick="go(3)">＋ New plan</button>
+
+      <div class="label mt-l">Past nights</div>
+      <div class="col">
+        <div class="card" style="padding:13px">
+          <div class="row" style="justify-content:space-between; align-items:center">
+            <div><div style="font-weight:700">Achilles Heel</div><div class="xs muted">Greenpoint · cocktails</div></div>
+            <span class="chip green">Went · 4.5</span>
+          </div>
+        </div>
+        <div class="card" style="padding:13px">
+          <div class="row" style="justify-content:space-between; align-items:center">
+            <div><div style="font-weight:700">Birria-Landia</div><div class="xs muted">Williamsburg · tacos</div></div>
+            <span class="chip green">Went · 5</span>
+          </div>
+        </div>
+        <div class="card" style="padding:13px; opacity:.6">
+          <div class="row" style="justify-content:space-between; align-items:center">
+            <div><div style="font-weight:700">House of Yes</div><div class="xs muted">Bushwick · club</div></div>
+            <span class="chip" style="color:#ff9aa9">Downvoted · too much</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 · NEW PLAN (occasion-led) -->
+    <section class="screen" data-i="3">
+      <div class="topbar"><div class="back" onclick="go(2)">←</div><div class="eyebrow">New plan</div></div>
+      <h2>What's the night?</h2>
+      <p class="lead">The occasion sets the vibe — your crew's taste handles the rest.</p>
+
+      <div class="mt">
+        <span class="label">Occasion</span>
+        <div class="wrap">
+          <span class="chip on">Casual catch-up</span>
+          <span class="chip">Birthday </span>
+          <span class="chip">Date night</span>
+          <span class="chip">Big send </span>
+        </div>
+      </div>
+
+      <div class="mt">
+        <span class="label">Anything specific in mind? <span style="color:#7ee29a">(your strongest signal)</span></span>
+        <textarea class="input" rows="2" placeholder="e.g. somewhere with a patio, good cocktails, not too loud">somewhere with a patio &amp; good cocktails, not too loud</textarea>
+      </div>
+
+      <div class="mt">
+        <span class="label">When</span>
+        <div class="row">
+          <input class="input" value="Fri, Jun 6" style="flex:1.4" />
+          <input class="input" value="8:00 PM" style="flex:1" />
+        </div>
+      </div>
+
+      <div class="spacer mt"></div>
+      <button class="btn" onclick="go(4)">Ask the crew →</button>
+      <div class="center xs muted mt-s">Pre-filled from each person's usual — they just confirm.</div>
+    </section>
+
+    <!-- 4 · PER-MEMBER CONSTRAINTS -->
+    <section class="screen" data-i="4">
+      <div class="topbar"><div class="back" onclick="go(3)">←</div><div class="eyebrow">Your call for tonight</div></div>
+      <h2>Confirm your 3</h2>
+      <p class="lead">These change night to night — that's why we ask. Tap to tweak, or just confirm your usual.</p>
+
+      <div class="mt">
+        <span class="label">Budget <span class="muted">· your usual</span></span>
+        <div class="seg">
+          <div class="opt">$</div><div class="opt on">$$</div><div class="opt">$$$</div><div class="opt">$$$$</div>
+        </div>
+      </div>
+
+      <div class="mt">
+        <span class="label">Energy tonight <span class="muted">· drag the slider</span></span>
+        <div class="nii">
+          <div class="nii-head">
+            <span class="nii-emoji" id="eEmoji"></span>
+            <div>
+              <div class="nii-name" id="eName">Going out</div>
+              <div class="nii-anchor" id="eAnchor">A real night — drinks &amp; dancing, out late.</div>
+            </div>
+          </div>
+          <input type="range" min="0" max="100" value="58" class="slider" id="eSlider" oninput="energy(this.value)" />
+          <div class="nii-ticks"><span>Chill</span><span>Vibey</span><span>Out</span><span>Send</span></div>
+        </div>
+      </div>
+
+      <div class="mt">
+        <span class="label">Coming from + how</span>
+        <div class="row" style="margin-bottom:8px"><input class="input" value="East Village" style="flex:1"/></div>
+        <div class="wrap">
+          <span class="chip">Walk</span><span class="chip on">Transit</span><span class="chip">Car</span>
+        </div>
+        <div class="mt-s">
+          <span class="label">Willing to travel <span class="muted">· by transit</span></span>
+          <div class="seg">
+            <div class="opt">15m</div><div class="opt on">30m</div><div class="opt">45m</div><div class="opt">60m</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="label">Crew status</div>
+      <div class="col">
+        <div class="status"><span><span class="dot ok"></span>You</span><span class="muted xs">confirmed</span></div>
+        <div class="status"><span><span class="dot ok"></span>Maya</span><span class="muted xs">confirmed</span></div>
+        <div class="status"><span><span class="dot wait"></span>Dev</span><span class="muted xs">waiting…</span></div>
+        <div class="status"><span><span class="dot wait"></span>Sam</span><span class="muted xs">waiting…</span></div>
+        <p class="center xs muted" style="margin-top:4px">Everyone's answers stay private — you only see who's in, not what they picked.</p>
+      </div>
+      <button class="btn mt" onclick="go(5)">Confirm &amp; see where it lands</button>
+      <div class="center xs muted mt-s">We start finding spots now and refine as Dev &amp; Sam reply.</div>
+    </section>
+
+    <!-- 5 · GROUP RECONCILIATION -->
+    <section class="screen" data-i="5">
+      <div class="topbar"><div class="back" onclick="go(4)">←</div><div class="eyebrow">Where the crew landed</div></div>
+      <h2>Reading the room</h2>
+      <p class="lead">4 of 4 in. Here's how everyone's answers combine.</p>
+
+      <div class="card mt">
+        <div class="row" style="justify-content:space-between"><b>Budget</b><span class="chip green">Comfortable at $$</span></div>
+        <div class="small muted mt-s">Mostly wallet-friendly tonight — we'll still slip in a standout worth a small stretch.</div>
+      </div>
+
+      <div class="card mt-s">
+        <div class="row" style="justify-content:space-between"><b>Getting there</b><span class="chip green">All within their limit</span></div>
+        <div class="col mt-s" style="gap:5px">
+          <div class="strain"><span class="snm">You</span><div class="sbar"><i style="width:40%"></i></div><span class="sval">12 / 30m</span></div>
+          <div class="strain"><span class="snm">Maya</span><div class="sbar"><i style="width:45%"></i></div><span class="sval">9 / 20m</span></div>
+          <div class="strain"><span class="snm">Dev</span><div class="sbar"><i style="width:73%; background:var(--amber)"></i></div><span class="sval">22 / 30m</span></div>
+          <div class="strain"><span class="snm">Sam</span><div class="sbar"><i style="width:40%"></i></div><span class="sval">18 / 45m</span></div>
+        </div>
+        <div class="small muted mt-s">Balanced against each person's own willingness — not absolute time. Dev is the most stretched (73% of their limit), still comfortably in.</div>
+      </div>
+
+      <div class="card mt-s">
+        <div class="row" style="justify-content:space-between; margin-bottom:10px"><b>Energy split</b><span class="muted xs">we won't force it</span></div>
+        <div class="splitbar"><div class="out" style="flex:3">3 · going out</div><div class="chill" style="flex:1">1 · chill</div></div>
+        <div class="small muted mt-s">Leaning lively — we'll favor a spot with a calmer corner so the low-key crowd isn't stuck.</div>
+      </div>
+
+      <div class="spacer mt"></div>
+      <button class="btn" onclick="go(6)">Find our spots →</button>
+    </section>
+
+    <!-- 6 · RESULTS -->
+    <section class="screen" data-i="6">
+      <div class="topbar">
+        <div class="back" onclick="go(5)">←</div>
+        <div style="flex:1"><div style="font-weight:800; font-size:16px">Friday · 3 picks</div><div class="xs muted">tuned to the crew + tonight</div></div>
+        <span class="chip dim xs"></span>
+      </div>
+
+      <div class="why" style="margin-top:6px">
+        <b style="color:#fff">Why these →</b> matched to your crew's taste (cocktails, $$, gems) and tonight's calmer-lively split, mixed across neighborhoods. We <b style="color:#fff">skipped 2 famous spots</b> your crew downvoted as "too much."
+      </div>
+
+      <!-- Card A : hidden gem -->
+      <div class="card mt" style="padding:0; overflow:hidden">
+        <div class="venue-img">
+          <span class="pill gem" style="position:absolute; top:10px; left:10px">LOCAL GEM</span>
+          <span class="pill rate" style="position:absolute; top:10px; right:10px">4.6</span>
+          <span class="venue-name">The Long Island Bar</span>
+        </div>
+        <div style="padding:14px">
+          <div class="wrap" style="margin-bottom:10px">
+            <span class="chip dim xs">intimate</span><span class="chip dim xs">low-key</span><span class="chip dim xs">classic cocktails</span>
+          </div>
+          <div class="why">For your crew: a neighborhood cocktail classic with a quiet end of the bar — the un-scene-y vibe you keep going back to. Most tourists never find it.</div>
+          <div class="metabar mt-s">
+            <span class="meta">You 11m · all ≤24m</span><span class="meta">$$</span><span class="meta">Vibey energy</span>
+            <span class="pill fit">within budget</span><span class="pill fit">reachable by all</span>
+          </div>
+          <div class="meter"><i style="width:41%"></i></div>
+          <div class="vote"><div class="vbtn up on">3</div><div class="vbtn">0</div></div>
+        </div>
+      </div>
+
+      <!-- Card B : balanced -->
+      <div class="card mt-s" style="padding:0; overflow:hidden">
+        <div class="venue-img b">
+          <span class="pill rate" style="position:absolute; top:10px; right:10px">4.4</span>
+          <span class="venue-name">Birds of a Feather</span>
+        </div>
+        <div style="padding:14px">
+          <div class="wrap" style="margin-bottom:10px">
+            <span class="chip dim xs">buzzy-not-chaotic</span><span class="chip dim xs">Sichuan</span><span class="chip dim xs">groups</span>
+          </div>
+          <div class="why">Lively enough for the 3 who want a night, big tables and a chill back room for Dev. Bridges the split.</div>
+          <div class="metabar mt-s">
+            <span class="meta">all ≤25m</span><span class="meta">$$</span><span class="meta">Going-out energy</span><span class="pill fit">bridges energy split</span>
+          </div>
+          <div class="meter"><i style="width:60%"></i></div>
+          <div class="vote"><div class="vbtn up">1</div><div class="vbtn">0</div></div>
+        </div>
+      </div>
+
+      <!-- Card C : exploration slot -->
+      <div class="card mt-s" style="padding:0; overflow:hidden">
+        <div class="venue-img c">
+          <span class="pill new" style="position:absolute; top:10px; left:10px">NEW FOR THE CREW</span>
+          <span class="pill rate" style="position:absolute; top:10px; right:10px">new</span>
+          <span class="venue-name">Sundown Rooftop</span>
+        </div>
+        <div style="padding:14px">
+          <div class="wrap" style="margin-bottom:10px">
+            <span class="chip dim xs">patio</span><span class="chip dim xs">sunset</span><span class="chip dim xs">cocktails</span>
+          </div>
+          <div class="why">A wildcard — you asked for a patio, and you've never tried a rooftop together. A touch above your usual $$, but it nails the patio ask and looks worth the stretch.</div>
+          <div class="metabar mt-s">
+            <span class="meta">L.E.S.</span><span class="meta">$$$</span><span class="pill stretch">worth a small stretch</span><span class="pill fit">matches "patio"</span>
+          </div>
+          <div class="vote"><div class="vbtn up">2</div><div class="vbtn">0</div></div>
+        </div>
+      </div>
+
+      <div class="center xs muted mt mt-s" style="padding-bottom:6px">Every vote teaches the crew's taste for next time.</div>
+    </section>
+
+  </div>
+
+  <!-- design notes -->
+  <div class="note" id="note"></div>
+  <div class="dots" id="dots"></div>
+  <div class="navbtns">
+    <button class="btn secondary sm" style="flex:1; height:44px" onclick="prev()">← Back</button>
+    <button class="btn sm" style="flex:1; height:44px" onclick="next()">Next →</button>
+  </div>
+
+<script>
+  const NOTES = [
+    "<b>Squad-first entry.</b> The app opens on “make a crew,” not “fill out a form.” Solo is just a squad of one — one system, not two.",
+    "<b>The persistent container.</b> You create the crew once; every future night lives inside it. This is the group-chat mental model, and it's what makes learning possible.",
+    "<b>Learned crew taste (the centerpiece).</b> Squad-level learning, not an average of individuals. The “Planner reads history” summary + past-night outcomes (incl. the downvoted club) drive future picks. <b>This is the new core.</b>",
+    "<b>Occasion-led + lead with the strong signal.</b> Occasion sets the vibe; the free-text box is surfaced as the highest-signal input (was buried at the bottom in today's app).",
+    "<b>Per-event, per-member constraints.</b> Each member sets budget, an <b>energy Night-Intensity slider</b> (drag it — the anchored description updates so everyone shares one definition; the NII score stays internal, never shown), and how they're getting there — including <b>how far they'll travel, in time, by mode</b>. Pre-filled; one tap. Answers stay private.",
+    "<b>Aggregate softly, surface conflict — don't force it.</b> Budget = soft comfort (stretch for a standout); <b>travel = each person's strain vs their own willingness</b> (minimize the most-stretched, not absolute minutes); energy = blended and shown as a split we bridge. Aggregates are anonymous — except travel logistics, which everyone wants to see.",
+    "<b>Results on the same axis.</b> Every venue is scored on the same <b>Night Intensity Index</b> as the slider (see the meter), so matching is real, not vibes. Plus character tags (the “TAO problem”), a hidden-gem signal, group-fit chips, a bandit exploration pick, and transparent “skipped the famous-but-downvoted spots.”"
+  ];
+  let i = 0; const N = NOTES.length;
+  const dots = document.getElementById('dots');
+  for(let k=0;k<N;k++){const d=document.createElement('i'); d.onclick=()=>go(k); dots.appendChild(d);}
+  function render(){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active', +s.dataset.i===i));
+    document.querySelectorAll('.dots i').forEach((d,k)=>d.classList.toggle('on',k===i));
+    document.getElementById('note').innerHTML = "<b>Design note —</b> " + NOTES[i];
+    const ph=document.querySelector('.phone'); ph.scrollTop=0;
+    document.querySelector('.screen.active').scrollTop=0;
+  }
+  function go(n){ i=Math.max(0,Math.min(N-1,n)); render(); }
+  function next(){ go(i+1); } function prev(){ go(i-1); }
+
+  // Energy slider → Night Intensity band + anchored description
+  const BANDS = [
+    {max:25,  emoji:'', name:'Chill',     anchor:'Show up as you are — dive-bar easy, home whenever.'},
+    {max:50,  emoji:'', name:'Vibey',     anchor:'Dressed but easy — cool bar, reasonable bedtime.'},
+    {max:78,  emoji:'', name:'Going out', anchor:'A real night — drinks & dancing, out late.'},
+    {max:101, emoji:'', name:'Full send', anchor:'All-out — clubs, big money, 4–5am.'},
+  ];
+  function energy(v){
+    v=+v; const b=BANDS.find(x=>v<x.max);
+    eEmoji.textContent=b.emoji; eName.textContent=b.name; eAnchor.textContent=b.anchor;
+  }
+  energy(document.getElementById('eSlider').value);
+  render();
+</script>
+</body>
+</html>

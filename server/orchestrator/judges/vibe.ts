@@ -8,14 +8,16 @@ import type { JudgeFn, JudgeVerdict } from './types';
 import type { EnrichedCandidate } from '../envelope';
 import { getAnthropic, getGemini, MODELS } from './clients';
 import { parseVerdictArray } from './parse';
+import { HIGH_ENERGY_LEVELS } from '@shared/energy';
 
+const HIGH_ENERGY_PROMPT_LABELS = HIGH_ENERGY_LEVELS.map(level => `"${level}"`).join(' / ');
 const SYSTEM = `You are a strict, calibrated rater for a social-event recommendation app.
 You score how well each venue matches the GROUP'S VIBE on a 1-5 scale.
 
 DIMENSION: VIBE
 - Does this candidate match the user's energy level, free-text vibe description, and categories?
 - Are the tags/description consistent with the desired experience?
-- A high-energy "Going out" / "Full send" intent should reward clubs, late-night cocktails, dance floors.
+- A high-energy ${HIGH_ENERGY_PROMPT_LABELS} intent should reward clubs, late-night cocktails, dance floors.
   A "Chill" / "Vibey" intent should reward listening bars, low-key cocktail rooms, neighborhood gems.
 
 SCALE (1-5):

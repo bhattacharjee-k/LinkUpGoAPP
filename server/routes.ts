@@ -14,6 +14,7 @@ import { signAccessToken, signRefreshToken, storeRefreshToken, validateAndRotate
 import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from "./middleware/error-handler";
 import { LoginRequestSchema, RegisterRequestSchema, SuggestRequestSchema, CreateGroupRequestSchema, VoteRequestSchema, CreateMessageRequestSchema } from "@shared/api-schemas";
 import { logger } from "./logger";
+import { aggregateEnergy, toEnergyLevel } from "@shared/energy";
 
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -84,9 +85,8 @@ async function regenerateSuggestionsForSession(sessionId: string, session: any, 
   const budgets = validUsers.map((u: any) => u.budget || '$$');
   const avgBudgetIdx = Math.round(budgets.reduce((sum: number, b: string) => sum + budgetOrder.indexOf(b), 0) / budgets.length);
 
-  const energyOrder = ['Chill', 'Vibey', 'Hype'];
   const energies = validUsers.map((u: any) => u.energy || 'Vibey');
-  const avgEnergyIdx = Math.round(energies.reduce((sum: number, e: string) => sum + energyOrder.indexOf(e), 0) / energies.length);
+  const energyAggregate = aggregateEnergy(energies.map((e: string) => toEnergyLevel(e)));
 
   const allNeighborhoods = validUsers.flatMap((u: any) => u.favoriteNeighborhoods || []);
   const uniqueNeighborhoods = [...new Set(allNeighborhoods)] as string[];
@@ -97,7 +97,7 @@ async function regenerateSuggestionsForSession(sessionId: string, session: any, 
     categories: [...new Set(allCategories)] as string[],
     commonCategories: commonCategories.length > 0 ? commonCategories : (filters.categories || filters.category || ['Drinks']),
     budget: budgetOrder[avgBudgetIdx] || '$$',
-    energy: energyOrder[avgEnergyIdx] || 'Vibey',
+    energy: energyAggregate.target,
     crowdPreference: validUsers[0]?.crowdPreference || 'no_preference',
     discoveryStyle: validUsers[0]?.discoveryStyle || 'mixed',
     favoriteNeighborhoods: uniqueNeighborhoods,

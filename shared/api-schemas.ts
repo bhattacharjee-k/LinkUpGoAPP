@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DownvoteReason } from './schema';
+import { ENERGY_LEVELS } from './energy';
 
 export const LoginRequestSchema = z.object({
   username: z.string().min(1, 'Username is required'),
@@ -14,7 +15,7 @@ export const RegisterRequestSchema = z.object({
   email: z.string().email().optional().nullable(),
   city: z.enum(['NYC', 'Chicago']),
   budget: z.array(z.enum(['$', '$$', '$$$', '$$$$'])).min(1, 'Select at least one budget'),
-  energy: z.enum(['Chill', 'Vibey', 'Going out', 'Full send']),
+  energy: z.enum(ENERGY_LEVELS),
   categories: z.array(z.string()).min(1, 'Select at least one category'),
   hardNos: z.array(z.string()).default([]),
 });

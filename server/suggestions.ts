@@ -2,6 +2,7 @@ import { getSearchCenter, haversineDistance, isWithinCity, LatLng } from './geo'
 import { devLog } from './logger';
 import { discoverTrendingVenues, discoverVenuesFromQuery } from './perplexity';
 import { synthesizeContext, validateAndRankSuggestions, OrchestratorBrief } from './orchestrator';
+import { isHighEnergy } from '@shared/energy';
 
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
@@ -170,10 +171,6 @@ function isLateNight(specificTime?: string, timeWindow?: string): boolean {
     return timeWindow.toLowerCase().includes('night');
   }
   return false;
-}
-
-function isHighEnergy(energy?: string): boolean {
-  return energy === 'Going out' || energy === 'Full send';
 }
 
 const nightlifeTypes = ['night_club', 'bar'];
@@ -1236,7 +1233,7 @@ export function generateWhyExplanation(
   const isNightlifeVenue = option.tags.some(t => 
     ['night club', 'night_club', 'club', 'lounge', 'bar'].some(k => t.toLowerCase().includes(k))
   );
-  const isNightEnergy = groupPrefs.energy === 'Going out' || groupPrefs.energy === 'Full send';
+  const isNightEnergy = isHighEnergy(groupPrefs.energy);
   if (isNightlifeVenue && isNightEnergy) {
     reasons.push('Perfect for a night out');
   }

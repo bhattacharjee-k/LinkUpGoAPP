@@ -1,6 +1,9 @@
 import OpenAI from "openai";
 import { SuggestionOption, SuggestRequest, DownvoteReasonAggregates, GroupPreferenceSummary } from "./suggestions";
 import { devLog } from "./logger";
+import { HIGH_ENERGY_LEVELS, isHighEnergy } from "@shared/energy";
+
+const HIGH_ENERGY_PROMPT_LABELS = HIGH_ENERGY_LEVELS.map(level => `"${level}"`).join(", ");
 
 let _openai: OpenAI | null = null;
 function getOpenAI() {
@@ -113,7 +116,7 @@ Respond with a JSON object with these fields:
 10. "radiusBias": "tight" if user wants walkable/nearby, "wide" if exploring, "normal" otherwise. If downvotes include "tooFar", use "tight".
 
 IMPORTANT RULES:
-- For late-night plans (after 9PM) or high-energy vibes ("Going out", "Full send"), AGGRESSIVELY exclude restaurant types. Bars that primarily serve food should be excluded too.
+- For late-night plans (after 9PM) or high-energy vibes (${HIGH_ENERGY_PROMPT_LABELS}), AGGRESSIVELY exclude restaurant types. Bars that primarily serve food should be excluded too.
 - For daytime/chill plans, restaurants and cafes are totally fine.
 - If past feedback shows 1-2★ ratings for venues, note what to avoid. If 4-5★, note what to replicate.
 - If downvotes show "tooFar", tighten the radius. If "tooExpensive", lower the budget.
@@ -174,8 +177,7 @@ function buildFallbackBrief(req: SuggestRequest): OrchestratorBrief {
     return req.timeWindow?.toLowerCase().includes("night") || false;
   })();
 
-  const isHighEnergy = req.energy === "Going out" || req.energy === "Full send";
-  const excludeTypes = (isLateNight || isHighEnergy) ? ["restaurant", "cafe"] : [];
+  const excludeTypes = (isLateNight || isHighEnergy(req.energy)) ? ["restaurant", "cafe"] : [];
 
   return {
     naturalLanguageIntent: `Looking for ${req.categories.join(", ")} in ${req.city}`,

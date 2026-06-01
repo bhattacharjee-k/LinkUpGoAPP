@@ -20,9 +20,11 @@
 import { devLog } from '../logger';
 import type { OrchestratorBrief } from '../orchestrator';
 import type { SuggestRequest, GroupPreferenceSummary, DownvoteReasonAggregates } from '../suggestions';
+import { HIGH_ENERGY_LEVELS } from '@shared/energy';
 
 const GEMINI_REST = 'https://generativelanguage.googleapis.com/v1beta/models';
 const GROUNDED_MODEL = 'gemini-2.5-flash'; // grounding requires Flash or Pro, not Flash-Lite
+const HIGH_ENERGY_PROMPT_LABELS = HIGH_ENERGY_LEVELS.map(level => `"${level}"`).join(', ');
 
 export interface GroundedBrief extends OrchestratorBrief {
   /** Names + light context surfaced by the grounded search. Re-fetched via Places. */
@@ -82,7 +84,7 @@ ${feedbackSummary}
 
 INSTRUCTIONS:
 1. Use Search to find 8-15 real venues that match this intent — favor variety. Include genuine hidden gems alongside well-known spots.
-2. AGGRESSIVELY exclude restaurant types for late-night (>9PM) or high-energy ("Going out", "Full send") plans.
+2. AGGRESSIVELY exclude restaurant types for late-night (>9PM) or high-energy (${HIGH_ENERGY_PROMPT_LABELS}) plans.
 3. Return ONLY valid JSON — no markdown fences. Schema:
 
 {

@@ -3,6 +3,9 @@ import type { Session, Message, User, Suggestion, InsertSuggestion } from "@shar
 import { getSuggestions, getOrchestratedSuggestions, generateWhyExplanation, GroupPreferenceSummary, SuggestionOption } from "./suggestions";
 import { aggregateGroupPreferences } from "./group-preferences";
 import { storage } from "./storage";
+import { HIGH_ENERGY_LEVELS } from "@shared/energy";
+
+const HIGH_ENERGY_PROMPT_LABELS = HIGH_ENERGY_LEVELS.map(level => `"${level}"`).join(", ");
 
 let _openai: OpenAI | null = null;
 function getOpenAI() {
@@ -248,7 +251,7 @@ IMPORTANT RULES:
 - Be conversational and fun - use casual language appropriate for young professionals
 - When mentioning events, include the ticket URL so users can buy tickets
 - Don't make up specific venue details you don't know
-- For late-night plans (after 9PM) or high-energy vibes ("Going out", "Full send"), prioritize nightclubs, bars, lounges, and events over restaurants
+- For late-night plans (after 9PM) or high-energy vibes (${HIGH_ENERGY_PROMPT_LABELS}), prioritize nightclubs, bars, lounges, and events over restaurants
 - When regenerating suggestions for a night out, use categories like Club, Dancing, Live Music, Cocktails, Lounge - not just Dinner or Drinks`;
 }
 
@@ -635,4 +638,3 @@ export async function getPlannerResponse(
     return { text: "I'm having trouble connecting right now. Try asking me again in a moment!" };
   }
 }
-
