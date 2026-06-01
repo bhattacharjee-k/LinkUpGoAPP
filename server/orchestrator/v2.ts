@@ -177,7 +177,7 @@ export async function getOrchestratedSuggestionsV2(
     {
       k: 10,
       lambda: 0.7,
-      userCategoryHistogram: opts.userCategoryHistogram,
+      userCategoryHistogram: historyHistogram(req, opts),
     },
     undefined, // embeddings — wire in once pgvector lands
     env,
@@ -276,7 +276,7 @@ export async function runV2BrainOnly(
   const { final, klToHistory } = diversify(
     ranked,
     aggMap,
-    { k: 10, lambda: 0.7, userCategoryHistogram: opts.userCategoryHistogram },
+    { k: 10, lambda: 0.7, userCategoryHistogram: historyHistogram(req, opts) },
     undefined,
     env,
   );
@@ -379,6 +379,13 @@ export const v2Pipeline: PipelineFn = async (intent) => {
 function priceTierFromBudget(b?: string): number | undefined {
   if (!b) return undefined;
   return ({ '$': 1, '$$': 2, '$$$': 3, '$$$$': 4 } as Record<string, number>)[b];
+}
+
+function historyHistogram(req: SuggestRequest, opts: Pick<V2Options, 'userCategoryHistogram'>): Record<string, number> | undefined {
+  const squadHistogram = req.squadHistory?.categoryHistogram;
+  return squadHistogram && Object.keys(squadHistogram).length > 0
+    ? squadHistogram
+    : opts.userCategoryHistogram;
 }
 
 export async function applyV2StructuredAdjustments(

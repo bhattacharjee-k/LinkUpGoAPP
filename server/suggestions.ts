@@ -58,6 +58,10 @@ export interface SuggestRequest {
     mode: 'walk' | 'transit' | 'car';
     toleranceMin?: number;
   }>;
+  squadHistory?: {
+    text: string;
+    categoryHistogram: Record<string, number>;
+  };
 }
 
 // Max distance (in miles) for each transportation mode

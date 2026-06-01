@@ -25,6 +25,7 @@ import { HIGH_ENERGY_LEVELS } from '@shared/energy';
 const GEMINI_REST = 'https://generativelanguage.googleapis.com/v1beta/models';
 const GROUNDED_MODEL = 'gemini-2.5-flash'; // grounding requires Flash or Pro, not Flash-Lite
 const HIGH_ENERGY_PROMPT_LABELS = HIGH_ENERGY_LEVELS.map(level => `"${level}"`).join(', ');
+const SQUAD_HISTORY_TEXT_LIMIT = 600;
 
 export interface GroundedBrief extends OrchestratorBrief {
   /** Names + light context surfaced by the grounded search. Re-fetched via Places. */
@@ -59,6 +60,7 @@ function buildPrompt(
     : 'none';
 
   const memberCount = groupPrefs?.memberCount || 1;
+  const squadHistoryText = (req.squadHistory?.text || '').slice(0, SQUAD_HISTORY_TEXT_LIMIT);
 
   return `You are a social-event planning assistant for young professionals in NYC and Chicago.
 Use Google Search to find current, real venues that match this group's intent. Return BOTH a structured brief AND the venue names you discovered.
@@ -81,6 +83,7 @@ ${req.vibeDescription ? `- Free-text vibe: "${req.vibeDescription}"` : ''}
 PAST DOWNVOTE REASONS: ${downvoteSummary}
 PAST VENUE FEEDBACK:
 ${feedbackSummary}
+${squadHistoryText ? `\nSQUAD HISTORY:\n${squadHistoryText}\n` : ''}
 
 INSTRUCTIONS:
 1. Use Search to find 8-15 real venues that match this intent — favor variety. Include genuine hidden gems alongside well-known spots.
