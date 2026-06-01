@@ -1,5 +1,6 @@
 import { devLog } from './logger';
 import type { User, Session } from '@shared/schema';
+import { aggregateEnergy, toEnergyLevel, type EnergyLevel } from '@shared/energy';
 
 export interface AggregatedGroupPreferences {
   city: string;
@@ -7,7 +8,7 @@ export interface AggregatedGroupPreferences {
   commonCategories: string[];
   budgetRange: string[];
   preferredBudget: string;
-  energyLevel: string;
+  energyLevel: EnergyLevel;
   hardNos: string[];
   memberCount: number;
   discoveryStyle: 'hidden_gems' | 'popular' | 'mixed';
@@ -91,11 +92,7 @@ export function aggregateGroupPreferences(
   const preferredBudget = Array.from(budgetCounts.entries())
     .sort((a, b) => b[1] - a[1])[0]?.[0] || '$$';
 
-  // Aggregate energy levels - find middle ground
-  const energyOrder = ['Chill', 'Vibey', 'Going out', 'Full send'];
-  const energyScores = users.map(u => energyOrder.indexOf(u.energy));
-  const avgEnergy = Math.round(energyScores.reduce((a, b) => a + b, 0) / users.length);
-  const energyLevel = energyOrder[Math.max(0, Math.min(avgEnergy, energyOrder.length - 1))];
+  const energyLevel = aggregateEnergy(users.map(u => toEnergyLevel(u.energy))).target;
 
   // Combine all hard nos from users and session guardrails
   const hardNosSet = new Set<string>();
