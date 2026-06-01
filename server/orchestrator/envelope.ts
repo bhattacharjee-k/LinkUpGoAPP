@@ -13,6 +13,7 @@
 //   Phase 1.6 (diversity)    → emits `final` (the user-visible ranked list)
 
 import type { SuggestionOption, SuggestRequest } from '../suggestions';
+import type { VenueFeatures } from '../venue-features';
 
 export type Task = 'sourcing' | 'preprocess' | 'judging' | 'pairwise' | 'diversity' | 'final';
 
@@ -99,6 +100,10 @@ export interface EnrichedCandidate {
   h3Res7: string | null;
   /** True if Perplexity / grounded-Gemini surfaced this venue (not a Places primary hit). */
   trending: boolean;
+  /** Internal structured venue features for v2 scoring. Never returned to clients. */
+  venueFeatures?: VenueFeatures;
+  /** Internal Night Intensity Index for v2 scoring. Never returned to clients. */
+  venueNii?: number;
 }
 
 export interface PoLLScores {

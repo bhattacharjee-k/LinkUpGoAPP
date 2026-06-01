@@ -33,10 +33,12 @@ import { preprocess } from './preprocess';
 import { runPanel } from './judges/aggregate';
 import { pairwiseRerank } from './pairwise';
 import { diversify } from './diversity';
+import { applyStructuredAdjustment, niiMatchScore, softBudgetScore } from './score';
 import { resolveFavoritesToNtaIds } from '../geo/lookup';
 import { getCityCenter, getSearchCenter, getNeighborhoodCenter } from '../geo';
 import type { PipelineFn } from '../eval/replay';
 import type { RankedItem } from '../eval/types';
+import { toEnergyLevel } from '@shared/energy';
 
 const RADIUS_BIAS_MULT: Record<'tight' | 'normal' | 'wide', number> = {
   tight: 0.7,
@@ -155,6 +157,7 @@ export async function getOrchestratedSuggestionsV2(
   // in the aggregator). Build the lookup map.
   const aggMap = new Map<string, number | null>();
   for (const s of scores) aggMap.set(s.candidateId, s.aggregate);
+  applyV2StructuredAdjustments(enriched, aggMap, req);
 
   // ---- Stage 5: pairwise PRP re-rank of top 10 ----
   const orderedIds = await pairwiseRerank(enriched, aggMap, req, env, 10);
@@ -260,6 +263,7 @@ export async function runV2BrainOnly(
   const scores = await runPanel(enriched, { request: req, favoriteNtaIds }, env);
   const aggMap = new Map<string, number | null>();
   for (const s of scores) aggMap.set(s.candidateId, s.aggregate);
+  applyV2StructuredAdjustments(enriched, aggMap, req);
 
   const orderedIds = await pairwiseRerank(enriched, aggMap, req, env, 10);
   const idToCand = new Map(enriched.map((c) => [c.id, c]));
@@ -370,4 +374,24 @@ export const v2Pipeline: PipelineFn = async (intent) => {
 function priceTierFromBudget(b?: string): number | undefined {
   if (!b) return undefined;
   return ({ '$': 1, '$$': 2, '$$$': 3, '$$$$': 4 } as Record<string, number>)[b];
+}
+
+function applyV2StructuredAdjustments(
+  candidates: Array<{ id: string; venueNii?: number; priceTier: number | null }>,
+  aggMap: Map<string, number | null>,
+  req: SuggestRequest,
+): void {
+  const targetEnergy = toEnergyLevel(req.energy);
+  const comfortTier = priceTierFromBudget(req.budget) || 2;
+
+  for (const candidate of candidates) {
+    const aggregate = aggMap.get(candidate.id) ?? null;
+    const quality = aggregate == null ? 0.5 : aggregate / 5;
+    const niiMatch = candidate.venueNii == null ? 1 : niiMatchScore(candidate.venueNii, targetEnergy);
+    const softBudget = candidate.priceTier == null
+      ? 1
+      : softBudgetScore(candidate.priceTier, comfortTier, quality);
+
+    aggMap.set(candidate.id, applyStructuredAdjustment(aggregate, { niiMatch, softBudget }));
+  }
 }
