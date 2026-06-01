@@ -73,6 +73,19 @@ describe('orchestrator structured score terms', () => {
       expect(adjusted).toBeLessThanOrEqual(aggregate);
     });
 
+    it('uses a three-term average when travel is provided', () => {
+      const adjusted = applyStructuredAdjustment(4, { niiMatch: 1, softBudget: 1, travel: 0 });
+
+      expect(adjusted).toBeCloseTo(4 * (0.75 + 0.25 * (2 / 3)));
+    });
+
+    it('omitting travel preserves the two-term behavior', () => {
+      const withoutTravel = applyStructuredAdjustment(4, { niiMatch: 1, softBudget: 0 });
+      const equivalentTwoTerm = 4 * (0.75 + 0.25 * 0.5);
+
+      expect(withoutTravel).toBeCloseTo(equivalentTwoTerm);
+    });
+
     it('flips ordering of mock candidates when only structured terms differ', () => {
       const candidateA = applyStructuredAdjustment(4, { niiMatch: 0.05, softBudget: 0.1 });
       const candidateB = applyStructuredAdjustment(4, { niiMatch: 1, softBudget: 1 });

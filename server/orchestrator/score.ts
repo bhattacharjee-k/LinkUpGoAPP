@@ -5,6 +5,8 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+export const HARD_UNREACHABLE_MULTIPLIER = 0.05;
+
 export function niiMatchScore(venueNii: number, target: EnergyLevel): number {
   const { lo, hi } = niiRangeForLevel(target);
   const normalized = Math.min(100, Math.max(0, venueNii));
@@ -40,7 +42,7 @@ export function softBudgetScore(venuePriceTier: number, comfortTier: number, qua
  * Bounded structured adjustment for PoLL aggregates.
  *
  * Formula:
- *   combined = average(niiMatch, softBudget)
+ *   combined = average(niiMatch, softBudget, travel if present)
  *   adjusted = aggregate * (0.75 + 0.25 * combined)
  *
  * This keeps the LLM panel dominant: structured terms can only scale a non-null
@@ -48,11 +50,21 @@ export function softBudgetScore(venuePriceTier: number, comfortTier: number, qua
  */
 export function applyStructuredAdjustment(
   aggregate: number | null,
-  terms: { niiMatch: number; softBudget: number },
+  terms: { niiMatch: number; softBudget: number; travel?: number },
 ): number | null {
   if (aggregate == null) return null;
 
-  const combined = (clamp01(terms.niiMatch) + clamp01(terms.softBudget)) / 2;
+  const presentTerms = [
+    terms.niiMatch,
+    terms.softBudget,
+    terms.travel,
+  ].filter((term): term is number => term !== undefined);
+  const combined = presentTerms.reduce((sum, term) => sum + clamp01(term), 0) / presentTerms.length;
   const multiplier = 0.75 + 0.25 * combined;
   return aggregate * multiplier;
+}
+
+export function applyHardUnreachablePenalty(aggregate: number | null): number | null {
+  if (aggregate == null) return null;
+  return aggregate * HARD_UNREACHABLE_MULTIPLIER;
 }

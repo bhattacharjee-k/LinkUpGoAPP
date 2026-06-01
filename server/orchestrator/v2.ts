@@ -33,12 +33,13 @@ import { preprocess } from './preprocess';
 import { runPanel } from './judges/aggregate';
 import { pairwiseRerank } from './pairwise';
 import { diversify } from './diversity';
-import { applyStructuredAdjustment, niiMatchScore, softBudgetScore } from './score';
+import { applyHardUnreachablePenalty, applyStructuredAdjustment, niiMatchScore, softBudgetScore } from './score';
 import { resolveFavoritesToNtaIds } from '../geo/lookup';
 import { getCityCenter, getSearchCenter, getNeighborhoodCenter } from '../geo';
 import type { PipelineFn } from '../eval/replay';
 import type { RankedItem } from '../eval/types';
 import { toEnergyLevel } from '@shared/energy';
+import { travelScore, type Member, type RouteMatrixProvider } from '../travel';
 
 const RADIUS_BIAS_MULT: Record<'tight' | 'normal' | 'wide', number> = {
   tight: 0.7,
@@ -51,6 +52,10 @@ const BASE_RADIUS_METERS = 3000;
 interface V2Options {
   /** Override the user's category history for the diversity calibration step. */
   userCategoryHistogram?: Record<string, number>;
+  /** Test/internal override for deterministic travel scoring. */
+  routeProvider?: RouteMatrixProvider;
+  departBucket?: string;
+  now?: number;
 }
 
 export async function getOrchestratedSuggestionsV2(
@@ -157,7 +162,7 @@ export async function getOrchestratedSuggestionsV2(
   // in the aggregator). Build the lookup map.
   const aggMap = new Map<string, number | null>();
   for (const s of scores) aggMap.set(s.candidateId, s.aggregate);
-  applyV2StructuredAdjustments(enriched, aggMap, req);
+  await applyV2StructuredAdjustments(enriched, aggMap, req, opts);
 
   // ---- Stage 5: pairwise PRP re-rank of top 10 ----
   const orderedIds = await pairwiseRerank(enriched, aggMap, req, env, 10);
@@ -263,7 +268,7 @@ export async function runV2BrainOnly(
   const scores = await runPanel(enriched, { request: req, favoriteNtaIds }, env);
   const aggMap = new Map<string, number | null>();
   for (const s of scores) aggMap.set(s.candidateId, s.aggregate);
-  applyV2StructuredAdjustments(enriched, aggMap, req);
+  await applyV2StructuredAdjustments(enriched, aggMap, req, opts);
 
   const orderedIds = await pairwiseRerank(enriched, aggMap, req, env, 10);
   const idToCand = new Map(enriched.map((c) => [c.id, c]));
@@ -376,13 +381,19 @@ function priceTierFromBudget(b?: string): number | undefined {
   return ({ '$': 1, '$$': 2, '$$$': 3, '$$$$': 4 } as Record<string, number>)[b];
 }
 
-function applyV2StructuredAdjustments(
-  candidates: Array<{ id: string; venueNii?: number; priceTier: number | null }>,
+export async function applyV2StructuredAdjustments(
+  candidates: Array<{ id: string; venueNii?: number; priceTier: number | null; raw: { lat?: number; lng?: number } }>,
   aggMap: Map<string, number | null>,
   req: SuggestRequest,
-): void {
+  opts: Pick<V2Options, 'routeProvider' | 'departBucket' | 'now'> = {},
+): Promise<void> {
   const targetEnergy = toEnergyLevel(req.energy);
   const comfortTier = priceTierFromBudget(req.budget) || 2;
+  const members: Member[] = (req.participantTravel || []).map(member => ({
+    origin: member.origin,
+    mode: member.mode,
+    toleranceMin: member.toleranceMin,
+  }));
 
   for (const candidate of candidates) {
     const aggregate = aggMap.get(candidate.id) ?? null;
@@ -391,7 +402,26 @@ function applyV2StructuredAdjustments(
     const softBudget = candidate.priceTier == null
       ? 1
       : softBudgetScore(candidate.priceTier, comfortTier, quality);
+    let travel: number | undefined;
 
-    aggMap.set(candidate.id, applyStructuredAdjustment(aggregate, { niiMatch, softBudget }));
+    if (members.length > 0 && candidate.raw.lat != null && candidate.raw.lng != null) {
+      const result = await travelScore(
+        members,
+        { lat: candidate.raw.lat, lng: candidate.raw.lng },
+        {
+          city: req.city,
+          provider: opts.routeProvider,
+          departBucket: opts.departBucket,
+          now: opts.now,
+        },
+      );
+      if (result.hardUnreachable) {
+        aggMap.set(candidate.id, applyHardUnreachablePenalty(aggregate));
+        continue;
+      }
+      travel = result.score;
+    }
+
+    aggMap.set(candidate.id, applyStructuredAdjustment(aggregate, { niiMatch, softBudget, travel }));
   }
 }

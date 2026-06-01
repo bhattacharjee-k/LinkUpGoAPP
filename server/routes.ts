@@ -15,6 +15,7 @@ import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from "./
 import { LoginRequestSchema, RegisterRequestSchema, SuggestRequestSchema, CreateGroupRequestSchema, VoteRequestSchema, CreateMessageRequestSchema, UpdateParticipantTravelRequestSchema } from "@shared/api-schemas";
 import { logger } from "./logger";
 import { aggregateEnergy, toEnergyLevel } from "@shared/energy";
+import { buildParticipantTravel } from "./participant-travel";
 
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -122,6 +123,7 @@ async function regenerateSuggestionsForSession(sessionId: string, session: any, 
     crowdPreference: mergedGroupPrefs.crowdPreference as any,
     favoriteNeighborhoods: mergedGroupPrefs.favoriteNeighborhoods,
     transportationModes: validUsers.map((u: any) => u.transportationMode || 'car'),
+    participantTravel: buildParticipantTravel(activeParticipants, validUsers),
   };
 
   let result = await getOrchestratedSuggestions(
