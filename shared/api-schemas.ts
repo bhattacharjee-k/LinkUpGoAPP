@@ -93,6 +93,13 @@ export const UpdateSessionRequestSchema = z.object({
 });
 export type UpdateSessionRequest = z.infer<typeof UpdateSessionRequestSchema>;
 
+export const UpdateParticipantTravelRequestSchema = z.object({
+  transportMode: z.enum(['walk', 'transit', 'car']).optional(),
+  travelToleranceMin: z.number().int().positive().max(240).optional(),
+  startingNeighborhood: z.string().optional(),
+});
+export type UpdateParticipantTravelRequest = z.infer<typeof UpdateParticipantTravelRequestSchema>;
+
 export const CreateSuggestionRequestSchema = z.object({
   sessionId: z.string().uuid(),
   name: z.string().min(1),

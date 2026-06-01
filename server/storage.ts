@@ -62,9 +62,10 @@ export interface IStorage {
   softDeleteSession(id: string): Promise<void>;
   leaveSession(sessionId: string, userId: string): Promise<void>;
   addSessionParticipant(sessionId: string, userId: string, status?: string): Promise<void>;
-  getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string; startingNeighborhood?: string | null }>>;
+  getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string; startingNeighborhood?: string | null; transportMode?: string | null; travelToleranceMin?: number | null }>>;
   updateParticipantStatus(sessionId: string, userId: string, status: string): Promise<void>;
-  updateParticipantNeighborhood(sessionId: string, userId: string, neighborhood: string): Promise<void>;
+  updateParticipantNeighborhood(sessionId: string, userId: string, neighborhood: string, travel?: { transportMode?: 'walk' | 'transit' | 'car'; travelToleranceMin?: number }): Promise<void>;
+  updateParticipantTravel(sessionId: string, userId: string, updates: { startingNeighborhood?: string; transportMode?: 'walk' | 'transit' | 'car'; travelToleranceMin?: number }): Promise<void>;
 
   // Suggestions
   getSuggestion(id: string): Promise<Suggestion | undefined>;
@@ -293,13 +294,24 @@ export class DbStorage implements IStorage {
       .onConflictDoNothing();
   }
 
-  async getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string; startingNeighborhood?: string | null }>> {
+  async getSessionParticipants(sessionId: string): Promise<Array<{ userId: string; status: string; startingNeighborhood?: string | null; transportMode?: string | null; travelToleranceMin?: number | null }>> {
     const participants = await db.select().from(schema.sessionParticipants).where(eq(schema.sessionParticipants.sessionId, sessionId));
-    const uniqueParticipants = new Map<string, { status: string; startingNeighborhood: string | null }>();
+    const uniqueParticipants = new Map<string, { status: string; startingNeighborhood: string | null; transportMode: string | null; travelToleranceMin: number | null }>();
     participants.forEach(p => {
-      uniqueParticipants.set(p.userId, { status: p.status, startingNeighborhood: p.startingNeighborhood });
+      uniqueParticipants.set(p.userId, {
+        status: p.status,
+        startingNeighborhood: p.startingNeighborhood,
+        transportMode: p.transportMode,
+        travelToleranceMin: p.travelToleranceMin,
+      });
     });
-    return Array.from(uniqueParticipants.entries()).map(([userId, data]) => ({ userId, status: data.status, startingNeighborhood: data.startingNeighborhood }));
+    return Array.from(uniqueParticipants.entries()).map(([userId, data]) => ({
+      userId,
+      status: data.status,
+      startingNeighborhood: data.startingNeighborhood,
+      transportMode: data.transportMode,
+      travelToleranceMin: data.travelToleranceMin,
+    }));
   }
 
   async updateParticipantStatus(sessionId: string, userId: string, status: string): Promise<void> {
@@ -311,9 +323,22 @@ export class DbStorage implements IStorage {
       ));
   }
 
-  async updateParticipantNeighborhood(sessionId: string, userId: string, neighborhood: string): Promise<void> {
+  async updateParticipantNeighborhood(sessionId: string, userId: string, neighborhood: string, travel: { transportMode?: 'walk' | 'transit' | 'car'; travelToleranceMin?: number } = {}): Promise<void> {
+    await this.updateParticipantTravel(sessionId, userId, {
+      startingNeighborhood: neighborhood,
+      ...travel,
+    });
+  }
+
+  async updateParticipantTravel(sessionId: string, userId: string, updates: { startingNeighborhood?: string; transportMode?: 'walk' | 'transit' | 'car'; travelToleranceMin?: number }): Promise<void> {
+    const dbUpdates: Partial<typeof schema.sessionParticipants.$inferInsert> = {};
+    if (updates.startingNeighborhood !== undefined) dbUpdates.startingNeighborhood = updates.startingNeighborhood;
+    if (updates.transportMode !== undefined) dbUpdates.transportMode = updates.transportMode;
+    if (updates.travelToleranceMin !== undefined) dbUpdates.travelToleranceMin = updates.travelToleranceMin;
+    if (Object.keys(dbUpdates).length === 0) return;
+
     await db.update(schema.sessionParticipants)
-      .set({ startingNeighborhood: neighborhood })
+      .set(dbUpdates)
       .where(and(
         eq(schema.sessionParticipants.sessionId, sessionId),
         eq(schema.sessionParticipants.userId, userId)

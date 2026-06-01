@@ -46,6 +46,7 @@ export const groups = pgTable("groups", {
   adminId: varchar("admin_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   inviteCode: varchar("invite_code").notNull().unique(),
   locked: boolean("locked").notNull().default(false),
+  learnedTaste: jsonb("learned_taste"), // Nullable squad learning profile for Phase 3
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -102,6 +103,8 @@ export const sessionParticipants = pgTable("session_participants", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   status: text("status").notNull().default('active'), // 'active' | 'cant_make_it' | 'left'
   startingNeighborhood: text("starting_neighborhood"),
+  transportMode: text("transport_mode"), // 'walk' | 'transit' | 'car'
+  travelToleranceMin: integer("travel_tolerance_min"),
   joinedAt: timestamp("joined_at").notNull().defaultNow(),
 });
 

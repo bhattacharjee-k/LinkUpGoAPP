@@ -8,6 +8,7 @@ import {
   VoteRequestSchema,
   CreateMessageRequestSchema,
   CreateSuggestionRequestSchema,
+  UpdateParticipantTravelRequestSchema,
 } from '@shared/api-schemas';
 
 describe('LoginRequestSchema', () => {
@@ -191,6 +192,49 @@ describe('CreateGroupRequestSchema', () => {
   it('rejects name over 100 chars', () => {
     const result = CreateGroupRequestSchema.safeParse({ name: 'x'.repeat(101) });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('UpdateParticipantTravelRequestSchema', () => {
+  it('accepts a full participant travel body', () => {
+    const result = UpdateParticipantTravelRequestSchema.safeParse({
+      transportMode: 'transit',
+      travelToleranceMin: 45,
+      startingNeighborhood: 'Williamsburg',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a partial participant travel body', () => {
+    const result = UpdateParticipantTravelRequestSchema.safeParse({
+      transportMode: 'walk',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an empty participant travel body', () => {
+    const result = UpdateParticipantTravelRequestSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an invalid transport mode', () => {
+    const result = UpdateParticipantTravelRequestSchema.safeParse({
+      transportMode: 'bike',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects non-positive and non-integer travel tolerances', () => {
+    expect(UpdateParticipantTravelRequestSchema.safeParse({ travelToleranceMin: 0 }).success).toBe(false);
+    expect(UpdateParticipantTravelRequestSchema.safeParse({ travelToleranceMin: -1 }).success).toBe(false);
+    expect(UpdateParticipantTravelRequestSchema.safeParse({ travelToleranceMin: 12.5 }).success).toBe(false);
+  });
+
+  it('keeps legacy neighborhood-only payloads backward compatible', () => {
+    const result = UpdateParticipantTravelRequestSchema.safeParse({
+      neighborhood: 'Williamsburg',
+    });
+    expect(result.success).toBe(true);
   });
 });
 

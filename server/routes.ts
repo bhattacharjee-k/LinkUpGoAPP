@@ -12,7 +12,7 @@ import { sendPushToUsers } from "./push";
 import { requireAuth, requireGroupAdmin, requireGroupMember, requireSessionParticipant, requireSessionNotLocked } from "./middleware/auth";
 import { signAccessToken, signRefreshToken, storeRefreshToken, validateAndRotateRefreshToken, revokeAllRefreshTokens, extractBearerToken, verifyToken } from "./middleware/jwt-auth";
 import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from "./middleware/error-handler";
-import { LoginRequestSchema, RegisterRequestSchema, SuggestRequestSchema, CreateGroupRequestSchema, VoteRequestSchema, CreateMessageRequestSchema } from "@shared/api-schemas";
+import { LoginRequestSchema, RegisterRequestSchema, SuggestRequestSchema, CreateGroupRequestSchema, VoteRequestSchema, CreateMessageRequestSchema, UpdateParticipantTravelRequestSchema } from "@shared/api-schemas";
 import { logger } from "./logger";
 import { aggregateEnergy, toEnergyLevel } from "@shared/energy";
 
@@ -1226,22 +1226,35 @@ export async function registerRoutes(
   });
 
   app.patch("/api/sessions/:id/participants/:participantId/neighborhood", requireAuth, asyncHandler(async (req: Request, res: Response) => {
-    const { neighborhood } = req.body;
-    if (!neighborhood || typeof neighborhood !== 'string') {
-      return res.status(400).json({ message: "Neighborhood is required" });
+    const parsed = UpdateParticipantTravelRequestSchema.safeParse({
+      ...req.body,
+      startingNeighborhood: req.body.startingNeighborhood ?? req.body.neighborhood,
+    });
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid participant travel info" });
     }
+    const { transportMode, travelToleranceMin } = parsed.data;
+    const startingNeighborhood = parsed.data.startingNeighborhood?.trim();
 
     const userId = req.userId;
     if (userId !== req.params.participantId) {
       return res.status(403).json({ message: "You can only set your own starting neighborhood" });
     }
 
-    await storage.updateParticipantNeighborhood(req.params.id, req.params.participantId, neighborhood.trim());
+    if (parsed.data.startingNeighborhood !== undefined && !startingNeighborhood) {
+      return res.status(400).json({ message: "Neighborhood cannot be empty" });
+    }
+
+    await storage.updateParticipantTravel(req.params.id, req.params.participantId, {
+      ...(startingNeighborhood ? { startingNeighborhood } : {}),
+      ...(transportMode ? { transportMode } : {}),
+      ...(travelToleranceMin !== undefined ? { travelToleranceMin } : {}),
+    });
 
     const session = await storage.getSession(req.params.id);
     const filters = (session?.filters as any) || {};
 
-    if (filters.locationMode === 'meet_in_the_middle') {
+    if (startingNeighborhood && filters.locationMode === 'meet_in_the_middle') {
       const participants = await storage.getSessionParticipants(req.params.id);
       const city = filters.locationScope || 'NYC';
       const points: LatLng[] = [];
@@ -1261,15 +1274,17 @@ export async function registerRoutes(
       }
     }
 
-    const participant = await storage.getUser(req.params.participantId);
-    const participantName = participant?.name || participant?.username || 'Someone';
-    const systemMsg = await storage.createMessage({
-      sessionId: req.params.id,
-      sender: 'system',
-      senderName: 'System',
-      text: `${participantName} is coming from ${neighborhood.trim()}`,
-    });
-    broadcastToSession(req.params.id, { type: 'new_message', message: systemMsg });
+    if (startingNeighborhood) {
+      const participant = await storage.getUser(req.params.participantId);
+      const participantName = participant?.name || participant?.username || 'Someone';
+      const systemMsg = await storage.createMessage({
+        sessionId: req.params.id,
+        sender: 'system',
+        senderName: 'System',
+        text: `${participantName} is coming from ${startingNeighborhood}`,
+      });
+      broadcastToSession(req.params.id, { type: 'new_message', message: systemMsg });
+    }
     broadcastToSession(req.params.id, { type: 'session_update', session: { id: req.params.id } });
 
     res.json({ success: true });
