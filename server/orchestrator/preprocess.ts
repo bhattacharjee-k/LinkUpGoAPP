@@ -15,6 +15,7 @@ import type { SuggestionOption } from '../suggestions';
 import type { EnrichedCandidate, SuggestionEnvelope } from './envelope';
 import { h3Cell, H3_RES_BLOCK, H3_RES_NEIGHBORHOOD, h3Coarsen } from '../geo/h3';
 import { resolveByCoords } from '../geo/lookup';
+import { getVenueFeatures, venueNii as computeVenueNii } from '../venue-features';
 
 const DESCRIPTION_LENGTH = 220;
 const PADDING = '…';
@@ -136,6 +137,8 @@ export async function preprocess(
       const popularityProxy = Math.log(reviewCount + 1);
       const transport = distanceMiles != null ? transportScore(distanceMiles, mode) : 0.5;
       const trending = c.tags?.some((t) => t.toLowerCase().includes('trending')) ?? false;
+      const venueFeatures = getVenueFeatures(c);
+      const nii = computeVenueNii(venueFeatures);
 
       return {
         id: c.placeId || `cand_${i}_${normalizeName(c.title).slice(0, 20)}`,
@@ -152,6 +155,8 @@ export async function preprocess(
         h3Res9: cellRes9,
         h3Res7: cellRes7,
         trending,
+        venueFeatures,
+        venueNii: nii,
       };
     }),
   );

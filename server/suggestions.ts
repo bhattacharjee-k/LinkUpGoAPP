@@ -53,6 +53,11 @@ export interface SuggestRequest {
   crowdPreference?: 'quiet' | 'buzzing' | 'no_preference';
   favoriteNeighborhoods?: string[];
   transportationModes?: string[]; // Array of participant transport modes: 'car' | 'walk' | 'transit'
+  participantTravel?: Array<{
+    origin: string | { lat: number; lng: number };
+    mode: 'walk' | 'transit' | 'car';
+    toleranceMin?: number;
+  }>;
 }
 
 // Max distance (in miles) for each transportation mode
