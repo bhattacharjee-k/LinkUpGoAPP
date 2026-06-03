@@ -4,6 +4,7 @@ import { useApp, subscribeToSessionMessages, subscribeToVoteUpdates, subscribeTo
 import { api } from '@/lib/api';
 import { Layout } from '@/components/layout';
 import { EnergySlider } from '@/components/energy-slider';
+import { TravelControl } from '@/components/travel-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -70,6 +71,8 @@ export function Session() {
   const [isLockingPlan, setIsLockingPlan] = useState(false);
   const [votingInProgress, setVotingInProgress] = useState<string | null>(null);
   const [neighborhoodInput, setNeighborhoodInput] = useState('');
+  const [transportMode, setTransportMode] = useState<'walk' | 'transit' | 'car'>('transit');
+  const [travelToleranceMin, setTravelToleranceMin] = useState<number>(30);
   const [isSettingNeighborhood, setIsSettingNeighborhood] = useState(false);
   const [editForm, setEditForm] = useState({
     date: new Date(),
@@ -91,6 +94,22 @@ export function Session() {
       refreshSession(params.id).finally(() => setSessionLoading(false));
     }
   }, [params?.id]);
+
+  // Sync transportation mode and tolerance from user profile when loaded
+  useEffect(() => {
+    if (user && (user as any).transportationMode) {
+      const mode = (user as any).transportationMode;
+      if (mode === 'walk' || mode === 'transit' || mode === 'car') {
+        setTransportMode(mode as 'walk' | 'transit' | 'car');
+        const defaultTolerance = ({
+          walk: 15,
+          transit: 30,
+          car: 45,
+        } as const)[mode as 'walk' | 'transit' | 'car'];
+        setTravelToleranceMin(defaultTolerance);
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -944,28 +963,35 @@ export function Session() {
             if (myParticipant && myParticipant !== 'left' && !hasSetNeighborhood) {
               const city = (session.filters as any)?.locationScope || 'NYC';
               return (
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 space-y-2">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-4">
                   <div className="flex items-center gap-2 text-xs font-medium text-blue-400">
                     <MapPin size={14} />
                     Where are you coming from?
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder={city === 'Chicago' ? "e.g. Wicker Park" : "e.g. East Village"}
-                      className="bg-white/5 border-white/10 h-8 text-xs flex-1"
-                      value={neighborhoodInput}
-                      onChange={e => setNeighborhoodInput(e.target.value)}
-                      data-testid="input-starting-neighborhood"
-                    />
+                  
+                  <TravelControl
+                    neighborhood={neighborhoodInput}
+                    onNeighborhoodChange={setNeighborhoodInput}
+                    mode={transportMode}
+                    onModeChange={setTransportMode}
+                    toleranceMin={travelToleranceMin}
+                    onToleranceChange={setTravelToleranceMin}
+                    placeholder={city === 'Chicago' ? 'e.g. Wicker Park' : 'e.g. East Village'}
+                  />
+
+                  <div className="flex flex-col gap-2">
                     <Button
                       size="sm"
-                      className="h-8 text-xs px-3"
+                      className="w-full h-9 text-xs"
                       disabled={!neighborhoodInput.trim() || isSettingNeighborhood}
                       onClick={async () => {
                         if (!neighborhoodInput.trim()) return;
                         setIsSettingNeighborhood(true);
                         try {
-                          await api.sessions.updateParticipantNeighborhood(session.id, user.id, neighborhoodInput.trim());
+                          await api.sessions.updateParticipantNeighborhood(session.id, user.id, neighborhoodInput.trim(), {
+                            transportMode,
+                            travelToleranceMin,
+                          });
                           refreshSession(session.id);
                           toast({ title: "Set!", description: `Starting from ${neighborhoodInput.trim()}` });
                           setNeighborhoodInput('');
@@ -979,8 +1005,8 @@ export function Session() {
                     >
                       {isSettingNeighborhood ? '...' : 'Set'}
                     </Button>
+                    <p className="text-[10px] text-muted-foreground text-center">We'll find spots central to everyone</p>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">We'll find spots central to everyone</p>
                 </div>
               );
             }
