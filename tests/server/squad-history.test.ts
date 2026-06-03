@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSquadSummary, type SquadPlan } from '../../server/squad-history';
+import { buildSquadSummary, topCategoriesFromHistogram, type SquadPlan } from '../../server/squad-history';
 
 function nycCrewFixture(): SquadPlan[] {
   return [
@@ -115,5 +115,43 @@ describe('buildSquadSummary', () => {
       text: '',
       categoryHistogram: {},
     });
+  });
+});
+
+describe('topCategoriesFromHistogram', () => {
+  it('sorts by weight descending and tie-breaks alphabetically', () => {
+    expect(
+      topCategoriesFromHistogram({
+        Cocktails: 10,
+        'Wine Bar': 10,
+        'Live Music': 5,
+      }),
+    ).toEqual(['Cocktails', 'Wine Bar', 'Live Music']);
+  });
+
+  it('drops zero and negative weights', () => {
+    expect(
+      topCategoriesFromHistogram({
+        Cocktails: 3,
+        Club: 0,
+        Arcade: -2,
+        'Wine Bar': 1,
+      }),
+    ).toEqual(['Cocktails', 'Wine Bar']);
+  });
+
+  it('caps results at n', () => {
+    const histogram = {
+      a: 9,
+      b: 8,
+      c: 7,
+      d: 6,
+      e: 5,
+      f: 4,
+      g: 3,
+      h: 2,
+    };
+    expect(topCategoriesFromHistogram(histogram, 4)).toEqual(['a', 'b', 'c', 'd']);
+    expect(topCategoriesFromHistogram(histogram)).toHaveLength(6);
   });
 });

@@ -38,6 +38,14 @@ export interface SquadHistorySummary {
   categoryHistogram: Record<string, number>;
 }
 
+export function topCategoriesFromHistogram(histogram: Record<string, number>, n = 6): string[] {
+  return Object.entries(histogram)
+    .filter(([, weight]) => weight > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, n)
+    .map(([key]) => key);
+}
+
 const SUMMARY_TEXT_LIMIT = 600;
 
 function priceTierFromBudget(budget?: string | null): number | null {

@@ -16,7 +16,7 @@ import { LoginRequestSchema, RegisterRequestSchema, SuggestRequestSchema, Create
 import { logger } from "./logger";
 import { aggregateEnergy, toEnergyLevel } from "@shared/energy";
 import { buildParticipantTravel } from "./participant-travel";
-import { summarizeSquadHistory } from "./squad-history";
+import { summarizeSquadHistory, topCategoriesFromHistogram } from "./squad-history";
 import { buildGroupAggregate } from "./group-aggregate";
 
 function generateInviteCode(): string {
@@ -733,6 +733,15 @@ export async function registerRoutes(
       res.status(400).json({ message: error.message });
     }
   });
+
+  app.get("/api/groups/:id/taste", requireAuth, requireGroupMember, asyncHandler(async (req: Request, res: Response) => {
+    const taste = await summarizeSquadHistory(req.params.id).catch(() => ({ text: '', categoryHistogram: {} }));
+    res.json({
+      text: taste.text,
+      categoryHistogram: taste.categoryHistogram,
+      topCategories: topCategoriesFromHistogram(taste.categoryHistogram),
+    });
+  }));
 
   app.patch("/api/groups/:id", requireAuth, requireGroupAdmin, asyncHandler(async (req: Request, res: Response) => {
     const updated = await storage.updateGroup(req.params.id, req.body);
