@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { SquadTasteCard } from '@/components/squad-taste-card';
 
 export function GroupDetails() {
   const [match, params] = useRoute('/group/:id');
@@ -97,6 +98,8 @@ export function GroupDetails() {
              </Avatar>
            </div>
         </div>
+
+        <SquadTasteCard groupId={group.id} />
 
         {/* Admin Settings Card */}
         <Card className={cn("p-6 bg-white/5 border-white/10 space-y-6 transition-opacity", !isUserAdmin && "opacity-60 pointer-events-none")}>

@@ -2,6 +2,12 @@
 
 import type { SuggestRequest } from '@shared/api-schemas';
 
+export interface GroupTasteResponse {
+  text: string;
+  categoryHistogram: Record<string, number>;
+  topCategories: string[];
+}
+
 export interface GroupAggregateResponse {
   memberCount: number;
   energy: {
@@ -73,6 +79,7 @@ export const api = {
     update: (id: string, updates: any) => fetchAPI(`/groups/${id}`, { method: 'PATCH', body: JSON.stringify(updates) }),
     join: (inviteCode: string) => fetchAPI(`/groups/join/${inviteCode}`, { method: 'POST' }),
     addMember: (groupId: string, memberId: string) => fetchAPI(`/groups/${groupId}/members`, { method: 'POST', body: JSON.stringify({ memberId }) }),
+    getTaste: (groupId: string): Promise<GroupTasteResponse> => fetchAPI(`/groups/${groupId}/taste`),
   },
   
   // Sessions
