@@ -2,6 +2,27 @@
 
 import type { SuggestRequest } from '@shared/api-schemas';
 
+export interface GroupAggregateResponse {
+  memberCount: number;
+  energy: {
+    target: string;
+    spread: [string, string];
+    split: Record<string, number>;
+  };
+  budget: {
+    comfortTier: number;
+    label: string;
+  };
+  travel: {
+    members: Array<{
+      name: string;
+      neighborhood: string | null;
+      mode: string | null;
+      toleranceMin: number | null;
+    }>;
+  };
+}
+
 const API_BASE = `${import.meta.env.VITE_API_URL || ''}/api`;
 
 async function fetchAPI(url: string, options?: RequestInit) {
@@ -66,8 +87,18 @@ export const api = {
     addParticipant: (id: string, status?: string, memberId?: string) => fetchAPI(`/sessions/${id}/participants`, { method: 'POST', body: JSON.stringify({ status, memberId }) }),
     updateParticipantStatus: (sessionId: string, participantId: string, status: string) => 
       fetchAPI(`/sessions/${sessionId}/participants/${participantId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
-    updateParticipantNeighborhood: (sessionId: string, participantId: string, neighborhood: string) =>
-      fetchAPI(`/sessions/${sessionId}/participants/${participantId}/neighborhood`, { method: 'PATCH', body: JSON.stringify({ neighborhood }) }),
+    updateParticipantNeighborhood: (
+      sessionId: string,
+      participantId: string,
+      neighborhood: string,
+      travel?: { transportMode?: 'walk' | 'transit' | 'car'; travelToleranceMin?: number }
+    ) =>
+      fetchAPI(`/sessions/${sessionId}/participants/${participantId}/neighborhood`, {
+        method: 'PATCH',
+        body: JSON.stringify({ neighborhood, ...travel })
+      }),
+    getAggregate: (sessionId: string): Promise<GroupAggregateResponse> =>
+      fetchAPI(`/sessions/${sessionId}/aggregate`),
   },
   
   // Suggestions

@@ -17,6 +17,7 @@ import { logger } from "./logger";
 import { aggregateEnergy, toEnergyLevel } from "@shared/energy";
 import { buildParticipantTravel } from "./participant-travel";
 import { summarizeSquadHistory } from "./squad-history";
+import { buildGroupAggregate } from "./group-aggregate";
 
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -1058,6 +1059,49 @@ export async function registerRoutes(
       res.status(400).json({ message: error.message });
     }
   });
+
+  app.get("/api/sessions/:id/aggregate", requireAuth, requireSessionParticipant, asyncHandler(async (req, res) => {
+    const sessionId = req.params.id;
+    const participants = await storage.getSessionParticipants(sessionId);
+    // Only active attendees shape the group summary — exclude 'cant_make_it' and 'left'.
+    const activeParticipants = participants.filter(p => p.status === 'active');
+
+    const budgetMap: Record<string, number> = {
+      '$': 1,
+      '$$': 2,
+      '$$$': 3,
+      '$$$$': 4
+    };
+
+    const members = [];
+    for (const p of activeParticipants) {
+      const user = await storage.getUser(p.userId);
+      if (!user) {
+        continue;
+      }
+
+      // Map budget strings to numeric tiers 1-4
+      const budgetTiers = user.budget
+        .map(b => budgetMap[b])
+        .filter((b): b is number => b !== undefined);
+
+      // Comment: energy and budget come from each member's baseline profile today.
+      // Per-event per-member preference capture is planned for a later chunk.
+      members.push({
+        energy: user.energy,
+        budgetTiers,
+        travel: {
+          name: user.name,
+          neighborhood: p.startingNeighborhood ?? null,
+          mode: p.transportMode ?? null,
+          toleranceMin: p.travelToleranceMin ?? null,
+        }
+      });
+    }
+
+    const aggregate = buildGroupAggregate(members);
+    res.json(aggregate);
+  }));
 
   app.patch("/api/sessions/:id", async (req, res) => {
     try {
