@@ -2,6 +2,27 @@
 
 import type { SuggestRequest } from '@shared/api-schemas';
 
+export interface GroupAggregateResponse {
+  memberCount: number;
+  energy: {
+    target: string;
+    spread: [string, string];
+    split: Record<string, number>;
+  };
+  budget: {
+    comfortTier: number;
+    label: string;
+  };
+  travel: {
+    members: Array<{
+      name: string;
+      neighborhood: string | null;
+      mode: string | null;
+      toleranceMin: number | null;
+    }>;
+  };
+}
+
 const API_BASE = `${import.meta.env.VITE_API_URL || ''}/api`;
 
 async function fetchAPI(url: string, options?: RequestInit) {
@@ -76,6 +97,8 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ neighborhood, ...travel })
       }),
+    getAggregate: (sessionId: string): Promise<GroupAggregateResponse> =>
+      fetchAPI(`/sessions/${sessionId}/aggregate`),
   },
   
   // Suggestions

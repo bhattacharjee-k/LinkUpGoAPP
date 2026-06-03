@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Send, ThumbsUp, ThumbsDown, MapPin, DollarSign, Users, Bot, Star, UserPlus, Link as LinkIcon, Check, Copy, X, Shield, Lock, Ban, ArrowLeft, Pencil, RefreshCw, Calendar, Clock, Zap, MoreVertical, LogOut, Trash2, Info, ChevronRight } from 'lucide-react';
 import { DownvoteModal } from '@/components/downvote-modal';
+import { GroupReconciliation } from '@/components/group-reconciliation';
 import { calculateScore, getVoteSummary, REASON_PENALTIES } from '@shared/ranking';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -1328,6 +1329,7 @@ export function Session() {
 
           {/* Suggestions Tab */}
           <TabsContent value="suggestions" className="flex-1 overflow-y-auto p-6 pb-8 space-y-6 data-[state=inactive]:hidden">
+             <GroupReconciliation sessionId={session.id} session={session} />
              {sortedSuggestions.length === 0 ? (
                <div className="flex flex-col items-center justify-center py-16 px-6 text-center space-y-6">
                  <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
