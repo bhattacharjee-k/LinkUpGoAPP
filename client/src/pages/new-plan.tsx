@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '@/lib/context';
 import { api } from '@/lib/api';
 import { AdInline } from '@/components/ad-inline';
+import { EnergySlider } from '@/components/energy-slider';
 import { useLocation, useSearch } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +47,20 @@ export function NewPlan() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(preselectedGroupId);
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([user?.id || '']);
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    date: Date;
+    timeStart: string;
+    timeEnd: string;
+    locationScope: string;
+    neighborhood: string;
+    budget: Budget;
+    energy: Energy;
+    categories: Category[];
+    referenceVenues: PlaceResult[];
+    vibeDescription: string;
+    locationMode: 'near_me' | 'explore_anywhere' | 'meet_in_the_middle';
+  }>({
     name: '',
     date: new Date(),
     timeStart: '19:00',
@@ -54,7 +68,7 @@ export function NewPlan() {
     locationScope: user?.city || 'NYC',
     neighborhood: '',
     budget: '$$' as Budget,
-    energy: user?.energy || 'Vibey',
+    energy: (user?.energy as Energy) || 'Vibey',
     categories: [] as Category[],
     referenceVenues: [] as PlaceResult[],
     vibeDescription: '',
@@ -471,20 +485,10 @@ export function NewPlan() {
 
             <div className="space-y-3">
               <Label className="text-xs text-muted-foreground">Energy</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {['Chill', 'Vibey', 'Going out', 'Full send'].map((e) => (
-                  <button
-                    key={e}
-                    onClick={() => setFormData({...formData, energy: e as Energy})}
-                    className={cn(
-                      "h-10 rounded-lg border border-white/10 text-sm font-medium transition-all",
-                      formData.energy === e ? "bg-primary text-black border-primary font-bold" : "bg-white/5 text-muted-foreground"
-                    )}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
+              <EnergySlider
+                value={formData.energy}
+                onChange={(level) => setFormData({ ...formData, energy: level })}
+              />
             </div>
             
             <div className="space-y-3">

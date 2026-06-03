@@ -3,6 +3,7 @@ import { useRoute, useLocation } from 'wouter';
 import { useApp, subscribeToSessionMessages, subscribeToVoteUpdates, subscribeToSessionUpdates } from '@/lib/context';
 import { api } from '@/lib/api';
 import { Layout } from '@/components/layout';
+import { EnergySlider } from '@/components/energy-slider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -781,20 +782,10 @@ export function Session() {
                       {/* Energy */}
                       <div className="space-y-3">
                         <Label className="text-sm font-medium">Energy / Vibe</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {['Chill', 'Vibey', 'Going out', 'Full send'].map((e) => (
-                            <button
-                              key={e}
-                              onClick={() => setEditForm({...editForm, energy: e as Energy})}
-                              className={cn(
-                                "h-9 rounded-lg border text-xs font-medium transition-all",
-                                editForm.energy === e ? "bg-primary text-black border-primary font-bold" : "bg-white/5 border-white/10 text-muted-foreground"
-                              )}
-                            >
-                              {e}
-                            </button>
-                          ))}
-                        </div>
+                        <EnergySlider
+                          value={editForm.energy}
+                          onChange={(level) => setEditForm({ ...editForm, energy: level })}
+                        />
                       </div>
 
                       {/* Category */}
