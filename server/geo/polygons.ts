@@ -129,9 +129,12 @@ function centroid(geom: PolygonFeature['geometry']): { lat: number; lng: number 
 }
 
 function featureToMatch(feat: PolygonFeature, idField: string, nameField: string): NeighborhoodMatch {
+  const p = feat.properties;
+  // Tolerant of dataset-vintage/casing differences (NYC 2020 uses nta2020/ntaname;
+  // Socrata GeoJSON exports lowercase keys; older vintages used NTACode/NTAName).
   return {
-    id: String(feat.properties[idField] ?? feat.properties.NTACode ?? feat.properties.AREA_NUMBE),
-    name: String(feat.properties[nameField] ?? feat.properties.NTAName ?? feat.properties.COMMUNITY ?? 'unknown'),
+    id: String(p[idField] ?? p.nta2020 ?? p.NTACode ?? p.area_numbe ?? p.AREA_NUMBE ?? 'unknown'),
+    name: String(p[nameField] ?? p.ntaname ?? p.NTAName ?? p.community ?? p.COMMUNITY ?? 'unknown'),
     centroid: centroid(feat.geometry),
   };
 }
@@ -141,7 +144,7 @@ export function lookupNyc(lat: number, lng: number): NeighborhoodMatch | null {
   if (!fc) return null;
   for (const feat of fc.features) {
     if (pointInPolygon([lng, lat], feat.geometry)) {
-      return featureToMatch(feat, 'NTACode', 'NTAName');
+      return featureToMatch(feat, 'nta2020', 'ntaname');
     }
   }
   return null;
@@ -152,7 +155,7 @@ export function lookupChicago(lat: number, lng: number): NeighborhoodMatch | nul
   if (!fc) return null;
   for (const feat of fc.features) {
     if (pointInPolygon([lng, lat], feat.geometry)) {
-      return featureToMatch(feat, 'AREA_NUMBE', 'COMMUNITY');
+      return featureToMatch(feat, 'area_numbe', 'community');
     }
   }
   return null;
