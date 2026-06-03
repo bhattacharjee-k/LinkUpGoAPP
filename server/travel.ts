@@ -86,74 +86,70 @@ export function strain(etaSec: number, toleranceMin: number): number {
   return etaSec / (toleranceMin * 60);
 }
 
-function googleTravelMode(mode: Mode): 'WALK' | 'TRANSIT' | 'DRIVE' {
-  if (mode === 'walk') return 'WALK';
-  if (mode === 'transit') return 'TRANSIT';
-  return 'DRIVE';
+function distanceMatrixMode(mode: Mode): 'driving' | 'walking' | 'transit' {
+  if (mode === 'walk') return 'walking';
+  if (mode === 'transit') return 'transit';
+  return 'driving';
 }
 
-export class GoogleRoutesProvider implements RouteMatrixProvider {
+// Google Distance Matrix needs a now-or-FUTURE epoch (seconds): required for transit,
+// and enables traffic for driving. Coerce a past/invalid departBucket forward.
+export function futureDepartureEpochSec(departBucket: string, nowMs: number = Date.now()): number {
+  const ts = Date.parse(departBucket);
+  if (Number.isFinite(ts) && ts > nowMs) return Math.floor(ts / 1000);
+  return Math.floor(nowMs / 1000) + 60;
+}
+
+interface DistanceMatrixResponse {
+  status: string;
+  rows?: Array<{
+    elements?: Array<{
+      status: string;
+      duration?: { value: number };
+      duration_in_traffic?: { value: number };
+    }>;
+  }>;
+}
+
+// Uses the Google Distance Matrix API. Unlike Routes API computeRouteMatrix, this supports
+// TRANSIT (NYC's dominant mode) alongside driving/walking in a single matrix call, with a
+// now-or-future departure_time (schedule-aware for transit, traffic-aware for driving).
+export class GoogleDistanceMatrixProvider implements RouteMatrixProvider {
   constructor(private readonly apiKey = getRoutesApiKey()) {}
 
   async getEtas(origins: LatLng[], mode: Mode, destinations: LatLng[], departBucket: string): Promise<number[][]> {
     if (!this.apiKey) {
-      throw new Error('Google Routes API key is not configured');
+      throw new Error('Google Distance Matrix API key is not configured');
     }
 
-    // TODO: transit mode may require per-leg computeRoutes or the legacy Distance Matrix API
-    // for better transit-specific behavior. Keep this behind the provider boundary.
-    // TODO(Phase 2 / real keys): departureTime must be a FUTURE RFC3339 timestamp and is
-    // mode-restricted. The current departBucket (hour-rounded ISO, possibly in the past) will
-    // make Google reject the request, causing a SILENT fallback to Haversine. Fix before relying
-    // on live Google ETAs.
-    const body = {
-      origins: origins.map(origin => ({
-        waypoint: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
-      })),
-      destinations: destinations.map(destination => ({
-        waypoint: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
-      })),
-      travelMode: googleTravelMode(mode),
-      routingPreference: mode === 'car' ? 'TRAFFIC_AWARE' : undefined,
-      departureTime: departBucket,
-    };
-
-    const response = await fetch('https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': this.apiKey,
-        'X-Goog-FieldMask': 'originIndex,destinationIndex,duration',
-      },
-      body: JSON.stringify(body),
+    const params = new URLSearchParams({
+      origins: origins.map(o => `${o.lat},${o.lng}`).join('|'),
+      destinations: destinations.map(d => `${d.lat},${d.lng}`).join('|'),
+      mode: distanceMatrixMode(mode),
+      departure_time: String(futureDepartureEpochSec(departBucket)),
+      key: this.apiKey,
     });
 
+    const response = await fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?${params.toString()}`);
     if (!response.ok) {
-      throw new Error(`Google Routes API error: ${response.status}`);
+      throw new Error(`Google Distance Matrix HTTP ${response.status}`);
     }
 
-    const cells = await response.json() as Array<{
-      originIndex?: number;
-      destinationIndex?: number;
-      duration?: string;
-    }>;
-    const matrix = origins.map(() => destinations.map(() => Number.POSITIVE_INFINITY));
-
-    for (const cell of cells) {
-      const originIndex = cell.originIndex ?? 0;
-      const destinationIndex = cell.destinationIndex ?? 0;
-      const durationSec = Number(String(cell.duration || '').replace(/s$/, ''));
-      if (
-        matrix[originIndex] &&
-        Number.isFinite(durationSec) &&
-        destinationIndex >= 0 &&
-        destinationIndex < destinations.length
-      ) {
-        matrix[originIndex][destinationIndex] = durationSec;
-      }
+    const data = (await response.json()) as DistanceMatrixResponse;
+    if (data.status !== 'OK') {
+      throw new Error(`Google Distance Matrix status: ${data.status}`);
     }
 
-    return matrix;
+    // Per-cell: prefer traffic-aware duration; non-OK element → non-finite so the caller
+    // falls back to Haversine for that pair.
+    return origins.map((_, i) =>
+      destinations.map((_, j) => {
+        const el = data.rows?.[i]?.elements?.[j];
+        if (!el || el.status !== 'OK') return Number.POSITIVE_INFINITY;
+        const sec = el.duration_in_traffic?.value ?? el.duration?.value;
+        return typeof sec === 'number' && Number.isFinite(sec) ? sec : Number.POSITIVE_INFINITY;
+      }),
+    );
   }
 }
 
@@ -212,7 +208,7 @@ export async function travelScore(
 ): Promise<TravelScoreResult> {
   const now = opts.now ?? Date.now();
   const departBucket = opts.departBucket || defaultDepartBucket(now);
-  const provider = opts.provider || (getRoutesApiKey() ? new GoogleRoutesProvider() : new HaversineFallbackProvider());
+  const provider = opts.provider || (getRoutesApiKey() ? new GoogleDistanceMatrixProvider() : new HaversineFallbackProvider());
 
   if (members.length === 0) {
     return { score: 1, maxStrain: 0, reachableByAll: true, hardUnreachable: false, perMember: [] };

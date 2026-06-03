@@ -12,6 +12,8 @@ import {
   resolveOrigin,
   strain,
   travelScore,
+  GoogleDistanceMatrixProvider,
+  futureDepartureEpochSec,
 } from '../../server/travel';
 
 class FakeRouteMatrixProvider implements RouteMatrixProvider {
@@ -243,5 +245,64 @@ describe('travel', () => {
     expect(provider.calls).toBe(2);
     expect(cached.perMember[0].etaMin).toBe(first.perMember[0].etaMin);
     expect(recomputed.perMember[0].etaMin).toBe(20);
+  });
+
+  describe('GoogleDistanceMatrixProvider', () => {
+    const origFetch = global.fetch;
+    afterEach(() => { global.fetch = origFetch; });
+
+    function mockFetch(payload: any, captured: string[]) {
+      global.fetch = (async (url: any) => {
+        captured.push(String(url));
+        return { ok: true, json: async () => payload } as any;
+      }) as any;
+    }
+
+    it('requests transit mode + a future departure_time and parses durations', async () => {
+      const urls: string[] = [];
+      mockFetch({ status: 'OK', rows: [{ elements: [
+        { status: 'OK', duration: { value: 1200 } },
+        { status: 'ZERO_RESULTS' },
+      ] }] }, urls);
+      const provider = new GoogleDistanceMatrixProvider('test-key');
+      const matrix = await provider.getEtas(
+        [{ lat: 40.7, lng: -74 }],
+        'transit',
+        [{ lat: 40.71, lng: -73.99 }, { lat: 40.8, lng: -73.9 }],
+        '2020-01-01T00:00:00Z', // past bucket → must be coerced forward
+      );
+      const u = new URL(urls[0]);
+      expect(u.searchParams.get('mode')).toBe('transit');
+      expect(Number(u.searchParams.get('departure_time'))).toBeGreaterThanOrEqual(Math.floor(Date.now() / 1000));
+      expect(matrix[0][0]).toBe(1200);
+      expect(matrix[0][1]).toBe(Number.POSITIVE_INFINITY); // ZERO_RESULTS → caller falls back
+    });
+
+    it('maps car→driving and walk→walking', async () => {
+      const urls: string[] = [];
+      mockFetch({ status: 'OK', rows: [{ elements: [{ status: 'OK', duration: { value: 600 } }] }] }, urls);
+      const p = new GoogleDistanceMatrixProvider('k');
+      await p.getEtas([{ lat: 1, lng: 1 }], 'car', [{ lat: 2, lng: 2 }], 'now');
+      await p.getEtas([{ lat: 1, lng: 1 }], 'walk', [{ lat: 2, lng: 2 }], 'now');
+      expect(new URL(urls[0]).searchParams.get('mode')).toBe('driving');
+      expect(new URL(urls[1]).searchParams.get('mode')).toBe('walking');
+    });
+
+    it('throws on a non-OK top-level status so the caller falls back to Haversine', async () => {
+      const urls: string[] = [];
+      mockFetch({ status: 'REQUEST_DENIED' }, urls);
+      const p = new GoogleDistanceMatrixProvider('k');
+      await expect(p.getEtas([{ lat: 1, lng: 1 }], 'car', [{ lat: 2, lng: 2 }], 'now')).rejects.toThrow();
+    });
+  });
+
+  describe('futureDepartureEpochSec', () => {
+    it('coerces past/invalid buckets forward and keeps future buckets', () => {
+      const now = 1_780_000_000_000; // ~2026, so '2020-01-01' is genuinely in the past
+      expect(futureDepartureEpochSec('2020-01-01T00:00:00Z', now)).toBe(Math.floor(now / 1000) + 60);
+      expect(futureDepartureEpochSec('not-a-date', now)).toBe(Math.floor(now / 1000) + 60);
+      const future = new Date(now + 3_600_000).toISOString();
+      expect(futureDepartureEpochSec(future, now)).toBe(Math.floor((now + 3_600_000) / 1000));
+    });
   });
 });
