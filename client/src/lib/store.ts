@@ -129,6 +129,19 @@ export interface PlanningSession {
   inviteCode?: string; // Session specific invite
 }
 
+/**
+ * Broaden a set of session filters to widen the search area.
+ *
+ * This is the SAME broadening the manual "Widen Search Area" button applies
+ * (it sets the search distance to "5 mi"). It is shared between the manual
+ * widen handler and the automatic empty-first-generation retry in
+ * `startSession` so the two paths cannot drift apart.
+ */
+export const WIDEN_SEARCH_DISTANCE = '5 mi';
+export function widenFilters<T extends Record<string, any>>(filters: T): T {
+  return { ...filters, distance: WIDEN_SEARCH_DISTANCE };
+}
+
 // --- Store ---
 interface AppState {
   currentUser: UserProfile | null;

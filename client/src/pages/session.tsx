@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from '@/hooks/use-toast';
-import { PlanningSession, Budget, Energy, Category } from '@/lib/store';
+import { PlanningSession, Budget, Energy, Category, widenFilters } from '@/lib/store';
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -626,7 +626,7 @@ export function Session() {
         setIsRetrying(true);
         try {
           const currentFilters = (session.filters as any) || {};
-          const updatedFilters = { ...currentFilters, distance: '5 mi' };
+          const updatedFilters = widenFilters(currentFilters);
           await updateSessionFilters(session.id, updatedFilters);
           await regenerateSuggestions(session.id);
           toast({ title: "Searching wider", description: "Looking for options in a larger area." });

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { api } from './api';
-import { MOCK_SUGGESTIONS, MOCK_SUGGESTIONS_BY_CITY, CITY_COORDS, type City } from './store';
+import { MOCK_SUGGESTIONS, MOCK_SUGGESTIONS_BY_CITY, CITY_COORDS, widenFilters, type City } from './store';
 
 // WebSocket connection for real-time updates
 let wsConnection: WebSocket | null = null;
@@ -398,30 +398,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       referenceVenues: initialFilters.referenceVenues,
     });
 
+    // Build the /api/suggest request body from a set of filters. Used for both
+    // the initial generation and the automatic widened retry below so the two
+    // share an identical mapping.
+    const buildFetchParams = (filters: any) => ({
+      city: filters.locationScope || user?.city || 'NYC',
+      neighborhood: filters.neighborhood,
+      userLat: user?.lastKnownLat ? parseFloat(user.lastKnownLat) : undefined,
+      userLng: user?.lastKnownLng ? parseFloat(user.lastKnownLng) : undefined,
+      categories: filters.category || ['Drinks'],
+      budget: filters.budget,
+      energy: filters.energy,
+      timeWindow: filters.timeWindow,
+      specificDate: filters.specificDate,
+      specificTime: filters.specificTime,
+      referenceVenues: filters.referenceVenues,
+      vibeDescription: filters.vibeDescription,
+      locationMode: filters.locationMode,
+    });
+
     try {
-      const result = await api.suggestions.fetch({
-        city: initialFilters.locationScope || user?.city || 'NYC',
-        neighborhood: initialFilters.neighborhood,
-        userLat: user?.lastKnownLat ? parseFloat(user.lastKnownLat) : undefined,
-        userLng: user?.lastKnownLng ? parseFloat(user.lastKnownLng) : undefined,
-        categories: initialFilters.category || ['Drinks'],
-        budget: initialFilters.budget,
-        energy: initialFilters.energy,
-        timeWindow: initialFilters.timeWindow,
-        specificDate: initialFilters.specificDate,
-        specificTime: initialFilters.specificTime,
-        referenceVenues: initialFilters.referenceVenues,
-        vibeDescription: initialFilters.vibeDescription,
-        locationMode: initialFilters.locationMode,
-      });
-      
+      let result = await api.suggestions.fetch(buildFetchParams(initialFilters));
+
+      // If the very first generation comes back empty, automatically widen the
+      // search ONCE (same broadening as the manual "Widen Search Area" button)
+      // and retry before surfacing the "No options found" empty state.
+      if (result.suggestions.length === 0) {
+        console.log('[Session] first generation empty — auto-widened');
+        const widenedFilters = widenFilters(initialFilters);
+        await api.sessions.update(session.id, { filters: widenedFilters });
+        result = await api.suggestions.fetch(buildFetchParams(widenedFilters));
+      }
+
       for (const suggestion of result.suggestions) {
         await api.suggestions.create({
           sessionId: session.id,
           ...suggestion
         });
       }
-      
+
       console.log('[Session] Fetched suggestions from APIs:', result.meta);
     } catch (error) {
       console.error('[Session] API fetch failed, using fallback:', error);
