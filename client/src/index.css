@@ -79,8 +79,8 @@
   --secondary-foreground: 0 0% 95%;
   
   --muted: 0 0% 12%;
-  /* Muted Gray #A1A1A1 -> HSL 0 0% 63% */
-  --muted-foreground: 0 0% 63%;
+  /* Muted Gray — bumped from 63% to 72% for readability on the near-black bg */
+  --muted-foreground: 0 0% 72%;
   
   --accent: 0 0% 12%;
   --accent-foreground: 0 0% 95%;

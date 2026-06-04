@@ -21,6 +21,7 @@ export function Onboarding() {
   const [_, setLocation] = useLocation();
   const [step, setStep] = useState(1);
   const [isReturningUser, setIsReturningUser] = useState(false);
+  const [justLoggedOut, setJustLoggedOut] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -36,6 +37,17 @@ export function Onboarding() {
     if (hasAccount === 'true') {
       setIsReturningUser(true);
       setIsLoginMode(true);
+    }
+    // A deliberate logout sets this marker; read + clear it once so we can
+    // show a calm, neutral message rather than the warning-style banner.
+    try {
+      if (sessionStorage.getItem('linkupgo_just_logged_out') === 'true') {
+        sessionStorage.removeItem('linkupgo_just_logged_out');
+        setJustLoggedOut(true);
+        setIsLoginMode(true);
+      }
+    } catch {
+      // sessionStorage unavailable — ignore.
     }
   }, []);
   
@@ -266,7 +278,7 @@ export function Onboarding() {
           variant="ghost"
           size="sm"
           onClick={handleBack}
-          className="absolute top-6 left-6 z-20 text-white hover:bg-white/10"
+          className="absolute top-4 left-4 z-30 text-white hover:bg-white/10"
           data-testid="button-back"
         >
           <ChevronLeft size={20} className="mr-1" />
@@ -281,8 +293,8 @@ export function Onboarding() {
         exit={{ opacity: 0, x: -20 }}
         className="z-10 w-full max-w-md mx-auto space-y-8"
       >
-        {/* Logo centered at top */}
-        <div className="flex justify-center items-center mb-8">
+        {/* Logo centered at top — pt-8 keeps it clear of the absolute Back button */}
+        <div className="flex justify-center items-center mb-8 pt-8">
           <img 
             src={logoImg} 
             alt="LinkUpGo" 
@@ -318,7 +330,17 @@ export function Onboarding() {
           </div>
         )}
 
-        {step === 1 && isReturningUser && (
+        {step === 1 && justLoggedOut && (
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-start gap-3" data-testid="logged-out-banner">
+            <CheckCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-white font-medium">You've been signed out</p>
+              <p className="text-muted-foreground text-sm">Sign back in to keep planning.</p>
+            </div>
+          </div>
+        )}
+
+        {step === 1 && isReturningUser && !justLoggedOut && (
           <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 flex items-start gap-3" data-testid="returning-user-banner">
             <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
             <div>
@@ -331,9 +353,13 @@ export function Onboarding() {
         {step === 1 && (
           <div className="space-y-6">
             <div className="space-y-2">
-              <Label>Username</Label>
+              <Label htmlFor="onboarding-username">Username</Label>
               <div className="relative">
-                <Input 
+                <Input
+                  id="onboarding-username"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
                   data-testid="input-username"
                   value={formData.username}
                   onChange={e => handleUsernameChange(e.target.value)}
@@ -364,10 +390,13 @@ export function Onboarding() {
               )}
             </div>
             <div className="space-y-2">
-              <Label>Password</Label>
-              <Input 
+              <Label htmlFor="onboarding-password">Password</Label>
+              <Input
+                id="onboarding-password"
+                name="password"
                 data-testid="input-password"
                 type="password"
+                autoComplete={isLoginMode ? 'current-password' : 'new-password'}
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
                 placeholder="••••••••"
@@ -390,8 +419,12 @@ export function Onboarding() {
         {step === 2 && (
           <div className="space-y-6">
             <div className="space-y-2">
-              <Label>Name</Label>
-              <Input 
+              <Label htmlFor="onboarding-name">Name</Label>
+              <Input
+                id="onboarding-name"
+                name="name"
+                type="text"
+                autoComplete="name"
                 data-testid="input-name"
                 value={formData.name}
                 onChange={e => setFormData({...formData, name: e.target.value})}
@@ -450,19 +483,25 @@ export function Onboarding() {
         {step === 4 && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3">
-                {['Chill', 'Vibey', 'Going out', 'Full send'].map((e) => (
+                {[
+                  { value: 'Chill', desc: 'Low-key hangs — coffee, a quiet bar, easy conversation' },
+                  { value: 'Vibey', desc: 'Good energy and atmosphere without going overboard' },
+                  { value: 'Going out', desc: 'A proper night out — drinks, music, somewhere lively' },
+                  { value: 'Full send', desc: 'Big night, no brakes — dancing til late' },
+                ].map((e) => (
                   <button
-                    key={e}
-                    data-testid={`button-energy-${e.replace(/\s+/g, '-')}`}
-                    onClick={() => setFormData({...formData, energy: e as Energy})}
+                    key={e.value}
+                    data-testid={`button-energy-${e.value.replace(/\s+/g, '-')}`}
+                    onClick={() => setFormData({...formData, energy: e.value as Energy})}
                     className={cn(
-                      "h-16 rounded-xl border border-white/10 flex items-center px-6 transition-all",
-                      formData.energy === e 
-                        ? "bg-primary text-black border-primary shadow-lg shadow-primary/20 font-bold" 
-                        : "bg-white/5 hover:bg-white/10 text-muted-foreground"
+                      "h-auto py-3 px-6 rounded-xl border border-white/10 flex flex-col items-start text-left transition-all",
+                      formData.energy === e.value
+                        ? "bg-primary text-black border-primary shadow-lg shadow-primary/20"
+                        : "bg-white/5 hover:bg-white/10"
                     )}
                   >
-                    <span className="text-lg font-bold">{e}</span>
+                    <span className="text-lg font-bold">{e.value}</span>
+                    <span className={cn("text-xs", formData.energy === e.value ? "text-black/70" : "text-muted-foreground")}>{e.desc}</span>
                   </button>
                 ))}
               </div>

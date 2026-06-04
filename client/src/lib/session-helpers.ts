@@ -30,3 +30,24 @@ export function formatVoteLabel(upvotes: number, downvotes: number): string {
   const total = upvotes + downvotes;
   return total === 1 ? '1 vote' : `${total} votes`;
 }
+
+export type LocationMode = 'near_me' | 'explore_anywhere' | 'meet_in_the_middle';
+
+/**
+ * The location-scope clause for the suggestion-search loading copy.
+ *
+ * It must NOT claim "nearby" when the user picked the "Anywhere"/explore
+ * scope, and should reflect the meet-in-the-middle case too. Pure + tiny
+ * so it can be unit-tested.
+ */
+export function searchingCopy(locationMode?: LocationMode): string {
+  switch (locationMode) {
+    case 'explore_anywhere':
+      return 'Searching for the best spots city-wide...';
+    case 'meet_in_the_middle':
+      return 'Searching for spots central to everyone...';
+    case 'near_me':
+    default:
+      return 'Searching the best spots nearby...';
+  }
+}

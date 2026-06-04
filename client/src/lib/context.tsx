@@ -291,6 +291,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUserState(null);
     setGroups([]);
     setSessions([]);
+    // Mark a deliberate logout so onboarding can greet with a neutral
+    // "you've been signed out" message instead of the warning-styled
+    // returning-user banner. Read + cleared once by onboarding.
+    try {
+      sessionStorage.setItem('linkupgo_just_logged_out', 'true');
+    } catch {
+      // sessionStorage may be unavailable (private mode); non-critical.
+    }
   };
 
   const updateUserProfile = async (updates: any) => {
