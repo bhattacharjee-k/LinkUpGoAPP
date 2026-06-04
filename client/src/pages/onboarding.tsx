@@ -584,6 +584,12 @@ export function Onboarding() {
           {!isLoading && <ChevronRight className="ml-2" />}
         </Button>
 
+        {step === 1 && !isStep1Valid && !isLoading && (
+          <p className="text-xs text-muted-foreground text-center mt-2" data-testid="text-step1-hint">
+            Enter a username and a password of at least 6 characters.
+          </p>
+        )}
+
         {/* Spacer for fixed banner ad */}
         <div className="h-16" />
       </motion.div>
