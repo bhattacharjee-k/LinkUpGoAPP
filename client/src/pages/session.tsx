@@ -1321,16 +1321,29 @@ export function Session() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
           <div className="px-6 py-2">
-             <TabsList className="w-full grid grid-cols-2 bg-white/5">
+             <TabsList className="w-full grid grid-cols-3 bg-white/5">
               <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
+              <TabsTrigger value="squad">Squad</TabsTrigger>
               <TabsTrigger value="chat">Chat</TabsTrigger>
             </TabsList>
           </div>
 
           {/* Suggestions Tab */}
           <TabsContent value="suggestions" className="flex-1 overflow-y-auto p-6 pb-8 space-y-6 data-[state=inactive]:hidden">
-             <GroupReconciliation sessionId={session.id} session={session} />
-             {sortedSuggestions.length === 0 ? (
+             {isRegenerating ? (
+               <div className="space-y-6">
+                 <div className="flex flex-col items-center justify-center py-8 px-6 text-center space-y-3">
+                   <RefreshCw size={28} className="text-primary animate-spin" />
+                   <div className="space-y-1">
+                     <h2 className="text-lg font-bold">Finding options your squad will love…</h2>
+                     <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                       Matching tonight's energy, budget, and travel limits. Here's what we're balancing for the crew:
+                     </p>
+                   </div>
+                 </div>
+                 <GroupReconciliation sessionId={session.id} session={session} />
+               </div>
+             ) : sortedSuggestions.length === 0 ? (
                <div className="flex flex-col items-center justify-center py-16 px-6 text-center space-y-6">
                  <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
                    <MapPin size={40} className="text-muted-foreground" />
@@ -1619,6 +1632,17 @@ export function Session() {
                  </div>
                );
              })()}
+          </TabsContent>
+
+          {/* Squad Tab */}
+          <TabsContent value="squad" className="flex-1 overflow-y-auto p-6 pb-8 space-y-4 data-[state=inactive]:hidden">
+            <div className="space-y-1">
+              <h2 className="text-lg font-bold">What your squad wants</h2>
+              <p className="text-muted-foreground text-sm">
+                The crew's blended budget, energy, and travel limits for this plan. Individual budget and energy stay anonymous — only travel logistics are named.
+              </p>
+            </div>
+            <GroupReconciliation sessionId={session.id} session={session} />
           </TabsContent>
 
           {/* Chat Tab */}

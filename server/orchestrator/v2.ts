@@ -165,7 +165,7 @@ export async function getOrchestratedSuggestionsV2(
   await applyV2StructuredAdjustments(enriched, aggMap, req, opts);
 
   // ---- Stage 5: pairwise PRP re-rank of top 10 ----
-  const orderedIds = await pairwiseRerank(enriched, aggMap, req, env, 10);
+  const orderedIds = await pairwiseRerank(enriched, aggMap, req, env, 6);
 
   // ---- Stage 6: diversity post-pass ----
   // Reorder enriched candidates per the pairwise output, then run MMR+KL+quotas.
@@ -270,7 +270,7 @@ export async function runV2BrainOnly(
   for (const s of scores) aggMap.set(s.candidateId, s.aggregate);
   await applyV2StructuredAdjustments(enriched, aggMap, req, opts);
 
-  const orderedIds = await pairwiseRerank(enriched, aggMap, req, env, 10);
+  const orderedIds = await pairwiseRerank(enriched, aggMap, req, env, 6);
   const idToCand = new Map(enriched.map((c) => [c.id, c]));
   const ranked = orderedIds.map((id) => idToCand.get(id)).filter((c): c is NonNullable<typeof c> => !!c);
   const { final, klToHistory } = diversify(
