@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, LogOut, Check, MapPin, DollarSign, Zap, X, Mail, Car, Footprints, Train } from 'lucide-react';
+import { ArrowLeft, LogOut, Check, MapPin, DollarSign, Zap, X, Mail, Car, Footprints, Train, Calendar, ChevronRight } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { City, Budget, Energy, Category, DiscoveryStyle, CrowdPreference, NEIGHBORHOODS } from '@/lib/store';
@@ -286,15 +286,26 @@ export function Profile() {
             </div>
           </div>
 
-          <Button 
-            onClick={handleSave} 
-            disabled={isSaving}
-            className="w-full bg-primary text-black font-bold"
-            data-testid="button-save-prefs"
-          >
-            {isSaving ? 'Saving...' : 'Save All Preferences'}
-          </Button>
         </Card>
+
+        <button
+          onClick={() => setLocation('/history')}
+          className="w-full"
+          data-testid="button-plan-history"
+        >
+          <Card className="p-4 bg-white/5 border-white/10 hover:bg-white/10 transition-all cursor-pointer flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                <Calendar size={18} className="text-muted-foreground" />
+              </div>
+              <div className="text-left">
+                <p className="font-bold text-sm">Plan history</p>
+                <p className="text-xs text-muted-foreground">Your past confirmed plans</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground" />
+          </Card>
+        </button>
 
         <Card className="p-6 bg-white/5 border-white/10 space-y-6">
           <h3 className="text-lg font-bold">Discovery Preferences</h3>
@@ -365,18 +376,19 @@ export function Profile() {
             </div>
           </div>
 
-          <Button 
-            onClick={handleSave} 
-            disabled={isSaving}
-            className="w-full bg-primary text-black font-bold"
-            data-testid="button-save-discovery"
-          >
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </Button>
         </Card>
 
-        <Button 
-          variant="outline" 
+        <Button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full bg-primary text-black font-bold"
+          data-testid="button-save-prefs"
+        >
+          {isSaving ? 'Saving...' : 'Save changes'}
+        </Button>
+
+        <Button
+          variant="outline"
           onClick={handleLogout}
           className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10"
         >
