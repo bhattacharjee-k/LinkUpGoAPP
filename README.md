@@ -64,3 +64,12 @@ Open http://localhost:5003. Test accounts after seeding: `alice`, `bob`, `carla`
 
 - **5003** — App (Express + Vite dev server)
 - **5434** — PostgreSQL (Docker)
+
+## Testing
+
+- **Unit / component tests:** `npm run test` (Vitest). Suites live in `tests/{shared,server,client}`.
+- **UX / QA browser runs:** `playwright` is installed as a devDependency for driving the running app like a real user (headless Chromium) during manual UX/QA passes — load `http://localhost:5003`, sign up, click through flows, and screenshot each screen. It is not wired into `npm run test`; use it ad hoc.
+
+## Troubleshooting
+
+- **Auth requests return HTTP 400 with an empty `{"message":""}` body (sign-up / sign-in silently fail).** The local Postgres almost certainly isn't running — the app boots even when the DB is down, so this looks like a broken auth form rather than a missing database. Start it with `docker compose up -d`, confirm `docker ps` shows `linkupgo-postgres-1` up on port 5434, then retry.
