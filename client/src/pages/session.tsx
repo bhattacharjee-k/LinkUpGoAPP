@@ -16,6 +16,7 @@ import { Send, ThumbsUp, ThumbsDown, MapPin, DollarSign, Users, Bot, Star, UserP
 import { DownvoteModal } from '@/components/downvote-modal';
 import { GroupReconciliation } from '@/components/group-reconciliation';
 import { calculateScore, getVoteSummary, REASON_PENALTIES } from '@shared/ranking';
+import { derivePlannerReply, formatVoteLabel } from '@/lib/session-helpers';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -1431,8 +1432,8 @@ export function Session() {
                    )}
                    
                    <div className="flex flex-wrap gap-2 text-xs">
-                     <span className="px-2 py-1 rounded-md bg-white/5 border border-white/5 flex items-center gap-1">
-                       <Users size={12} /> {suggestion.turnout}
+                     <span className="px-2 py-1 rounded-md bg-white/5 border border-white/5 flex items-center gap-1" title="Expected turnout">
+                       <Users size={12} /> {suggestion.turnout} going
                      </span>
                      <span className="px-2 py-1 rounded-md bg-white/5 border border-white/5 flex items-center gap-1">
                        <MapPin size={12} /> {suggestion.distance}
@@ -1447,13 +1448,18 @@ export function Session() {
                      <div className="flex justify-between items-center mb-3">
                          <div className="flex items-center gap-2">
                            <span className="text-xs font-bold uppercase text-muted-foreground">Score: {score}</span>
-                           <button 
+                           <button
                              onClick={() => { setInfoSuggestion(suggestion); setInfoVoteData(voteData); setRankingInfoOpen(true); }}
                              className="p-1 rounded-full bg-white/10 text-muted-foreground hover:text-foreground hover:bg-white/20 transition-colors"
+                             aria-label="How scoring works"
+                             title="How scoring works"
                              data-testid={`button-info-ranking-${suggestion.id}`}
                            >
                              <Info size={14} />
                            </button>
+                           <span className="text-[10px] text-muted-foreground" data-testid={`text-vote-count-${suggestion.id}`}>
+                             {formatVoteLabel(voteSummary.upvotes, voteSummary.downvotes)}
+                           </span>
                          </div>
                          {myVote && !isLocked && (
                              <span className="text-[10px] text-primary">You voted {myVote === 'up' ? '👍' : '👎'}</span>
@@ -1474,7 +1480,7 @@ export function Session() {
                          ) : (
                            <ThumbsUp size={18} className={cn(myVote === 'up' ? "fill-black" : "")} />
                          )}
-                         <span className="text-xs">{voteSummary.upvotes}</span>
+                         <span className="text-xs">In · {voteSummary.upvotes}</span>
                        </Button>
                        
                        <Button 
@@ -1486,7 +1492,7 @@ export function Session() {
                          data-testid={`button-downvote-${suggestion.id}`}
                        >
                          <ThumbsDown size={18} />
-                         <span className="text-xs">{voteSummary.downvotes}</span>
+                         <span className="text-xs">Out · {voteSummary.downvotes}</span>
                        </Button>
                      </div>
                    </div>
@@ -1682,7 +1688,9 @@ export function Session() {
                     {isPlannerAi && <div className="text-[10px] text-primary font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner</div>}
                     {isOtherUser && <div className="text-[10px] text-blue-400 font-bold mb-1">{displayName}</div>}
                     {isCurrentUser && <div className="text-[10px] text-black/70 font-bold mb-1">You</div>}
-                    {msg.text}
+                    {isPlannerAi
+                      ? derivePlannerReply({ response: msg.text, suggestionsUpdated: !!(msg.metadata as any)?.suggestionsUpdated })
+                      : msg.text}
                   </motion.div>
                   );
                 })}
@@ -1937,6 +1945,9 @@ export function Session() {
                     <span className="text-xs font-medium">Total Score</span>
                     <span className={cn("font-bold", summary.score >= 0 ? "text-primary" : "text-red-400")}>{summary.score > 0 ? '+' : ''}{summary.score}</span>
                   </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Score ranks the options: each <span className="text-foreground font-medium">upvote</span> adds a point and each <span className="text-foreground font-medium">downvote</span> subtracts more when people flag a reason (too far, too pricey, bad timing). The highest score leads.
+                  </p>
                 </div>
                 
                 {isMajorityDownvoted && (
