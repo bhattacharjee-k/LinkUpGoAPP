@@ -48,10 +48,10 @@ export function GroupReconciliation({ sessionId, session }: GroupReconciliationP
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full" data-testid="group-reconciliation-loading">
-        <Skeleton className="h-36 bg-white/5 border border-white/10 rounded-2xl animate-pulse" />
-        <Skeleton className="h-36 bg-white/5 border border-white/10 rounded-2xl animate-pulse" />
-        <Skeleton className="h-36 bg-white/5 border border-white/10 rounded-2xl animate-pulse" />
+      <div className="flex flex-col gap-4 w-full" data-testid="group-reconciliation-loading">
+        <Skeleton className="h-28 bg-white/5 border border-white/10 rounded-2xl animate-pulse" />
+        <Skeleton className="h-28 bg-white/5 border border-white/10 rounded-2xl animate-pulse" />
+        <Skeleton className="h-28 bg-white/5 border border-white/10 rounded-2xl animate-pulse" />
       </div>
     );
   }
@@ -161,7 +161,7 @@ export function GroupReconciliation({ sessionId, session }: GroupReconciliationP
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full" data-testid="group-reconciliation">
+    <div className="flex flex-col gap-4 w-full" data-testid="group-reconciliation">
       {/* BUDGET CARD */}
       <Card className="bg-white/5 border-white/10 shadow-2xl backdrop-blur-md flex flex-col justify-between rounded-2xl overflow-hidden transition-all duration-300 hover:border-white/15 hover:bg-white/[0.07]" data-testid="budget-card">
         <CardHeader className="p-4 pb-2 space-y-1.5">

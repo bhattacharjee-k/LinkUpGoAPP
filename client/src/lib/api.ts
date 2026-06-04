@@ -32,18 +32,36 @@ export interface GroupAggregateResponse {
 const API_BASE = `${import.meta.env.VITE_API_URL || ''}/api`;
 
 async function fetchAPI(url: string, options?: RequestInit) {
-  const response = await fetch(`${API_BASE}${url}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    credentials: 'include',
-  });
-  
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${url}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      credentials: 'include',
+    });
+  } catch {
+    // Network failure (offline, DNS, server unreachable) — distinct from an
+    // auth rejection so callers can show a connection-specific message.
+    throw new Error("Can't reach the server. Check your connection and try again.");
+  }
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new Error(error.message || 'Request failed');
+    // Prefer the server's JSON `message` (e.g. the humane rate-limit text or
+    // "Invalid credentials"). Only fall back to a generic message when the
+    // body isn't valid JSON / has no message.
+    const body = await response.json().catch(() => null);
+    const serverMessage = body && typeof body.message === 'string' ? body.message : null;
+    if (serverMessage) {
+      throw new Error(serverMessage);
+    }
+    throw new Error(
+      response.status >= 500
+        ? 'Something went wrong on our end. Please try again in a moment.'
+        : 'Request failed'
+    );
   }
   
   // Handle 204 No Content responses

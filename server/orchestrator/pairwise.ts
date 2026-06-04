@@ -1,11 +1,16 @@
-// Phase 1.5: Pairwise Ranking Prompting (PRP) re-rank of the top 10.
+// Phase 1.5: Pairwise Ranking Prompting (PRP) re-rank of the top N.
 //
 // Per the rebuild brief §1.5:
 //   - Single judge (locked to Haiku 4.5; falls back to Gemini Flash if no key).
 //   - For each pair (i, j), ask twice with positions swapped. If disagreement → tie.
 //   - Aggregate via Borda count.
-//   - n=10 → C(10,2)=45 unique pairs × 2 = 90 calls. Bounded; with prompt caching the
-//     marginal cost is small.
+//
+// COST / RATE NOTE: call volume is C(N,2)*2 — it grows quadratically in N.
+//   N=10 → 90 calls, N=6 → 30 calls. The Anthropic Haiku rate limit is a
+//   PER-MINUTE throughput ceiling (50/min on the entry tier), NOT a concurrency
+//   cap — so bounding in-flight calls does NOT keep you under it; total calls per
+//   minute does. The caller passes a small N (6) so a single generation's burst
+//   fits under 50/min. Raise N (and/or the Anthropic tier) once on a higher tier.
 
 import type { EnrichedCandidate, SuggestionEnvelope } from './envelope';
 import { getAnthropic, getGemini, MODELS } from './judges/clients';
@@ -144,9 +149,10 @@ export async function pairwiseRerank(
   for (const c of top) points.set(c.id, 0);
 
   // Build pair THUNKS (not started promises) so the concurrency limiter
-  // actually controls how many fire at a time. Anthropic Haiku free-tier is
-  // 50 req/min — pairwise fires C(N,2) * 2 calls (N=10 → 90 calls). With
-  // concurrency=4 and ~1s per call, we stay well under the rate limit.
+  // controls how many fire at a time. NOTE: concurrency smooths the burst but
+  // does NOT keep us under the 50/min ceiling — only the total call count does
+  // (see the COST / RATE NOTE at the top). N is kept small by the caller for
+  // exactly this reason.
   const pairThunks: Array<() => Promise<void>> = [];
   for (let i = 0; i < top.length; i++) {
     for (let j = i + 1; j < top.length; j++) {
@@ -167,9 +173,8 @@ export async function pairwiseRerank(
     }
   }
 
-  // Bound the concurrency. Each pair fires 2 calls in parallel inside, so
-  // `concurrency=4` produces 8 in-flight calls — comfortably under 50/min
-  // assuming ~1s per call.
+  // Bound the concurrency to smooth the burst. (This caps in-flight calls, not
+  // calls-per-minute — staying under 50/min is handled by keeping N small.)
   await runWithLimit(pairThunks, 4);
 
   // Re-order top by Borda points, breaking ties with original aggregate score.

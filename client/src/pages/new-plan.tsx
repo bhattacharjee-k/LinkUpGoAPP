@@ -17,8 +17,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from '@/hooks/use-toast';
 import { PlacesAutocomplete } from '@/components/places-autocomplete';
 import { motion, AnimatePresence } from 'framer-motion';
+import { searchingCopy } from '@/lib/session-helpers';
 import type { ReferenceVenue } from '@shared/schema';
 
+// First message honors the selected location mode (see searchingCopy); the
+// `text` here is just a fallback for the "near me" default.
 const LOADING_MESSAGES = [
   { icon: Search, text: "Searching the best spots nearby..." },
   { icon: Star, text: "Finding top-rated venues..." },
@@ -290,7 +293,7 @@ export function NewPlan() {
                   className="w-10 h-10 rounded-full border-2 border-primary/30 border-t-primary"
                 />
                 <div className="text-left">
-                  <h2 className="text-lg font-bold text-white">Searching your right vibe</h2>
+                  <h2 className="text-lg font-bold text-white">Searching for your vibe</h2>
                   <motion.p
                     key={loadingStep}
                     initial={{ opacity: 0, y: 5 }}
@@ -298,7 +301,9 @@ export function NewPlan() {
                     transition={{ duration: 0.4 }}
                     className="text-muted-foreground text-xs"
                   >
-                    {LOADING_MESSAGES[loadingStep].text}
+                    {loadingStep === 0
+                      ? searchingCopy(formData.locationMode)
+                      : LOADING_MESSAGES[loadingStep].text}
                   </motion.p>
                 </div>
               </div>

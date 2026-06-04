@@ -4,9 +4,11 @@ import { Layout } from '@/components/layout';
 import { AdBanner } from '@/components/ad-banner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Plus, MapPin, ArrowRight, Lock, Shield, Copy, Check, Unlock, Clock } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Plus, MapPin, ArrowRight, Lock, Shield, Copy, Check, Unlock, Clock, User } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -16,13 +18,16 @@ import { useToast } from '@/hooks/use-toast';
 import { NotificationBell } from '@/components/notification-bell';
 
 export function Home() {
-  const { user, sessions, groups, updateGroup, isAdmin, isGroupLocked } = useApp();
+  const { user, sessions, groups, createGroup, updateGroup, isAdmin, isGroupLocked } = useApp();
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
   const [selectedSquadId, setSelectedSquadId] = useState<string | null>(null);
   const [isSquadDrawerOpen, setIsSquadDrawerOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
 
   if (!user) return null;
 
@@ -30,6 +35,20 @@ export function Home() {
 
   const activeSessions = sessions.filter(s => s.status !== 'locked');
   const pastSessions = sessions.filter(s => s.status === 'locked');
+
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim() || isCreatingGroup) return;
+    setIsCreatingGroup(true);
+    try {
+      await createGroup(newGroupName.trim());
+      toast({ title: "Group created!", description: `${newGroupName.trim()} is ready to go.` });
+      setNewGroupName('');
+      setIsCreateGroupOpen(false);
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to create group", variant: "destructive" });
+    }
+    setIsCreatingGroup(false);
+  };
 
   const openSquadDrawer = (groupId: string) => {
     setSelectedSquadId(groupId);
@@ -72,7 +91,15 @@ export function Home() {
         <div className="flex justify-end items-center">
           <div className="flex items-center gap-2">
             <NotificationBell />
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-blue-500 border-2 border-white/20" />
+            <button
+              type="button"
+              onClick={() => setLocation('/profile')}
+              aria-label="Profile"
+              className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-blue-500 border-2 border-white/20 cursor-pointer flex items-center justify-center text-white/90 hover:border-white/40 transition-colors"
+              data-testid="button-profile"
+            >
+              <User size={18} />
+            </button>
           </div>
         </div>
         
@@ -145,7 +172,50 @@ export function Home() {
 
         {/* Your Groups */}
         <div className="space-y-4">
-           <h3 className="text-lg font-bold">Your Groups</h3>
+           <div className="flex justify-between items-center">
+             <h3 className="text-lg font-bold">Your Groups</h3>
+             <Dialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
+               <DialogTrigger asChild>
+                 <Button size="sm" variant="outline" className="border-white/10 bg-white/5" data-testid="button-create-group">
+                   <Plus size={14} className="mr-1" /> New
+                 </Button>
+               </DialogTrigger>
+               <DialogContent className="bg-card border-white/10">
+                 <DialogHeader>
+                   <DialogTitle>Create a Group</DialogTitle>
+                 </DialogHeader>
+                 <div className="space-y-4 pt-4">
+                   <div className="space-y-2">
+                     <Label htmlFor="new-group-name">Group Name</Label>
+                     <Input
+                       id="new-group-name"
+                       placeholder="e.g. Friday Night Crew"
+                       value={newGroupName}
+                       onChange={(e) => setNewGroupName(e.target.value)}
+                       onKeyDown={(e) => { if (e.key === 'Enter') handleCreateGroup(); }}
+                       className="bg-white/5 border-white/10"
+                       data-testid="input-group-name"
+                     />
+                   </div>
+                 </div>
+                 <DialogFooter>
+                   <Button
+                     onClick={handleCreateGroup}
+                     disabled={!newGroupName.trim() || isCreatingGroup}
+                     className="w-full bg-primary text-black hover:bg-primary/90 font-bold"
+                     data-testid="button-submit-create-group"
+                   >
+                     {isCreatingGroup ? 'Creating...' : 'Create Group'}
+                   </Button>
+                 </DialogFooter>
+               </DialogContent>
+             </Dialog>
+           </div>
+           {groups.length === 0 ? (
+             <div className="text-center py-10 border border-dashed border-white/10 rounded-xl" data-testid="empty-groups">
+               <p className="text-muted-foreground text-sm">No groups yet — create one or join with an invite link.</p>
+             </div>
+           ) : (
            <div className="space-y-3">
              {groups.map(group => {
                const isUserAdmin = isAdmin(group.id);
@@ -194,6 +264,7 @@ export function Home() {
                );
              })}
            </div>
+           )}
         </div>
 
       </div>

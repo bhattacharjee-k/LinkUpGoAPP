@@ -14,15 +14,23 @@ import { useEffect, useState } from "react";
 import { api } from "./lib/api";
 import { ErrorBoundary } from "@/components/error-boundary";
 
-function PrivateRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user } = useApp();
+export function PrivateRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useApp();
   const [_, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!user) {
+    if (!isLoading && !user) {
       setLocation('/onboarding');
     }
-  }, [user, setLocation]);
+  }, [user, isLoading, setLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-background text-foreground gap-4">
+        <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   if (!user) return null;
   return <Component />;

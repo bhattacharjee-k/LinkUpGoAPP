@@ -25,14 +25,14 @@ export function Layout({ children, hideNav = false }: LayoutProps) {
       </div>
 
       {/* Main Content */}
-      <main className="relative z-10 flex-1 flex flex-col max-w-md mx-auto w-full pb-20">
+      <main className="relative z-10 flex-1 flex flex-col max-w-md mx-auto w-full pb-28">
         {children}
       </main>
 
       {/* Bottom Navigation */}
       {!hideNav && (
         <div data-bottom-nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-safe">
-          <nav className="glass-panel mx-4 mb-4 px-6 py-3 rounded-2xl flex items-center justify-between w-full max-w-md backdrop-blur-xl bg-black/80 border-white/10">
+          <nav className="mx-4 mb-4 px-6 py-3 rounded-2xl flex items-center justify-between w-full max-w-md border border-white/10 shadow-lg bg-[#0a0a0a]">
             {navItems.map((item) => {
               const isActive = location === item.path;
               return (

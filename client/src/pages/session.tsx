@@ -16,13 +16,14 @@ import { Send, ThumbsUp, ThumbsDown, MapPin, DollarSign, Users, Bot, Star, UserP
 import { DownvoteModal } from '@/components/downvote-modal';
 import { GroupReconciliation } from '@/components/group-reconciliation';
 import { calculateScore, getVoteSummary, REASON_PENALTIES } from '@shared/ranking';
+import { derivePlannerReply, formatVoteLabel } from '@/lib/session-helpers';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from '@/hooks/use-toast';
-import { PlanningSession, Budget, Energy, Category } from '@/lib/store';
+import { PlanningSession, Budget, Energy, Category, widenFilters } from '@/lib/store';
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -626,7 +627,7 @@ export function Session() {
         setIsRetrying(true);
         try {
           const currentFilters = (session.filters as any) || {};
-          const updatedFilters = { ...currentFilters, distance: '5 mi' };
+          const updatedFilters = widenFilters(currentFilters);
           await updateSessionFilters(session.id, updatedFilters);
           await regenerateSuggestions(session.id);
           toast({ title: "Searching wider", description: "Looking for options in a larger area." });
@@ -1321,16 +1322,29 @@ export function Session() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
           <div className="px-6 py-2">
-             <TabsList className="w-full grid grid-cols-2 bg-white/5">
+             <TabsList className="w-full grid grid-cols-3 bg-white/5">
               <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
+              <TabsTrigger value="squad">Squad</TabsTrigger>
               <TabsTrigger value="chat">Chat</TabsTrigger>
             </TabsList>
           </div>
 
           {/* Suggestions Tab */}
           <TabsContent value="suggestions" className="flex-1 overflow-y-auto p-6 pb-8 space-y-6 data-[state=inactive]:hidden">
-             <GroupReconciliation sessionId={session.id} session={session} />
-             {sortedSuggestions.length === 0 ? (
+             {isRegenerating ? (
+               <div className="space-y-6">
+                 <div className="flex flex-col items-center justify-center py-8 px-6 text-center space-y-3">
+                   <RefreshCw size={28} className="text-primary animate-spin" />
+                   <div className="space-y-1">
+                     <h2 className="text-lg font-bold">Finding options your squad will love…</h2>
+                     <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                       Matching tonight's energy, budget, and travel limits. Here's what we're balancing for the crew:
+                     </p>
+                   </div>
+                 </div>
+                 <GroupReconciliation sessionId={session.id} session={session} />
+               </div>
+             ) : sortedSuggestions.length === 0 ? (
                <div className="flex flex-col items-center justify-center py-16 px-6 text-center space-y-6">
                  <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
                    <MapPin size={40} className="text-muted-foreground" />
@@ -1418,8 +1432,8 @@ export function Session() {
                    )}
                    
                    <div className="flex flex-wrap gap-2 text-xs">
-                     <span className="px-2 py-1 rounded-md bg-white/5 border border-white/5 flex items-center gap-1">
-                       <Users size={12} /> {suggestion.turnout}
+                     <span className="px-2 py-1 rounded-md bg-white/5 border border-white/5 flex items-center gap-1" title="Expected turnout">
+                       <Users size={12} /> {suggestion.turnout} going
                      </span>
                      <span className="px-2 py-1 rounded-md bg-white/5 border border-white/5 flex items-center gap-1">
                        <MapPin size={12} /> {suggestion.distance}
@@ -1434,13 +1448,18 @@ export function Session() {
                      <div className="flex justify-between items-center mb-3">
                          <div className="flex items-center gap-2">
                            <span className="text-xs font-bold uppercase text-muted-foreground">Score: {score}</span>
-                           <button 
+                           <button
                              onClick={() => { setInfoSuggestion(suggestion); setInfoVoteData(voteData); setRankingInfoOpen(true); }}
                              className="p-1 rounded-full bg-white/10 text-muted-foreground hover:text-foreground hover:bg-white/20 transition-colors"
+                             aria-label="How scoring works"
+                             title="How scoring works"
                              data-testid={`button-info-ranking-${suggestion.id}`}
                            >
                              <Info size={14} />
                            </button>
+                           <span className="text-[10px] text-muted-foreground" data-testid={`text-vote-count-${suggestion.id}`}>
+                             {formatVoteLabel(voteSummary.upvotes, voteSummary.downvotes)}
+                           </span>
                          </div>
                          {myVote && !isLocked && (
                              <span className="text-[10px] text-primary">You voted {myVote === 'up' ? '👍' : '👎'}</span>
@@ -1461,7 +1480,7 @@ export function Session() {
                          ) : (
                            <ThumbsUp size={18} className={cn(myVote === 'up' ? "fill-black" : "")} />
                          )}
-                         <span className="text-xs">{voteSummary.upvotes}</span>
+                         <span className="text-xs">In · {voteSummary.upvotes}</span>
                        </Button>
                        
                        <Button 
@@ -1473,7 +1492,7 @@ export function Session() {
                          data-testid={`button-downvote-${suggestion.id}`}
                        >
                          <ThumbsDown size={18} />
-                         <span className="text-xs">{voteSummary.downvotes}</span>
+                         <span className="text-xs">Out · {voteSummary.downvotes}</span>
                        </Button>
                      </div>
                    </div>
@@ -1621,6 +1640,17 @@ export function Session() {
              })()}
           </TabsContent>
 
+          {/* Squad Tab */}
+          <TabsContent value="squad" className="flex-1 overflow-y-auto p-6 pb-8 space-y-4 data-[state=inactive]:hidden">
+            <div className="space-y-1">
+              <h2 className="text-lg font-bold">What your squad wants</h2>
+              <p className="text-muted-foreground text-sm">
+                The crew's blended budget, energy, and travel limits for this plan. Individual budget and energy stay anonymous — only travel logistics are named.
+              </p>
+            </div>
+            <GroupReconciliation sessionId={session.id} session={session} />
+          </TabsContent>
+
           {/* Chat Tab */}
           <TabsContent value="chat" className="flex-1 flex flex-col overflow-hidden data-[state=inactive]:hidden">
             <ScrollArea className="flex-1 px-4 py-4" ref={scrollRef}>
@@ -1658,7 +1688,9 @@ export function Session() {
                     {isPlannerAi && <div className="text-[10px] text-primary font-bold mb-1 flex items-center gap-1"><Bot size={10} /> Planner</div>}
                     {isOtherUser && <div className="text-[10px] text-blue-400 font-bold mb-1">{displayName}</div>}
                     {isCurrentUser && <div className="text-[10px] text-black/70 font-bold mb-1">You</div>}
-                    {msg.text}
+                    {isPlannerAi
+                      ? derivePlannerReply({ response: msg.text, suggestionsUpdated: !!(msg.metadata as any)?.suggestionsUpdated })
+                      : msg.text}
                   </motion.div>
                   );
                 })}
@@ -1913,6 +1945,9 @@ export function Session() {
                     <span className="text-xs font-medium">Total Score</span>
                     <span className={cn("font-bold", summary.score >= 0 ? "text-primary" : "text-red-400")}>{summary.score > 0 ? '+' : ''}{summary.score}</span>
                   </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Score ranks the options: each <span className="text-foreground font-medium">upvote</span> adds a point and each <span className="text-foreground font-medium">downvote</span> subtracts more when people flag a reason (too far, too pricey, bad timing). The highest score leads.
+                  </p>
                 </div>
                 
                 {isMajorityDownvoted && (

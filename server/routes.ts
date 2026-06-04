@@ -24,21 +24,51 @@ function generateInviteCode(): string {
 }
 
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
-function rateLimit(maxAttempts: number, windowMs: number) {
+
+// Format a retry delay (in seconds) into a human-friendly phrase.
+// Uses minutes for waits >= 60s, keeps seconds for short waits.
+export function formatRetryWait(retryAfterSeconds: number): string {
+  if (retryAfterSeconds >= 60) {
+    const minutes = Math.max(1, Math.round(retryAfterSeconds / 60));
+    const unit = minutes === 1 ? 'minute' : 'minutes';
+    return `Too many attempts. Please try again in about ${minutes} ${unit}.`;
+  }
+  const seconds = Math.max(1, retryAfterSeconds);
+  const unit = seconds === 1 ? 'second' : 'seconds';
+  return `Too many attempts. Please try again in ${seconds} ${unit}.`;
+}
+
+// Rate limiter that only counts FAILED attempts. The middleware increments
+// the counter up front (so concurrent requests are bounded), then watches the
+// response: a successful (2xx) response rolls the increment back so legitimate
+// logins/registrations never burn the quota. Only failures stick.
+export function rateLimit(maxAttempts: number, windowMs: number) {
   return (req: Request, res: Response, next: NextFunction) => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const now = Date.now();
-    const entry = rateLimitStore.get(ip);
+    let entry = rateLimitStore.get(ip);
     if (!entry || now > entry.resetAt) {
-      rateLimitStore.set(ip, { count: 1, resetAt: now + windowMs });
-      return next();
+      entry = { count: 0, resetAt: now + windowMs };
+      rateLimitStore.set(ip, entry);
     }
+
     if (entry.count >= maxAttempts) {
       const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
       res.set('Retry-After', String(retryAfter));
-      return res.status(429).json({ message: `Too many attempts. Try again in ${retryAfter} seconds.` });
+      return res.status(429).json({ message: formatRetryWait(retryAfter) });
     }
+
+    // Tentatively count this attempt, then roll it back if it succeeds.
     entry.count++;
+    res.on('finish', () => {
+      if (res.statusCode < 400) {
+        const current = rateLimitStore.get(ip);
+        if (current && current.count > 0) {
+          current.count--;
+        }
+      }
+    });
+
     return next();
   };
 }
